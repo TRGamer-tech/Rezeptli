@@ -40,6 +40,9 @@ jobs:
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: UI-Tests kompilieren
+        run: ./gradlew assembleDebugAndroidTest --stacktrace
+
       - name: Testergebnis zusammenfassen
         if: always()
         run: |
@@ -106,3 +109,51 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 14
+
+  instrumented:
+    name: UI-Tests auf dem Emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: KVM freigeben
+        run: |
+          # Ohne Hardware-Beschleunigung braucht der Emulator ein Vielfaches der Zeit.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Instrumentierte Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+
+      - name: Testberichte hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-reports
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -60,6 +60,10 @@ Ein Feature gilt erst als fertig, wenn seine Logik getestet ist:
 ./gradlew connectedAndroidTest  # UI-Tests auf Emulator oder Gerät
 ```
 
+Die CI hat dafür zwei Jobs: `Build und Tests` (ktlint, Unit-Tests, APK) läuft bei
+jedem Push, `UI-Tests auf dem Emulator` startet zusätzlich einen Emulator und führt die
+instrumentierten Tests aus.
+
 ## Datenbank-Schema
 
 Room exportiert bei jedem Build das aktuelle Schema nach `app/schemas/`. Diese Dateien
