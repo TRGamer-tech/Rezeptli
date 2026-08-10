@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -44,6 +45,7 @@ import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.presentation.common.components.PrepTimeLabel
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -115,14 +117,21 @@ private fun TopSwipeCard(
     val cardDescription = stringResource(R.string.swipe_card_description, card.title)
 
     // Ja/Nein ueber die Schaltflaechen oder den Screenreader: dieselbe Animation wie beim Wischen.
-    LaunchedEffect(state.requestedSwipe, card.id) {
-        val liked = state.requestedSwipe ?: return@LaunchedEffect
-        state.consumeRequest()
-        offsetX.animateTo(
-            targetValue = if (liked) cardWidth * DISMISS_FACTOR else -cardWidth * DISMISS_FACTOR,
-            animationSpec = tween(DISMISS_DURATION_MS),
-        )
-        onSwiped(liked)
+    //
+    // Die Anfrage wird ueber einen snapshotFlow beobachtet und nicht ueber einen
+    // LaunchedEffect-Key: Das Zuruecksetzen der Anfrage wuerde sonst den Effekt neu
+    // starten und die laufende Animation abbrechen, bevor onSwiped ueberhaupt ausgeloest ist.
+    LaunchedEffect(card.id) {
+        snapshotFlow { state.requestedSwipe }
+            .filterNotNull()
+            .collect { liked ->
+                state.consumeRequest()
+                offsetX.animateTo(
+                    targetValue = if (liked) cardWidth * DISMISS_FACTOR else -cardWidth * DISMISS_FACTOR,
+                    animationSpec = tween(DISMISS_DURATION_MS),
+                )
+                onSwiped(liked)
+            }
     }
 
     val progress = (offsetX.value / (cardWidth * SWIPE_THRESHOLD_FACTOR)).coerceIn(-1f, 1f)
