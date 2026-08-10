@@ -30,10 +30,11 @@ class SwipeCardStackTest {
         RecipeSummary(id = 2L, title = "Rösti"),
     )
 
+    private val cardStackState = SwipeCardStackState()
     private var swipedRecipeId: Long? = null
     private var swipedLiked: Boolean? = null
 
-    private fun setContent(state: SwipeCardStackState? = null) {
+    private fun setContent() {
         composeTestRule.setContent {
             RezeptliTheme {
                 SwipeCardStack(
@@ -42,8 +43,7 @@ class SwipeCardStackTest {
                         swipedRecipeId = recipe.id
                         swipedLiked = liked
                     },
-                    state = state ?: ch.rezeptli.app.presentation.swipe
-                        .rememberSwipeCardStackState(),
+                    state = cardStackState,
                 )
             }
         }
@@ -53,7 +53,7 @@ class SwipeCardStackTest {
     fun wischenNachRechtsBedeutetJa() {
         setContent()
 
-        composeTestRule.onNodeWithText("Älplermagronen").performTouchInput { swipeRight() }
+        composeTestRule.onNodeWithText(TOP_CARD_TITLE).performTouchInput { swipeRight() }
         composeTestRule.waitUntil(TIMEOUT_MS) { swipedRecipeId != null }
 
         assertEquals(1L, swipedRecipeId)
@@ -64,7 +64,7 @@ class SwipeCardStackTest {
     fun wischenNachLinksBedeutetNein() {
         setContent()
 
-        composeTestRule.onNodeWithText("Älplermagronen").performTouchInput { swipeLeft() }
+        composeTestRule.onNodeWithText(TOP_CARD_TITLE).performTouchInput { swipeLeft() }
         composeTestRule.waitUntil(TIMEOUT_MS) { swipedRecipeId != null }
 
         assertEquals(1L, swipedRecipeId)
@@ -75,7 +75,7 @@ class SwipeCardStackTest {
     fun nurDieObersteKarteReagiert() {
         setContent()
 
-        composeTestRule.onNodeWithText("Älplermagronen").performTouchInput { swipeRight() }
+        composeTestRule.onNodeWithText(TOP_CARD_TITLE).performTouchInput { swipeRight() }
         composeTestRule.waitUntil(TIMEOUT_MS) { swipedRecipeId != null }
 
         assertEquals(1L, swipedRecipeId)
@@ -101,6 +101,7 @@ class SwipeCardStackTest {
     }
 
     private companion object {
+        const val TOP_CARD_TITLE = "Älplermagronen"
         const val TIMEOUT_MS = 5_000L
     }
 }
