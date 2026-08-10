@@ -40,6 +40,31 @@ jobs:
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Testergebnis zusammenfassen
+        if: always()
+        run: |
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+
+          total = failures = skipped = 0
+          rows = []
+          for path in glob.glob("app/build/test-results/**/TEST-*.xml", recursive=True):
+              root = ET.parse(path).getroot()
+              tests = int(root.get("tests", 0))
+              failed = int(root.get("failures", 0)) + int(root.get("errors", 0))
+              total += tests
+              failures += failed
+              skipped += int(root.get("skipped", 0))
+              rows.append((root.get("name"), tests, failed))
+
+          print("## Unit-Tests\n")
+          print("| Testklasse | Tests | Fehler |")
+          print("|---|---:|---:|")
+          for name, tests, failed in sorted(rows):
+              print(f"| {name} | {tests} | {failed} |")
+          print(f"\n**{total} Tests, {failures} Fehler, {skipped} uebersprungen**")
+          PY
+
       - name: Testberichte hochladen
         if: always()
         uses: actions/upload-artifact@v4

@@ -192,6 +192,13 @@ private fun TextInputStep(
                 }
             }
         }
+
+        if (rawText.isBlank()) {
+            val example = stringResource(R.string.import_example_text)
+            TextButton(onClick = { onTextChange(example) }) {
+                Text(stringResource(R.string.import_example))
+            }
+        }
     }
 }
 
