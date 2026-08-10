@@ -1,5 +1,6 @@
 package ch.rezeptli.app.data
 
+import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -27,7 +28,7 @@ class RecipeDaoTest {
     fun setUp() {
         database = Room
             .inMemoryDatabaseBuilder(
-                ApplicationProvider.getApplicationContext(),
+                ApplicationProvider.getApplicationContext<Context>(),
                 RezeptliDatabase::class.java,
             ).build()
         dao = database.recipeDao()

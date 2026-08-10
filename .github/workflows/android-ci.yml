@@ -41,7 +41,7 @@ jobs:
         run: ./gradlew assembleDebug --stacktrace
 
       - name: UI-Tests kompilieren
-        run: ./gradlew assembleDebugAndroidTest --stacktrace
+        run: ./gradlew assembleDebugAndroidTest --console=plain
 
       - name: Testergebnis zusammenfassen
         if: always()
@@ -147,7 +147,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew connectedDebugAndroidTest --stacktrace
+          script: ./gradlew connectedDebugAndroidTest --console=plain
 
       - name: Testberichte hochladen
         if: always()
