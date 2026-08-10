@@ -40,9 +40,6 @@ jobs:
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: UI-Tests kompilieren
-        run: ./gradlew assembleDebugAndroidTest --console=plain
-
       - name: Testergebnis zusammenfassen
         if: always()
         run: |
@@ -109,6 +106,9 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 14
+
+      - name: UI-Tests kompilieren
+        run: ./gradlew assembleDebugAndroidTest --console=plain
 
   instrumented:
     name: UI-Tests auf dem Emulator
