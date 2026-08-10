@@ -60,6 +60,22 @@ Ein Feature gilt erst als fertig, wenn seine Logik getestet ist:
 ./gradlew connectedAndroidTest  # UI-Tests auf Emulator oder Gerät
 ```
 
+## Datenbank-Schema
+
+Room exportiert bei jedem Build das aktuelle Schema nach `app/schemas/`. Diese Dateien
+gehören ins Repository: Nur mit ihnen lassen sich später Migrationen gegen die
+tatsächliche Vorgängerversion testen. Wenn dein Beitrag Entities oder DAOs ändert:
+
+1. `./gradlew assembleDebug` laufen lassen – das aktualisiert `app/schemas/`.
+2. Die geänderte Schema-Datei mitcommitten.
+3. Für eine neue Datenbankversion eine `Migration` in `RezeptliDatabase.MIGRATIONS`
+   ergänzen. `fallbackToDestructiveMigration` ist tabu – niemand soll seine Rezepte
+   durch ein Update verlieren.
+
+Die CI meldet einen Fehler, wenn das erzeugte Schema von einer eingecheckten Datei
+abweicht. Ist noch keine eingecheckt, hängt sie das erzeugte Schema als Artefakt
+`room-schema` an den Workflow-Lauf – von dort lässt es sich herunterladen und einchecken.
+
 ## Architektur
 
 Bitte die Schichtung beibehalten:

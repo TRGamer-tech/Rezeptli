@@ -76,13 +76,28 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Room-Schema ausgeben
-        if: always()
+      - name: Room-Schema auf Abweichungen prüfen
         run: |
-          for f in app/schemas/**/*.json; do
-            echo "===== $f ====="
-            cat "$f"
-          done
+          # Room exportiert das Schema bei jedem Build nach app/schemas/. Sobald die
+          # Datei eingecheckt ist, muss jede Schema-Aenderung mitcommittet werden -
+          # sonst laesst sich spaeter keine Migration mehr gegen sie testen.
+          # Solange sie noch nicht eingecheckt ist (--untracked-files=no), stoert das nicht.
+          drift="$(git status --porcelain --untracked-files=no app/schemas)"
+          if [ -n "$drift" ]; then
+            echo "::error::Das exportierte Room-Schema weicht vom eingecheckten Stand ab."
+            echo "$drift"
+            git --no-pager diff -- app/schemas
+            exit 1
+          fi
+
+      - name: Room-Schema hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schema
+          path: app/schemas/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Debug-APK hochladen
         uses: actions/upload-artifact@v4
