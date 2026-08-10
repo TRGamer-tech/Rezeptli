@@ -76,6 +76,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Room-Schema ausgeben
+        if: always()
+        run: |
+          for f in app/schemas/**/*.json; do
+            echo "===== $f ====="
+            cat "$f"
+          done
+
       - name: Debug-APK hochladen
         uses: actions/upload-artifact@v4
         with:
