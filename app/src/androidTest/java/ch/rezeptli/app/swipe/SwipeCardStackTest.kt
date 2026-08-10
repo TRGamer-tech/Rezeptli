@@ -91,10 +91,9 @@ class SwipeCardStackTest {
 
     @Test
     fun dieSchaltflaechenSchickenDieObersteKarteWeg() {
-        val state = SwipeCardStackState()
-        setContent(state)
+        setContent()
 
-        composeTestRule.runOnUiThread { state.swipe(true) }
+        composeTestRule.runOnUiThread { cardStackState.swipe(true) }
         composeTestRule.waitUntil(TIMEOUT_MS) { swipedRecipeId != null }
 
         assertEquals(1L, swipedRecipeId)

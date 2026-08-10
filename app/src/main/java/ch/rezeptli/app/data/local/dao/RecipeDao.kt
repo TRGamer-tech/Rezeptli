@@ -15,7 +15,7 @@ import ch.rezeptli.app.data.local.entity.RecipeWithDetails
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface RecipeDao {
+abstract class RecipeDao {
     /**
      * Seitenweise Liste fuer die Rezeptuebersicht. Die Suche beruecksichtigt Titel,
      * Zubereitung und Zutatennamen; Tags werden mit UND-Semantik gefiltert.
@@ -43,7 +43,7 @@ interface RecipeDao {
         ORDER BY r.title COLLATE NOCASE ASC
         """,
     )
-    fun pagedSummaries(
+    abstract fun pagedSummaries(
         query: String,
         tags: List<String>,
         tagCount: Int,
@@ -72,7 +72,7 @@ interface RecipeDao {
         ORDER BY RANDOM()
         """,
     )
-    suspend fun filteredRecipeIds(
+    abstract suspend fun filteredRecipeIds(
         query: String,
         tags: List<String>,
         tagCount: Int,
@@ -92,52 +92,52 @@ interface RecipeDao {
         WHERE r.id IN (:ids)
         """,
     )
-    suspend fun summariesByIds(ids: List<Long>): List<RecipeSummaryProjection>
+    abstract suspend fun summariesByIds(ids: List<Long>): List<RecipeSummaryProjection>
 
     @Query("SELECT COUNT(*) FROM recipes")
-    fun observeRecipeCount(): Flow<Int>
+    abstract fun observeRecipeCount(): Flow<Int>
 
     @Query("SELECT DISTINCT tag FROM recipe_tags ORDER BY tag COLLATE NOCASE ASC")
-    fun observeAllTags(): Flow<List<String>>
+    abstract fun observeAllTags(): Flow<List<String>>
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE id = :id")
-    fun observeRecipeWithDetails(id: Long): Flow<RecipeWithDetails?>
+    abstract fun observeRecipeWithDetails(id: Long): Flow<RecipeWithDetails?>
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE id = :id")
-    suspend fun recipeWithDetails(id: Long): RecipeWithDetails?
+    abstract suspend fun recipeWithDetails(id: Long): RecipeWithDetails?
 
     @Insert
-    suspend fun insertRecipe(recipe: RecipeEntity): Long
+    abstract suspend fun insertRecipe(recipe: RecipeEntity): Long
 
     @Update
-    suspend fun updateRecipe(recipe: RecipeEntity)
+    abstract suspend fun updateRecipe(recipe: RecipeEntity)
 
     @Query("DELETE FROM recipes WHERE id = :id")
-    suspend fun deleteRecipe(id: Long)
+    abstract suspend fun deleteRecipe(id: Long)
 
     @Query("UPDATE recipes SET lastCookedAt = :cookedAt, updatedAt = :cookedAt WHERE id = :id")
-    suspend fun updateLastCookedAt(id: Long, cookedAt: Long)
+    abstract suspend fun updateLastCookedAt(id: Long, cookedAt: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertIngredients(ingredients: List<IngredientEntity>)
+    abstract suspend fun insertIngredients(ingredients: List<IngredientEntity>)
 
     @Query("DELETE FROM ingredients WHERE recipeId = :recipeId")
-    suspend fun deleteIngredientsOf(recipeId: Long)
+    abstract suspend fun deleteIngredientsOf(recipeId: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTags(tags: List<RecipeTagEntity>)
+    abstract suspend fun insertTags(tags: List<RecipeTagEntity>)
 
     @Query("DELETE FROM recipe_tags WHERE recipeId = :recipeId")
-    suspend fun deleteTagsOf(recipeId: Long)
+    abstract suspend fun deleteTagsOf(recipeId: Long)
 
     /**
      * Legt ein Rezept an oder aktualisiert es samt Zutaten und Tags - in einer
      * Transaktion, damit nie ein halb gespeicherter Zustand entstehen kann.
      */
     @Transaction
-    suspend fun upsertRecipe(
+    open suspend fun upsertRecipe(
         recipe: RecipeEntity,
         ingredients: List<IngredientEntity>,
         tags: List<String>,
