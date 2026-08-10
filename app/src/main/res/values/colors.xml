@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Nur fuer App-Icon und Splash-Screen. Die Farben der App selbst leben im
+         Compose-Theme (presentation/common/theme/Color.kt). -->
+    <color name="ic_launcher_background">#2E6B4F</color>
+    <color name="splash_background">#FFF8F0</color>
+    <color name="splash_background_dark">#12140F</color>
+</resources>

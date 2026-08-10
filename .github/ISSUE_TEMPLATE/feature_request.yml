@@ -1,0 +1,38 @@
+name: Funktion vorschlagen
+description: Eine Idee für Rezeptli
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem löst die Funktion?
+      description: Beschreibe die Situation, in der dir heute etwas fehlt.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Wie stellst du dir die Lösung vor?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Passt das zum Projekt?
+      description: |
+        Rezeptli bleibt kostenlos, quelloffen, offline und werbefrei. Funktionen, die
+        Tracking, Konten oder kostenpflichtige Dienste voraussetzen, kommen nicht in Frage.
+      options:
+        - "Ja, funktioniert komplett offline und ohne Konto"
+        - "Unsicher – bitte gemeinsam anschauen"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen, die du erwogen hast
+    validations:
+      required: false

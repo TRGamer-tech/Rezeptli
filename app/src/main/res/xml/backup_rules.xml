@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Rezeptli speichert alles lokal. Gesichert wird nur die Rezeptdatenbank, damit die
+  Sammlung ein Geraetewechsel ueberlebt.
+-->
+<full-backup-content>
+    <include domain="database" path="rezeptli.db" />
+    <include domain="database" path="rezeptli.db-wal" />
+    <include domain="database" path="rezeptli.db-shm" />
+</full-backup-content>
