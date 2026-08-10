@@ -21,7 +21,6 @@ annotation class IoDispatcher
 @Module
 @InstallIn(SingletonComponent::class)
 object DispatcherModule {
-
     @Provides
     @Singleton
     @IoDispatcher

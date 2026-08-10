@@ -33,7 +33,6 @@ data class ParsedRecipe(
 class RecipeTextParser @Inject constructor(
     private val ingredientParser: IngredientTextParser,
 ) {
-
     fun parse(text: String): ParsedRecipe {
         val lines = text.replace("\r\n", "\n").replace('\r', '\n').split('\n')
 
@@ -153,7 +152,8 @@ class RecipeTextParser @Inject constructor(
             .filter { tag -> normalized.contains(IngredientNameNormalizer.normalize(tag)) }
             .toMutableList()
 
-        if (prepTimeMinutes != null && prepTimeMinutes <= FAST_RECIPE_MINUTES &&
+        if (prepTimeMinutes != null &&
+            prepTimeMinutes <= FAST_RECIPE_MINUTES &&
             SuggestedTags.SCHNELL !in tags
         ) {
             tags.add(SuggestedTags.SCHNELL)

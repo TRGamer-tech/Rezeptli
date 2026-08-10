@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 
 /** Zugriff auf Swipe-Sessions und die darin getroffenen Entscheidungen. */
 interface SwipeSessionRepository {
-
     suspend fun startSession(mode: SwipeMode = SwipeMode.SOLO, startedAt: Long): Long
 
     suspend fun finishSession(sessionId: Long, finishedAt: Long)

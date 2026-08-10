@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import ch.rezeptli.app.data.local.PhotoStorage
 import ch.rezeptli.app.data.local.dao.RecipeDao
 import ch.rezeptli.app.data.mapper.toDomain
 import ch.rezeptli.app.data.mapper.toEntity
@@ -22,9 +23,9 @@ import javax.inject.Singleton
 @Singleton
 class RecipeRepositoryImpl @Inject constructor(
     private val recipeDao: RecipeDao,
+    private val photoStorage: PhotoStorage,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : RecipeRepository {
-
     override fun pagedSummaries(filter: RecipeFilter): Flow<PagingData<RecipeSummary>> =
         Pager(
             config = PagingConfig(
@@ -76,12 +77,18 @@ class RecipeRepositoryImpl @Inject constructor(
             ingredients = recipe.ingredients.mapIndexed { index, ingredient ->
                 ingredient.toEntity(recipeId = recipe.id, position = index)
             },
-            tags = recipe.tags.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+            tags = recipe.tags
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct(),
         )
     }
 
     override suspend fun deleteRecipe(id: Long) = withContext(ioDispatcher) {
+        // Das Foto gehoert zum Rezept - beim Loeschen darf keine verwaiste Datei zurueckbleiben.
+        val photoUri = recipeDao.recipeWithDetails(id)?.recipe?.photoUri
         recipeDao.deleteRecipe(id)
+        photoStorage.deletePhoto(photoUri)
     }
 
     override suspend fun markCooked(id: Long, cookedAt: Long) = withContext(ioDispatcher) {

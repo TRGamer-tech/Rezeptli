@@ -21,7 +21,6 @@ class SwipeSessionRepositoryImpl @Inject constructor(
     private val swipeSessionDao: SwipeSessionDao,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : SwipeSessionRepository {
-
     override suspend fun startSession(mode: SwipeMode, startedAt: Long): Long = withContext(ioDispatcher) {
         swipeSessionDao.insertSession(
             SwipeSessionEntity(startedAt = startedAt, finishedAt = null, mode = mode),

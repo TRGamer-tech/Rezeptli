@@ -37,6 +37,16 @@ class ObserveTagsUseCase @Inject constructor(
     operator fun invoke(): Flow<List<String>> = repository.observeAllTags()
 }
 
+/**
+ * Wie viele Rezepte zu einem Filter passen. Wird vor dem Start einer Swipe-Session
+ * gebraucht, damit die Nutzerin sieht, wie gross der Stapel wird.
+ */
+class CountMatchingRecipesUseCase @Inject constructor(
+    private val repository: RecipeRepository,
+) {
+    suspend operator fun invoke(filter: RecipeFilter): Int = repository.getFilteredRecipeIds(filter).size
+}
+
 class DeleteRecipeUseCase @Inject constructor(
     private val repository: RecipeRepository,
 ) {

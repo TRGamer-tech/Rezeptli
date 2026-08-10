@@ -20,7 +20,6 @@ import javax.inject.Inject
  * - "1 Zwiebel, fein gehackt" (Zusatz wird als Notiz abgetrennt)
  */
 class IngredientTextParser @Inject constructor() {
-
     /**
      * Parst einen mehrzeiligen Zutatenblock. Leerzeilen und Abschnittsueberschriften
      * ("Für den Teig:") werden uebersprungen.
@@ -276,12 +275,41 @@ class IngredientTextParser @Inject constructor() {
         val SENTENCE_MARKER = Regex("[.!?]\\s+\\p{Lu}")
 
         val PREPARATION_HINTS = listOf(
-            "gehackt", "geschnitten", "gerieben", "gewuerfelt", "gemahlen", "geschaelt",
-            "gepresst", "halbiert", "geviertelt", "entkernt", "gehobelt", "in scheiben",
-            "in streifen", "in wuerfel", "in stuecke", "in ringe", "fein", "grob", "frisch",
-            "getrocknet", "weich", "zimmerwarm", "kalt", "warm", "optional", "gesalzen",
-            "ungesalzen", "geputzt", "gewaschen", "abgetropft", "nach belieben",
-            "nach geschmack", "zum bestreuen", "zum garnieren", "klein",
+            "gehackt",
+            "geschnitten",
+            "gerieben",
+            "gewuerfelt",
+            "gemahlen",
+            "geschaelt",
+            "gepresst",
+            "halbiert",
+            "geviertelt",
+            "entkernt",
+            "gehobelt",
+            "in scheiben",
+            "in streifen",
+            "in wuerfel",
+            "in stuecke",
+            "in ringe",
+            "fein",
+            "grob",
+            "frisch",
+            "getrocknet",
+            "weich",
+            "zimmerwarm",
+            "kalt",
+            "warm",
+            "optional",
+            "gesalzen",
+            "ungesalzen",
+            "geputzt",
+            "gewaschen",
+            "abgetropft",
+            "nach belieben",
+            "nach geschmack",
+            "zum bestreuen",
+            "zum garnieren",
+            "klein",
         )
     }
 }

@@ -33,7 +33,6 @@ import ch.rezeptli.app.data.local.entity.SwipeSessionEntity
 )
 @TypeConverters(Converters::class)
 abstract class RezeptliDatabase : RoomDatabase() {
-
     abstract fun recipeDao(): RecipeDao
 
     abstract fun swipeSessionDao(): SwipeSessionDao

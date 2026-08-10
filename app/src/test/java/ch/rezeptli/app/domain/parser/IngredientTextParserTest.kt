@@ -14,13 +14,11 @@ import org.junit.jupiter.params.provider.ValueSource
 private const val DELTA = 0.0001
 
 class IngredientTextParserTest {
-
     private val parser = IngredientTextParser()
 
     @Nested
     @DisplayName("Menge, Einheit und Name")
     inner class BasicPatterns {
-
         @Test
         fun `erkennt Menge Einheit Zutat`() {
             val result = parser.parseLine("200 g Mehl")
@@ -104,7 +102,6 @@ class IngredientTextParserTest {
     @Nested
     @DisplayName("Zahlenformate")
     inner class NumberFormats {
-
         @ParameterizedTest(name = "\"{0}\" -> {1}")
         @CsvSource(
             "'1,5 dl Milch', 1.5",
@@ -158,7 +155,6 @@ class IngredientTextParserTest {
     @Nested
     @DisplayName("Aufzaehlungszeichen und Notizen")
     inner class BulletsAndNotes {
-
         @ParameterizedTest
         @ValueSource(strings = ["- 200 g Mehl", "• 200 g Mehl", "* 200 g Mehl", "  –  200 g Mehl"])
         fun `entfernt Aufzaehlungszeichen`(line: String) {
@@ -212,7 +208,6 @@ class IngredientTextParserTest {
     @Nested
     @DisplayName("Nicht verwertbare Zeilen")
     inner class RejectedLines {
-
         @ParameterizedTest
         @ValueSource(strings = ["", "   ", "Zutaten:", "Für den Teig:", "200 g", "2 dl"])
         fun `liefert null fuer Zeilen ohne Zutat`(line: String) {
@@ -241,7 +236,6 @@ class IngredientTextParserTest {
     @Nested
     @DisplayName("Synonyme")
     inner class Synonyms {
-
         @Test
         fun `haelt die hochdeutsche Normalform eines Schweizer Begriffs fest`() {
             val result = parser.parseLine("300 g Rüebli")
@@ -271,7 +265,6 @@ class IngredientTextParserTest {
     @Nested
     @DisplayName("Mehrzeiliger Block")
     inner class MultiLine {
-
         @Test
         fun `parst einen kompletten Zutatenblock`() {
             val block =

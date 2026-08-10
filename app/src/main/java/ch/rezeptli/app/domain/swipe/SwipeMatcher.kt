@@ -13,7 +13,6 @@ import javax.inject.Inject
  * Auswertung bleibt unveraendert.
  */
 class SwipeMatcher @Inject constructor() {
-
     /** Alle Personen, von denen in [decisions] Entscheidungen vorliegen. */
     fun participants(decisions: List<SwipeDecision>): Set<String> =
         decisions.mapTo(linkedSetOf()) { it.participantId }

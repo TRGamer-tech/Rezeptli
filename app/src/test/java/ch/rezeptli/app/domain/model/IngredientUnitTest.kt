@@ -8,7 +8,6 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class IngredientUnitTest {
-
     @ParameterizedTest(name = "\"{0}\" -> {1}")
     @CsvSource(
         "g, GRAMM",

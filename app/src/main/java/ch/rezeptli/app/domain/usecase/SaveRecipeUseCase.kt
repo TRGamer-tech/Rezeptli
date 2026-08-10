@@ -27,7 +27,6 @@ sealed interface SaveRecipeResult {
 class SaveRecipeUseCase @Inject constructor(
     private val repository: RecipeRepository,
 ) {
-
     suspend operator fun invoke(recipe: Recipe): SaveRecipeResult {
         val errors = buildSet {
             if (recipe.title.isBlank()) add(RecipeValidationError.TITLE_BLANK)

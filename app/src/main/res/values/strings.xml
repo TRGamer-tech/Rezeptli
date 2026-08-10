@@ -141,4 +141,17 @@
     <string name="loading">Einen Moment…</string>
     <string name="filter_time_any">Egal</string>
     <string name="filter_time_minutes">%1$d Min.</string>
+
+    <!-- Einheiten, die ausgeschrieben werden. Kurzformen wie g, dl oder EL sind
+         sprachneutral und stehen direkt im Code. -->
+    <string name="unit_none">–</string>
+    <string name="unit_prise">Prise</string>
+    <string name="unit_stueck">Stk.</string>
+    <string name="unit_bund">Bund</string>
+    <string name="unit_packung">Pck.</string>
+    <string name="unit_dose">Dose</string>
+    <string name="unit_zehe">Zehe</string>
+    <string name="unit_scheibe">Scheibe</string>
+    <string name="unit_tasse">Tasse</string>
+    <string name="unit_messerspitze">Msp.</string>
 </resources>

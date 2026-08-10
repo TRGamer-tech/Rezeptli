@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SwipeSessionDao {
-
     @Insert
     suspend fun insertSession(session: SwipeSessionEntity): Long
 

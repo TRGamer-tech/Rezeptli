@@ -9,7 +9,6 @@ import ch.rezeptli.app.domain.model.SwipeMode
  * lesbar und das Umsortieren oder Ergaenzen von Enum-Werten bricht keine Bestandsdaten.
  */
 class Converters {
-
     @TypeConverter
     fun toIngredientUnit(value: String?): IngredientUnit =
         value?.let { name -> IngredientUnit.entries.firstOrNull { it.name == name } } ?: IngredientUnit.NONE

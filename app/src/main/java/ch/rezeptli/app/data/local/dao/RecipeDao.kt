@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RecipeDao {
-
     /**
      * Seitenweise Liste fuer die Rezeptuebersicht. Die Suche beruecksichtigt Titel,
      * Zubereitung und Zutatennamen; Tags werden mit UND-Semantik gefiltert.

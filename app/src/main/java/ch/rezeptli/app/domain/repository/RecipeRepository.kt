@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.Flow
  * enthaelt keinen Android-Code (siehe docs/adr/0002-architektur.md).
  */
 interface RecipeRepository {
-
     fun pagedSummaries(filter: RecipeFilter): Flow<PagingData<RecipeSummary>>
 
     fun observeRecipe(id: Long): Flow<Recipe?>

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class RecipeTextParserTest {
-
     private val parser = RecipeTextParser(IngredientTextParser())
 
     @Test

@@ -15,13 +15,13 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context,
     ): RezeptliDatabase =
-        Room.databaseBuilder(context, RezeptliDatabase::class.java, RezeptliDatabase.DATABASE_NAME)
+        Room
+            .databaseBuilder(context, RezeptliDatabase::class.java, RezeptliDatabase.DATABASE_NAME)
             .addMigrations(*RezeptliDatabase.MIGRATIONS)
             .build()
 

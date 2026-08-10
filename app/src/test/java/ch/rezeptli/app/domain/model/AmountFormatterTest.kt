@@ -6,7 +6,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 
 class AmountFormatterTest {
-
     @ParameterizedTest(name = "{0} -> \"{1}\"")
     @CsvSource(
         "2.0, '2'",

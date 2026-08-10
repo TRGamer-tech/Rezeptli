@@ -2,7 +2,7 @@ package ch.rezeptli.app.presentation.common.theme
 
 import androidx.compose.ui.graphics.Color
 
-/**
+/*
  * Die Farbwelt von Rezeptli: Kraeutergruen als Leitfarbe, warmes Orange als Akzent und
  * ein cremiger, leicht warmer Hintergrund. Das soll nach Kueche und frischem Gemuese
  * aussehen und nicht nach Standard-Compose-Demo.
