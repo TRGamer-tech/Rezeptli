@@ -148,7 +148,7 @@ abstract class RecipeDao {
         recipe: RecipeEntity,
         ingredients: List<IngredientEntity>,
         tags: List<String>,
-        steps: List<RecipeStepEntity>,
+        steps: List<RecipeStepEntity> = emptyList(),
     ): Long {
         val recipeId = if (recipe.id == 0L) {
             insertRecipe(recipe)

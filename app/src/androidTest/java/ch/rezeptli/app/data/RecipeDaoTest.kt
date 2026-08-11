@@ -8,6 +8,7 @@ import ch.rezeptli.app.data.local.RezeptliDatabase
 import ch.rezeptli.app.data.local.dao.RecipeDao
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.domain.model.IngredientUnit
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -44,6 +45,7 @@ class RecipeDaoTest {
         prepTimeMinutes: Int? = null,
         tags: List<String> = emptyList(),
         ingredients: List<String> = emptyList(),
+        steps: List<String> = emptyList(),
     ): Long = dao.upsertRecipe(
         recipe = RecipeEntity(
             title = title,
@@ -66,6 +68,9 @@ class RecipeDaoTest {
             )
         },
         tags = tags,
+        steps = steps.mapIndexed { index, text ->
+            RecipeStepEntity(recipeId = 0L, position = index, text = text, timerMinutes = null)
+        },
     )
 
     @Test
@@ -101,10 +106,36 @@ class RecipeDaoTest {
                 ),
             ),
             tags = emptyList(),
+            steps = listOf(
+                RecipeStepEntity(recipeId = id, position = 0, text = "Lauch schneiden.", timerMinutes = null),
+            ),
         )
 
         val stored = dao.recipeWithDetails(id)
         assertEquals(listOf("Lauch"), stored?.ingredients?.map { it.name })
+        assertEquals(listOf("Lauch schneiden."), stored?.steps?.map { it.text })
+    }
+
+    @Test
+    fun ersetztSchritteBeimAktualisieren() = runTest {
+        val id = insertRecipe(
+            title = "Rösti",
+            steps = listOf("Kartoffeln raffeln.", "Braten."),
+        )
+        assertEquals(2, dao.recipeWithDetails(id)?.steps?.size)
+
+        dao.upsertRecipe(
+            recipe = dao.recipeWithDetails(id)!!.recipe,
+            ingredients = emptyList(),
+            tags = emptyList(),
+            steps = listOf(
+                RecipeStepEntity(recipeId = id, position = 0, text = "Alles zusammen.", timerMinutes = 15),
+            ),
+        )
+
+        val stored = dao.recipeWithDetails(id)
+        assertEquals(listOf("Alles zusammen."), stored?.steps?.map { it.text })
+        assertEquals(15, stored?.steps?.first()?.timerMinutes)
     }
 
     @Test
