@@ -21,16 +21,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -61,6 +63,7 @@ import kotlinx.coroutines.launch
 fun RecipeDetailRoute(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
+    onStartCooking: (Long) -> Unit,
     viewModel: RecipeDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,6 +85,7 @@ fun RecipeDetailRoute(
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onEdit = { uiState.recipe?.let { onEdit(it.id) } },
+        onStartCooking = { uiState.recipe?.let { onStartCooking(it.id) } },
         onDeleteRequest = viewModel::onDeleteRequest,
         onDeleteDismiss = viewModel::onDeleteDismiss,
         onDeleteConfirm = viewModel::onDeleteConfirm,
@@ -96,6 +100,7 @@ fun RecipeDetailScreen(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onStartCooking: () -> Unit,
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
@@ -144,11 +149,29 @@ fun RecipeDetailScreen(
         },
         floatingActionButton = {
             if (recipe != null) {
-                FloatingActionButton(onClick = onEdit) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = stringResource(R.string.action_edit),
-                    )
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SmallFloatingActionButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = stringResource(R.string.action_edit),
+                        )
+                    }
+                    // Der Kochmodus ist das, was man am Herd will - deshalb der grosse Knopf.
+                    if (recipe.steps.isNotEmpty()) {
+                        ExtendedFloatingActionButton(
+                            onClick = onStartCooking,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Restaurant,
+                                    contentDescription = null,
+                                )
+                            },
+                            text = { Text(stringResource(R.string.kochmodus_starten)) },
+                        )
+                    }
                 }
             }
         },

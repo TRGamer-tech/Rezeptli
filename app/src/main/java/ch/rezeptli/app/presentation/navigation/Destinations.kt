@@ -32,8 +32,11 @@ object Destinations {
     const val SHOPPING_LIST = "shopping"
     const val ONBOARDING = "onboarding"
     const val SETTINGS = "einstellungen"
+    const val COOKING = "kochen/{$ARG_RECIPE_ID}"
 
     fun recipeDetail(recipeId: Long): String = "recipes/$recipeId"
+
+    fun cooking(recipeId: Long): String = "kochen/$recipeId"
 
     fun recipeEdit(recipeId: Long? = null): String = "recipes/edit?$ARG_RECIPE_ID=${recipeId ?: 0L}"
 

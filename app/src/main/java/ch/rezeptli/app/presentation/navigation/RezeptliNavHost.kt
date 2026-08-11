@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.rezeptli.app.presentation.cooking.CookingRoute
 import ch.rezeptli.app.presentation.onboarding.OnboardingRoute
 import ch.rezeptli.app.presentation.recipedetail.RecipeDetailRoute
 import ch.rezeptli.app.presentation.recipeedit.RecipeEditRoute
@@ -74,7 +75,15 @@ fun RezeptliNavHost(
             RecipeDetailRoute(
                 onBack = { navController.popBackStack() },
                 onEdit = { recipeId -> navController.navigate(Destinations.recipeEdit(recipeId)) },
+                onStartCooking = { recipeId -> navController.navigate(Destinations.cooking(recipeId)) },
             )
+        }
+
+        composable(
+            route = Destinations.COOKING,
+            arguments = listOf(navArgument(Destinations.ARG_RECIPE_ID) { type = NavType.LongType }),
+        ) {
+            CookingRoute(onClose = { navController.popBackStack() })
         }
 
         composable(
