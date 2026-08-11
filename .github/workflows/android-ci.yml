@@ -1,0 +1,159 @@
+name: Android CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build und Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Code-Style prüfen (ktlint)
+        run: ./gradlew ktlintCheck --stacktrace
+
+      - name: Unit-Tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Debug-APK bauen
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Testergebnis zusammenfassen
+        if: always()
+        run: |
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+
+          total = failures = skipped = 0
+          rows = []
+          for path in glob.glob("app/build/test-results/**/TEST-*.xml", recursive=True):
+              root = ET.parse(path).getroot()
+              tests = int(root.get("tests", 0))
+              failed = int(root.get("failures", 0)) + int(root.get("errors", 0))
+              total += tests
+              failures += failed
+              skipped += int(root.get("skipped", 0))
+              rows.append((root.get("name"), tests, failed))
+
+          print("## Unit-Tests\n")
+          print("| Testklasse | Tests | Fehler |")
+          print("|---|---:|---:|")
+          for name, tests, failed in sorted(rows):
+              print(f"| {name} | {tests} | {failed} |")
+          print(f"\n**{total} Tests, {failures} Fehler, {skipped} uebersprungen**")
+          PY
+
+      - name: Testberichte hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Room-Schema auf Abweichungen prüfen
+        run: |
+          # Room exportiert das Schema bei jedem Build nach app/schemas/. Sobald die
+          # Datei eingecheckt ist, muss jede Schema-Aenderung mitcommittet werden -
+          # sonst laesst sich spaeter keine Migration mehr gegen sie testen.
+          # Solange sie noch nicht eingecheckt ist (--untracked-files=no), stoert das nicht.
+          drift="$(git status --porcelain --untracked-files=no app/schemas)"
+          if [ -n "$drift" ]; then
+            echo "::error::Das exportierte Room-Schema weicht vom eingecheckten Stand ab."
+            echo "$drift"
+            git --no-pager diff -- app/schemas
+            exit 1
+          fi
+
+      - name: Room-Schema hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-schema
+          path: app/schemas/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Debug-APK hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: rezeptli-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: UI-Tests kompilieren
+        run: ./gradlew assembleDebugAndroidTest --console=plain
+
+  instrumented:
+    name: UI-Tests auf dem Emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: KVM freigeben
+        run: |
+          # Ohne Hardware-Beschleunigung braucht der Emulator ein Vielfaches der Zeit.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Instrumentierte Tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: ./gradlew connectedDebugAndroidTest --console=plain
+
+      - name: Testberichte hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-reports
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,56 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du dir die Zeit nimmst. Je genauer die Beschreibung, desto schneller
+        ist der Fehler behoben.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Was ist passiert?
+      description: Beschreibe den Fehler und was du stattdessen erwartet hättest.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Nachstellen
+      placeholder: |
+        1. Rezept "…" öffnen
+        2. Auf "Swipen" tippen
+        3. Nach rechts wischen
+        4. Fehler tritt auf
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App-Version
+      placeholder: "1.0.0"
+    validations:
+      required: false
+
+  - type: input
+    id: device
+    attributes:
+      label: Gerät und Android-Version
+      placeholder: "Pixel 7, Android 14"
+    validations:
+      required: false
+
+  - type: textarea
+    id: recipe-text
+    attributes:
+      label: Betroffener Rezepttext (bei Import-Problemen)
+      description: |
+        Falls der Text-Import betroffen ist: der genaue Text, der nicht korrekt erkannt
+        wurde. Bitte nur Text einfügen, den du öffentlich teilen möchtest.
+      render: text
+    validations:
+      required: false

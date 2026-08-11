@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Standardsprache der App ist Hochdeutsch (de). Weitere Sprachen lassen sich ergaenzen,
+  indem diese Datei nach values-fr, values-it oder values-en uebersetzt wird; fehlende
+  Eintraege fallen automatisch auf diese Datei zurueck.
+-->
+<resources>
+    <string name="app_name">Rezeptli</string>
+
+    <!-- Allgemein -->
+    <string name="action_save">Speichern</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_delete">Löschen</string>
+    <string name="action_edit">Bearbeiten</string>
+    <string name="action_back">Zurück</string>
+    <string name="action_undo">Rückgängig</string>
+
+    <!-- Rezeptliste -->
+    <string name="recipes_title">Deine Rezepte</string>
+    <string name="recipes_search_hint">Rezept oder Zutat suchen</string>
+    <string name="recipes_search_clear">Suche löschen</string>
+    <string name="recipes_add">Rezept anlegen</string>
+    <string name="recipes_import">Text importieren</string>
+    <string name="recipes_start_swipe">Swipen</string>
+    <string name="recipes_filter">Filtern</string>
+    <string name="recipes_filter_reset">Filter zurücksetzen</string>
+    <string name="recipes_filter_tags">Tags</string>
+    <string name="recipes_filter_time">Höchstens</string>
+    <string name="recipes_empty_title">Noch keine Rezepte</string>
+    <string name="recipes_empty_message">Leg dein erstes Rezept an oder füge einen Text ein, den du irgendwo kopiert hast. Sobald ein paar Rezepte da sind, kannst du dich durch sie durchswipen.</string>
+    <string name="recipes_empty_action_create">Erstes Rezept anlegen</string>
+    <string name="recipes_empty_action_import">Rezept einfügen</string>
+    <string name="recipes_no_results_title">Nichts gefunden</string>
+    <string name="recipes_no_results_message">Zu dieser Suche passt kein Rezept. Andere Begriffe oder weniger Filter versuchen?</string>
+    <string name="recipes_swipe_needs_recipes">Für den Swipe-Modus brauchst du mindestens ein Rezept.</string>
+
+    <!-- Rezept-Detail -->
+    <string name="recipe_ingredients">Zutaten</string>
+    <string name="recipe_instructions">Zubereitung</string>
+    <string name="recipe_no_ingredients">Für dieses Rezept sind keine Zutaten erfasst.</string>
+    <string name="recipe_no_instructions">Für dieses Rezept ist keine Zubereitung erfasst.</string>
+    <string name="recipe_prep_time">%1$d Min.</string>
+    <string name="recipe_prep_time_long">Zubereitungszeit: %1$d Minuten</string>
+    <string name="recipe_mark_cooked">Heute gekocht</string>
+    <string name="recipe_marked_cooked">Notiert – gekocht am heutigen Tag.</string>
+    <string name="recipe_delete_title">Rezept löschen?</string>
+    <string name="recipe_delete_message">"%1$s" wird endgültig gelöscht. Das lässt sich nicht rückgängig machen.</string>
+    <string name="recipe_not_found">Dieses Rezept gibt es nicht mehr.</string>
+    <string name="recipe_photo_description">Foto von %1$s</string>
+    <string name="recipe_photo_placeholder">Kein Foto vorhanden</string>
+
+    <!-- Rezept bearbeiten -->
+    <string name="edit_title_new">Neues Rezept</string>
+    <string name="edit_title_edit">Rezept bearbeiten</string>
+    <string name="edit_field_title">Titel</string>
+    <string name="edit_field_title_hint">z. B. Älplermagronen</string>
+    <string name="edit_field_instructions">Zubereitung</string>
+    <string name="edit_field_instructions_hint">Schritt für Schritt, in deinen Worten</string>
+    <string name="edit_field_prep_time">Zubereitungszeit in Minuten</string>
+    <string name="edit_field_tags_hint">Neuer Tag</string>
+    <string name="edit_add_tag">Tag hinzufügen</string>
+    <string name="edit_remove_tag">Tag "%1$s" entfernen</string>
+    <string name="edit_ingredients">Zutaten</string>
+    <string name="edit_add_ingredient">Zutat hinzufügen</string>
+    <string name="edit_remove_ingredient">Zutat entfernen</string>
+    <string name="edit_ingredient_amount">Menge</string>
+    <string name="edit_ingredient_unit">Einheit</string>
+    <string name="edit_ingredient_name">Zutat</string>
+    <string name="edit_ingredient_note">Notiz</string>
+    <string name="edit_photo_add">Foto auswählen</string>
+    <string name="edit_photo_change">Foto ändern</string>
+    <string name="edit_photo_remove">Foto entfernen</string>
+    <string name="edit_error_title_blank">Ohne Titel geht es leider nicht.</string>
+    <string name="edit_error_prep_time">Die Zubereitungszeit muss zwischen 1 und 1440 Minuten liegen.</string>
+    <string name="edit_discard_title">Änderungen verwerfen?</string>
+    <string name="edit_discard_message">Deine Änderungen sind noch nicht gespeichert.</string>
+    <string name="edit_discard_confirm">Verwerfen</string>
+    <string name="edit_discard_keep">Weiter bearbeiten</string>
+
+    <!-- Import -->
+    <string name="import_title">Rezept einfügen</string>
+    <string name="import_intro">Füge hier den kopierten Rezepttext ein – zum Beispiel aus einem Google Doc oder einer Notiz. Rezeptli macht daraus einen Vorschlag, den du vor dem Speichern anpassen kannst.</string>
+    <string name="import_input_hint">Rezepttext einfügen</string>
+    <string name="import_analyse">Text auswerten</string>
+    <string name="import_clear">Text löschen</string>
+    <string name="import_result_title">Das haben wir erkannt</string>
+    <string name="import_result_hint">Alles hier lässt sich noch ändern. Zeilen mit einem Hinweis solltest du kurz prüfen.</string>
+    <string name="import_uncertain">Bitte prüfen</string>
+    <string name="import_uncertain_description">Diese Zeile konnte nicht sicher erkannt werden</string>
+    <string name="import_original_line">Original: %1$s</string>
+    <string name="import_nothing_found">Aus diesem Text liess sich nichts erkennen. Prüfe, ob wirklich ein Rezept eingefügt wurde.</string>
+    <string name="import_ingredients_found">%1$d Zutaten erkannt</string>
+    <string name="import_no_ingredients_found">Keine Zutaten erkannt</string>
+    <string name="import_example">Beispiel ansehen</string>
+    <string name="import_example_text">Älplermagronen\n\nZubereitungszeit: 40 Minuten\n\nZutaten\n400 g Hörnli\n4 Kartoffeln\n2 dl Vollrahm\n200 g Käse, gerieben\nSalz nach Belieben\n\nZubereitung\nKartoffeln schälen und würfeln.\nHörnli und Kartoffeln im Salzwasser kochen.\nRahm aufkochen und den Käse darin schmelzen lassen.</string>
+
+    <!-- Swipe -->
+    <string name="swipe_title">Was koche ich heute?</string>
+    <string name="swipe_setup_title">Bereit zum Swipen?</string>
+    <string name="swipe_setup_message">Wisch nach rechts, wenn dir ein Rezept zusagt, und nach links, wenn nicht. Am Ende siehst du alles, was übrig geblieben ist.</string>
+    <string name="swipe_setup_filter_hint">Optional: Vorher eingrenzen, was auf den Stapel kommt.</string>
+    <string name="swipe_setup_pool">%1$d Rezepte auf dem Stapel</string>
+    <string name="swipe_setup_pool_empty">Zu diesem Filter passt kein Rezept.</string>
+    <string name="swipe_setup_start">Los geht\'s</string>
+    <string name="swipe_yes">Ja</string>
+    <string name="swipe_no">Nein</string>
+    <string name="swipe_card_description">Rezept %1$s. Nach rechts wischen für Ja, nach links für Nein.</string>
+    <string name="swipe_progress">%1$d von %2$d</string>
+    <string name="swipe_finish">Session beenden</string>
+    <string name="swipe_undo_done">Letzte Entscheidung zurückgenommen</string>
+    <string name="swipe_nothing_left">Alle Rezepte durchgeswiped</string>
+    <string name="swipe_show_results">Ergebnis ansehen</string>
+    <string name="swipe_exit_title">Session abbrechen?</string>
+    <string name="swipe_exit_message">Deine bisherigen Entscheidungen bleiben erhalten.</string>
+    <string name="swipe_exit_confirm">Abbrechen</string>
+    <string name="swipe_exit_keep">Weiter swipen</string>
+
+    <!-- Ergebnis -->
+    <string name="results_title">Deine Treffer</string>
+    <string name="results_count">%1$d Rezepte haben es geschafft</string>
+    <string name="results_empty_title">Diesmal war nichts dabei</string>
+    <string name="results_empty_message">Kein Rezept hat es durch die Runde geschafft. Vielleicht mit einem anderen Filter nochmal probieren?</string>
+    <string name="results_empty_action">Neue Runde starten</string>
+    <string name="results_back_to_recipes">Zurück zu den Rezepten</string>
+    <string name="results_new_session">Nochmal swipen</string>
+
+    <!-- Fehler und Zustaende -->
+    <string name="filter_time_any">Egal</string>
+    <string name="filter_time_minutes">%1$d Min.</string>
+
+    <!-- Einheiten, die ausgeschrieben werden. Kurzformen wie g, dl oder EL sind
+         sprachneutral und stehen direkt im Code. -->
+    <string name="unit_none">–</string>
+    <string name="unit_prise">Prise</string>
+    <string name="unit_stueck">Stk.</string>
+    <string name="unit_bund">Bund</string>
+    <string name="unit_packung">Pck.</string>
+    <string name="unit_dose">Dose</string>
+    <string name="unit_zehe">Zehe</string>
+    <string name="unit_scheibe">Scheibe</string>
+    <string name="unit_tasse">Tasse</string>
+    <string name="unit_messerspitze">Msp.</string>
+</resources>

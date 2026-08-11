@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kochtopf mit Dampf - das Motiv der App. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Dampf -->
+    <path
+        android:pathData="M45,32 q5,-5 0,-9"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.85" />
+    <path
+        android:pathData="M63,32 q5,-5 0,-9"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.85" />
+
+    <!-- Deckelknauf -->
+    <path
+        android:pathData="M54,37 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Deckel -->
+    <path
+        android:pathData="M30,42 h48 a4,4 0 0 1 0,8 h-48 a4,4 0 0 1 0,-8 z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Griffe -->
+    <path
+        android:pathData="M24,56 h8 v9 h-8 a4.5,4.5 0 0 1 0,-9 z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85" />
+    <path
+        android:pathData="M84,56 h-8 v9 h8 a4.5,4.5 0 0 0 0,-9 z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.85" />
+
+    <!-- Topf -->
+    <path
+        android:pathData="M32,53 h44 v17 a10,10 0 0 1 -10,10 h-24 a10,10 0 0 1 -10,-10 z"
+        android:fillColor="#FFFFFF" />
+</vector>
