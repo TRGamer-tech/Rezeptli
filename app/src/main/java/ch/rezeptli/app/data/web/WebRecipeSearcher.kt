@@ -18,6 +18,7 @@ class WebRecipeSearcher @Inject constructor(
     private val fetcher: PageFetcher,
     private val sitemapParser: SitemapParser,
     private val store: WebIndexStore,
+    private val prebuiltIndex: PrebuiltIndex,
 ) {
     /**
      * Sucht in [source] nach [query].
@@ -49,9 +50,20 @@ class WebRecipeSearcher @Inject constructor(
             }
     }
 
-    /** Laedt das Verzeichnis einer Quelle - aus dem Cache, sonst aus dem Netz. */
+    /**
+     * Laedt das Verzeichnis einer Quelle. Drei Wege, in dieser Reihenfolge:
+     *
+     * 1. Der eigene Zwischenspeicher - kein Netzzugriff.
+     * 2. Das taeglich gebaute Verzeichnis - ein einziger Abruf.
+     * 3. Die Sitemaps der Quelle - bis zu hundert Abrufe, deshalb zuletzt.
+     */
     suspend fun index(source: RecipeSource): List<SitemapEntry> {
         store.read(source.id)?.let { return it }
+
+        prebuiltIndex.entriesFor(source.id)?.let { prebuilt ->
+            store.write(source.id, prebuilt)
+            return prebuilt
+        }
 
         val entries = mutableListOf<SitemapEntry>()
         source.sitemapUrls.forEach { sitemapUrl ->

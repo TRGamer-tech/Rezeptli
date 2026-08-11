@@ -27,6 +27,14 @@ android {
             "\"https://rezeptli-pairing.workers.dev\"",
         )
 
+        // Das taeglich gebaute Rezeptverzeichnis. Ist es nicht erreichbar,
+        // holt die App die Sitemaps wie bisher selbst.
+        buildConfigField(
+            "String",
+            "INDEX_URL",
+            "\"https://trgamer-tech.github.io/Rezeptli\"",
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

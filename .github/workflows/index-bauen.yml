@@ -1,0 +1,78 @@
+name: Rezeptindex
+
+on:
+  schedule:
+    # Nachts um vier, wenn bei den Anbietern wenig los ist.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+# Nur zum Veröffentlichen auf GitHub Pages - kein Schreibzugriff auf das Repository.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: rezeptindex
+  cancel-in-progress: false
+
+jobs:
+  bauen:
+    name: Index bauen und veröffentlichen
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.veroeffentlichen.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Index bauen
+        run: |
+          set -o pipefail
+          python3 tools/index-bauen.py 2>&1 | tee /tmp/index.log
+
+      - name: Ergebnis zusammenfassen
+        if: always()
+        run: |
+          {
+            echo '## Rezeptindex'
+            echo
+            if [ -f build/index/manifest.json ]; then
+              echo '| Quelle | Rezepte | Grösse |'
+              echo '|---|---:|---:|'
+              python3 - <<'PY'
+          import json
+          daten = json.load(open("build/index/manifest.json"))
+          for kennung, werte in sorted(daten["quellen"].items()):
+              kb = werte["groesseBytes"] // 1024
+              print(f"| {kennung} | {werte['eintraege']} | {kb} KB |")
+          gesamt = sum(w["eintraege"] for w in daten["quellen"].values())
+          groesse = sum(w["groesseBytes"] for w in daten["quellen"].values()) // 1024
+          print(f"\n**{gesamt} Rezepte, {groesse} KB insgesamt**")
+          PY
+            else
+              echo 'Der Index konnte nicht gebaut werden.'
+            fi
+            echo
+            echo '<details><summary>Protokoll</summary>'
+            echo
+            echo '```'
+            cat /tmp/index.log
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pages einrichten
+        uses: actions/configure-pages@v5
+
+      - name: Index hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/index
+
+      - name: Veröffentlichen
+        id: veroeffentlichen
+        uses: actions/deploy-pages@v4

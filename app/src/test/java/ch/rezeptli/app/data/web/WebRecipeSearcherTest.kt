@@ -29,6 +29,22 @@ private class FakeFetcher(private val responses: Map<String, String>) : PageFetc
     }
 }
 
+/**
+ * Ein Verzeichnisdienst, der standardmaessig nichts liefert.
+ *
+ * Damit laufen die bestehenden Tests wie bisher ueber die Sitemaps - und ein Test
+ * kann gezielt Eintraege setzen, um den schnellen Weg zu pruefen.
+ */
+private class FakePrebuiltIndex(var entries: List<SitemapEntry>? = null) : PrebuiltIndex {
+    var abgefragt = 0
+        private set
+
+    override suspend fun entriesFor(sourceId: String): List<SitemapEntry>? {
+        abgefragt += 1
+        return entries
+    }
+}
+
 private class FakeStore : WebIndexStore {
     private val entries = mutableMapOf<String, List<SitemapEntry>>()
     var writes: Int = 0
@@ -46,8 +62,11 @@ class WebRecipeSearcherTest {
     private val source = RecipeSourceCatalog.SWISSMILK
     private val sitemapUrl = source.sitemapUrls.single()
 
-    private fun searcher(fetcher: PageFetcher, store: WebIndexStore = FakeStore()) =
-        WebRecipeSearcher(fetcher, SitemapParser(), store)
+    private fun searcher(
+        fetcher: PageFetcher,
+        store: WebIndexStore = FakeStore(),
+        prebuilt: PrebuiltIndex = FakePrebuiltIndex(),
+    ) = WebRecipeSearcher(fetcher, SitemapParser(), store, prebuilt)
 
     @Test
     fun `findet Rezepte ueber den sprechenden Teil der Adresse`() = runTest {
@@ -129,5 +148,32 @@ class WebRecipeSearcherTest {
         }
 
         assertTrue(searcher(fetcher).search(source, "Aprikosen").isEmpty())
+    }
+
+    @Test
+    fun `nutzt das fertige Verzeichnis und laesst die Sitemaps in Ruhe`() = runTest {
+        val fetcher = FakeFetcher(mapOf(sitemapUrl to SITEMAP))
+        val prebuilt = FakePrebuiltIndex(
+            listOf(
+                SitemapEntry("https://www.swissmilk.ch/de/rezepte-kochideen/rezepte/x/", "Kuerbis Risotto"),
+            ),
+        )
+
+        val results = searcher(fetcher, prebuilt = prebuilt).search(source, "Risotto")
+
+        assertEquals(listOf("Kuerbis Risotto"), results.map { it.title })
+        assertEquals(0, fetcher.calls, "Mit fertigem Verzeichnis wird keine Sitemap geladen")
+    }
+
+    @Test
+    fun `faellt auf die Sitemaps zurueck, wenn das fertige Verzeichnis fehlt`() = runTest {
+        val fetcher = FakeFetcher(mapOf(sitemapUrl to SITEMAP))
+        val prebuilt = FakePrebuiltIndex(entries = null)
+
+        val results = searcher(fetcher, prebuilt = prebuilt).search(source, "Aprikosen")
+
+        assertEquals(1, prebuilt.abgefragt, "Der schnelle Weg wird zuerst versucht")
+        assertEquals(1, fetcher.calls, "Danach die Sitemap")
+        assertTrue(results.isNotEmpty())
     }
 }

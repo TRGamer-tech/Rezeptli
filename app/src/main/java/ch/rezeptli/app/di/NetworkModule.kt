@@ -1,6 +1,8 @@
 package ch.rezeptli.app.di
 
 import ch.rezeptli.app.data.web.PageFetcher
+import ch.rezeptli.app.data.web.PrebuiltIndex
+import ch.rezeptli.app.data.web.PrebuiltIndexClient
 import ch.rezeptli.app.data.web.RecipeWebClient
 import ch.rezeptli.app.data.web.WebIndexCache
 import ch.rezeptli.app.data.web.WebIndexStore
@@ -45,4 +47,8 @@ abstract class NetworkModule {
     @Binds
     @Singleton
     abstract fun bindWebIndexStore(impl: WebIndexCache): WebIndexStore
+
+    @Binds
+    @Singleton
+    abstract fun bindPrebuiltIndex(impl: PrebuiltIndexClient): PrebuiltIndex
 }
