@@ -6,6 +6,7 @@ import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
 import ch.rezeptli.app.domain.repository.WebSearchUpdate
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -23,13 +24,23 @@ class FakeWebRecipeRepository(
     var warmedUpSources: Set<String> = emptySet()
         private set
 
+    /**
+     * Haelt die Suche an, bis der Test sie freigibt.
+     *
+     * Damit laesst sich pruefen, was auf dem Bildschirm steht, waehrend noch gesucht
+     * wird - und nicht nur das Ergebnis danach.
+     */
+    var gate: CompletableDeferred<Unit>? = null
+
     /** Meldet die Treffer in zwei Schueben, so wie es zwei Quellen tun wuerden. */
     override fun search(query: String, sourceIds: Set<String>): Flow<WebSearchUpdate> = flow {
         lastQuery = query
         lastSourceIds = sourceIds
 
-        val half = results.size / 2
         emit(WebSearchUpdate(totalSources = 2))
+        gate?.await()
+
+        val half = results.size / 2
         emit(WebSearchUpdate(results.take(half), finishedSources = 1, totalSources = 2))
         emit(WebSearchUpdate(results, finishedSources = 2, totalSources = 2))
     }

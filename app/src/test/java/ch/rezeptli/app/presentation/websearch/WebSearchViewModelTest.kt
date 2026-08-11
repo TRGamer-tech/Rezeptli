@@ -8,6 +8,7 @@ import ch.rezeptli.app.domain.usecase.SearchWebRecipesUseCase
 import ch.rezeptli.app.fake.FakeUserProfileRepository
 import ch.rezeptli.app.fake.FakeWebRecipeRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -112,23 +113,33 @@ class WebSearchViewModelTest {
     }
 
     @Test
-    fun `eine neue Suche verwirft die Treffer der alten`() = runTest {
+    fun `waehrend einer neuen Suche stehen keine alten Treffer mehr da`() = runTest {
         val viewModel = createViewModel()
         viewModel.onQueryChange("Risotto")
         viewModel.onSearch()
         advanceUntilIdle()
-        assertTrue(
-            viewModel.uiState.value.results
-                .isNotEmpty(),
-        )
+        assertTrue(viewModel.uiState.value.hasResults())
 
+        // Die zweite Suche wird angehalten, solange das Tor zu ist.
+        val tor = CompletableDeferred<Unit>()
+        webRepository.gate = tor
         viewModel.onQueryChange("Anderes")
         viewModel.onSearch()
+        advanceUntilIdle()
 
-        // Direkt nach dem Start darf nichts Altes mehr stehen.
-        assertTrue(
-            viewModel.uiState.value.results
-                .isEmpty(),
+        val waehrendDerSuche = viewModel.uiState.value
+        assertTrue(waehrendDerSuche.isSearching)
+        assertFalse(
+            waehrendDerSuche.hasResults(),
+            "Treffer der vorigen Suche duerfen nicht stehen bleiben",
         )
+        // Solange gesucht wird, ist "nichts gefunden" noch keine Aussage.
+        assertFalse(waehrendDerSuche.isEmptyResult)
+
+        tor.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.hasResults())
     }
+
+    private fun WebSearchUiState.hasResults(): Boolean = results.isNotEmpty()
 }
