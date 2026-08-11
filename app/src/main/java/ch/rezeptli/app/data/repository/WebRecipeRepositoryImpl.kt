@@ -6,10 +6,19 @@ import ch.rezeptli.app.data.web.StructuredRecipeExtractor
 import ch.rezeptli.app.data.web.WebFetchError
 import ch.rezeptli.app.data.web.WebFetchException
 import ch.rezeptli.app.data.web.WebRecipeSearcher
+import ch.rezeptli.app.di.IoDispatcher
 import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
+import ch.rezeptli.app.domain.repository.WebSearchUpdate
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,14 +27,62 @@ class WebRecipeRepositoryImpl @Inject constructor(
     private val searcher: WebRecipeSearcher,
     private val fetcher: PageFetcher,
     private val extractor: StructuredRecipeExtractor,
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : WebRecipeRepository {
-    override suspend fun search(query: String, sourceIds: Set<String>): List<WebSearchResult> =
-        RecipeSourceCatalog.SEARCHABLE
-            .filter { it.id in sourceIds }
-            .flatMap { source ->
-                // Eine nicht erreichbare Quelle darf die Suche in den anderen nicht kippen.
-                runCatching { searcher.search(source, query) }.getOrDefault(emptyList())
-            }.sortedBy { it.title.length }
+    /**
+     * Fragt alle gewaehlten Quellen gleichzeitig und meldet jeden Zwischenstand.
+     *
+     * Vorher lief das nacheinander: Drei Quellen bedeuteten drei Wartezeiten
+     * hintereinander, und angezeigt wurde erst, wenn die letzte fertig war.
+     */
+    override fun search(query: String, sourceIds: Set<String>): Flow<WebSearchUpdate> = channelFlow {
+        val sources = RecipeSourceCatalog.SEARCHABLE.filter { it.id in sourceIds }
+        if (sources.isEmpty()) {
+            send(WebSearchUpdate())
+            return@channelFlow
+        }
+
+        send(WebSearchUpdate(totalSources = sources.size))
+
+        val collected = mutableListOf<WebSearchResult>()
+        val mutex = Mutex()
+        var finished = 0
+
+        coroutineScope {
+            sources.forEach { source ->
+                launch(ioDispatcher) {
+                    // Eine nicht erreichbare Quelle darf die Suche in den anderen nicht kippen.
+                    val hits = runCatching { searcher.search(source, query) }.getOrDefault(emptyList())
+
+                    mutex.withLock {
+                        collected += hits
+                        finished += 1
+                        send(
+                            WebSearchUpdate(
+                                results = collected.sortedBy { it.title.length },
+                                finishedSources = finished,
+                                totalSources = sources.size,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun warmUp(sourceIds: Set<String>) {
+        coroutineScope {
+            RecipeSourceCatalog.SEARCHABLE
+                .filter { it.id in sourceIds }
+                .forEach { source ->
+                    launch(ioDispatcher) {
+                        // Fehler sind hier bedeutungslos: Klappt es nicht, laedt die
+                        // Suche das Verzeichnis spaeter eben doch selbst.
+                        runCatching { searcher.index(source) }
+                    }
+                }
+        }
+    }
 
     override suspend fun loadRecipe(url: String): WebRecipeResult {
         val source = RecipeSourceCatalog.forUrl(url)

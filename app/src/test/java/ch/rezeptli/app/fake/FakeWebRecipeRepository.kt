@@ -5,6 +5,9 @@ import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
+import ch.rezeptli.app.domain.repository.WebSearchUpdate
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /** Liefert vorgegebene Antworten, damit der Import ohne Netz getestet werden kann. */
 class FakeWebRecipeRepository(
@@ -17,10 +20,22 @@ class FakeWebRecipeRepository(
     var lastSourceIds: Set<String> = emptySet()
         private set
 
-    override suspend fun search(query: String, sourceIds: Set<String>): List<WebSearchResult> {
+    var warmedUpSources: Set<String> = emptySet()
+        private set
+
+    /** Meldet die Treffer in zwei Schueben, so wie es zwei Quellen tun wuerden. */
+    override fun search(query: String, sourceIds: Set<String>): Flow<WebSearchUpdate> = flow {
         lastQuery = query
         lastSourceIds = sourceIds
-        return results
+
+        val half = results.size / 2
+        emit(WebSearchUpdate(totalSources = 2))
+        emit(WebSearchUpdate(results.take(half), finishedSources = 1, totalSources = 2))
+        emit(WebSearchUpdate(results, finishedSources = 2, totalSources = 2))
+    }
+
+    override suspend fun warmUp(sourceIds: Set<String>) {
+        warmedUpSources = sourceIds
     }
 
     override suspend fun loadRecipe(url: String): WebRecipeResult {

@@ -2,16 +2,19 @@ package ch.rezeptli.app.domain.usecase
 
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.WebRecipe
-import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.ranking.SourceRankingService
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
+import ch.rezeptli.app.domain.repository.WebSearchUpdate
 import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.domain.steps.RecipeStep
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class SearchWebRecipesUseCase @Inject constructor(
@@ -26,13 +29,17 @@ class SearchWebRecipesUseCase @Inject constructor(
      * kocht, sieht Schweizer Quellen zuerst. Innerhalb derselben Quelle bleibt die
      * Reihenfolge der Suche erhalten.
      */
-    suspend operator fun invoke(query: String, sourceIds: Set<String>): List<WebSearchResult> {
-        if (query.isBlank() || sourceIds.isEmpty()) return emptyList()
+    operator fun invoke(query: String, sourceIds: Set<String>): Flow<WebSearchUpdate> {
+        if (query.isBlank() || sourceIds.isEmpty()) return flowOf(WebSearchUpdate())
 
-        val results = repository.search(query.trim(), sourceIds)
-        val profile = profileRepository.profile.first()
-        return ranking.rankItems(results, profile) { it.origin }
+        return repository.search(query.trim(), sourceIds).map { update ->
+            val profile = profileRepository.profile.first()
+            update.copy(results = ranking.rankItems(update.results, profile) { it.origin })
+        }
     }
+
+    /** Laedt die Verzeichnisse im Voraus, damit die erste Suche nicht darauf wartet. */
+    suspend fun warmUp(sourceIds: Set<String>) = repository.warmUp(sourceIds)
 }
 
 sealed interface WebImportOutcome {

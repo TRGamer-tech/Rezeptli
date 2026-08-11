@@ -283,4 +283,5 @@
         <item quantity="one">%d Minute</item>
         <item quantity="other">%d Minuten</item>
     </plurals>
+    <string name="websearch_quellen_fortschritt">%1$d von %2$d Quellen durchsucht</string>
 </resources>
