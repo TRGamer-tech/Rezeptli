@@ -1,0 +1,25 @@
+# Konfiguration des Pairing-Dienstes.
+#
+# Die Account-ID steht hier im Klartext - sie ist eine Kennung, kein Geheimnis,
+# und taucht auch in jeder Dashboard-Adresse auf. Das API-Token gehoert dagegen
+# NICHT in diese Datei, sondern als Secret zu GitHub Actions.
+
+name = "rezeptli-pairing"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+account_id = "cd49e1430e8127b4e1f5704a25bb3562"
+
+# Die Datenbank haelt nur laufende Sitzungen. Die Kennung traegt hier ein, wer
+# sie mit `wrangler d1 create rezeptli-pairing` angelegt hat.
+[[d1_databases]]
+binding = "DB"
+database_name = "rezeptli-pairing"
+database_id = "HIER_DIE_ID_DER_ANGELEGTEN_D1_DATENBANK"
+migrations_dir = "migrations"
+
+# Einmal taeglich abgelaufene Sitzungen loeschen.
+[triggers]
+crons = ["0 4 * * *"]
+
+[observability]
+enabled = true
