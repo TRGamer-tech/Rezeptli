@@ -14,7 +14,7 @@ account_id = "cd49e1430e8127b4e1f5704a25bb3562"
 [[d1_databases]]
 binding = "DB"
 database_name = "rezeptli-pairing"
-database_id = "HIER_DIE_ID_DER_ANGELEGTEN_D1_DATENBANK"
+database_id = "30df9d9a-950e-4856-a0f5-efa3ba3615eb"
 migrations_dir = "migrations"
 
 # Einmal taeglich abgelaufene Sitzungen loeschen.
