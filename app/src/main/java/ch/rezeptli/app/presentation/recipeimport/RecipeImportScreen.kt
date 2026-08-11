@@ -16,7 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
+import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.form.RecipeFormActions
 import ch.rezeptli.app.presentation.common.form.RecipeFormState
@@ -73,7 +74,7 @@ fun RecipeImportRoute(
         ),
         onTextChange = viewModel::onTextChange,
         onClearText = viewModel::onClearText,
-        onParse = viewModel::onParse,
+        onAnalyse = viewModel::onAnalyse,
         onBack = { if (uiState.isPreviewVisible) viewModel.onBackToText() else onBack() },
         onSave = viewModel::onSave,
     )
@@ -86,7 +87,7 @@ fun RecipeImportScreen(
     actions: RecipeFormActions,
     onTextChange: (String) -> Unit,
     onClearText: () -> Unit,
-    onParse: () -> Unit,
+    onAnalyse: () -> Unit,
     onBack: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
@@ -117,11 +118,10 @@ fun RecipeImportScreen(
         val form = uiState.form
         if (form == null) {
             TextInputStep(
-                rawText = uiState.rawText,
-                nothingFound = uiState.nothingFound,
+                uiState = uiState,
                 onTextChange = onTextChange,
                 onClearText = onClearText,
-                onParse = onParse,
+                onAnalyse = onAnalyse,
                 contentPadding = innerPadding,
             )
         } else {
@@ -140,14 +140,14 @@ fun RecipeImportScreen(
 
 @Composable
 private fun TextInputStep(
-    rawText: String,
-    nothingFound: Boolean,
+    uiState: RecipeImportUiState,
     onTextChange: (String) -> Unit,
     onClearText: () -> Unit,
-    onParse: () -> Unit,
+    onAnalyse: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
+    val rawText = uiState.rawText
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -165,12 +165,12 @@ private fun TextInputStep(
         OutlinedTextField(
             value = rawText,
             onValueChange = onTextChange,
-            label = { Text(stringResource(R.string.import_input_hint)) },
-            minLines = 10,
+            label = { Text(stringResource(R.string.import_url_hint)) },
+            minLines = 8,
             modifier = Modifier.fillMaxWidth(),
         )
 
-        if (nothingFound) {
+        if (uiState.nothingFound) {
             InfoCard(
                 text = stringResource(R.string.import_nothing_found),
                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -178,13 +178,38 @@ private fun TextInputStep(
             )
         }
 
+        uiState.webError?.let { error ->
+            InfoCard(
+                text = stringResource(error.messageRes()),
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+
+        if (uiState.isLoadingFromWeb) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                Text(
+                    text = stringResource(R.string.import_loading_web),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = onParse,
-                enabled = rawText.isNotBlank(),
+                onClick = onAnalyse,
+                enabled = rawText.isNotBlank() && !uiState.isLoadingFromWeb,
                 modifier = Modifier.weight(1f),
             ) {
-                Text(stringResource(R.string.import_analyse))
+                Text(
+                    stringResource(
+                        if (uiState.looksLikeUrl) R.string.import_analyse_url else R.string.import_analyse,
+                    ),
+                )
             }
             if (rawText.isNotEmpty()) {
                 TextButton(onClick = onClearText) {
@@ -291,4 +316,13 @@ private fun InfoCard(
             Text(text = text, style = MaterialTheme.typography.bodyMedium)
         }
     }
+}
+
+/** Fehlermeldungen, die erklaeren was zu tun ist statt nur was schiefging. */
+private fun WebImportError.messageRes(): Int = when (this) {
+    WebImportError.NO_CONNECTION -> R.string.error_no_connection
+    WebImportError.REJECTED -> R.string.error_rejected
+    WebImportError.NOT_FOUND -> R.string.error_not_found
+    WebImportError.NO_RECIPE_FOUND -> R.string.error_no_recipe
+    WebImportError.UNKNOWN -> R.string.error_unknown
 }

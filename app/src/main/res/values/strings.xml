@@ -169,4 +169,25 @@
     <string name="category_tiefkuehl">Tiefkühl</string>
     <string name="category_getraenke">Getränke</string>
     <string name="category_sonstiges">Sonstiges</string>
+
+    <!-- Rezepte im Web suchen und importieren -->
+    <string name="websearch_title">Rezepte im Web finden</string>
+    <string name="websearch_hint">Wonach ist dir? z. B. Kürbis</string>
+    <string name="websearch_sources">Quellen</string>
+    <string name="websearch_loading">Beim ersten Mal wird das Rezeptverzeichnis der Quelle geladen. Danach geht es schnell.</string>
+    <string name="websearch_intro_title">Such dir was aus</string>
+    <string name="websearch_intro_message">Gib ein Stichwort ein und wähle die Quellen, die dich interessieren. Gefundene Rezepte kannst du prüfen, anpassen und in deine Sammlung übernehmen.</string>
+    <string name="websearch_no_results_title">Nichts gefunden</string>
+    <string name="websearch_no_results_message">Zu diesem Stichwort gibt es bei den gewählten Quellen kein Rezept. Versuch es mit einem anderen Wort oder wähle weitere Quellen.</string>
+    <string name="websearch_open">Im Web suchen</string>
+    <string name="import_url_hint">Rezepttext einfügen – oder einen Link zu einem Rezept</string>
+    <string name="import_loading_web">Rezept wird geladen…</string>
+    <string name="import_analyse_url">Rezept laden</string>
+    <string name="import_source">Quelle: %1$s</string>
+    <string name="import_open_source">Original ansehen</string>
+    <string name="error_no_connection">Keine Verbindung. Prüf dein Internet und versuch es nochmal.</string>
+    <string name="error_rejected">Diese Seite lässt sich nicht automatisch auslesen – sie weist die Anfrage ab. Kopier stattdessen den Rezepttext und füg ihn hier ein.</string>
+    <string name="error_not_found">Diese Seite gibt es nicht (mehr).</string>
+    <string name="error_no_recipe">Auf dieser Seite ist kein maschinenlesbares Rezept hinterlegt. Kopier den Text und füg ihn hier ein.</string>
+    <string name="error_unknown">Das hat nicht geklappt. Versuch es später nochmal.</string>
 </resources>

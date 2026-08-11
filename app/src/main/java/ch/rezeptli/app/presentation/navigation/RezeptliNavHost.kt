@@ -1,6 +1,7 @@
 package ch.rezeptli.app.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -15,12 +16,21 @@ import ch.rezeptli.app.presentation.results.ResultsRoute
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListRoute
 import ch.rezeptli.app.presentation.swipe.SwipeRoute
 import ch.rezeptli.app.presentation.swipe.SwipeSetupRoute
+import ch.rezeptli.app.presentation.websearch.WebSearchRoute
 
 /** Der Navigationsgraph der App. */
 @Composable
 fun RezeptliNavHost(
+    sharedUrl: String? = null,
     navController: NavHostController = rememberNavController(),
 ) {
+    // Ein geteilter Link fuehrt einmalig direkt in den Import.
+    LaunchedEffect(sharedUrl) {
+        if (!sharedUrl.isNullOrBlank()) {
+            navController.navigate(Destinations.recipeImport(sharedUrl))
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Destinations.RECIPE_LIST,
@@ -31,7 +41,8 @@ fun RezeptliNavHost(
                     navController.navigate(Destinations.recipeDetail(recipeId))
                 },
                 onCreateRecipe = { navController.navigate(Destinations.recipeEdit()) },
-                onImportRecipe = { navController.navigate(Destinations.RECIPE_IMPORT) },
+                onImportRecipe = { navController.navigate(Destinations.recipeImport()) },
+                onSearchWeb = { navController.navigate(Destinations.WEB_SEARCH) },
                 onStartSwipe = { navController.navigate(Destinations.SWIPE_SETUP) },
                 onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
             )
@@ -72,7 +83,15 @@ fun RezeptliNavHost(
             )
         }
 
-        composable(Destinations.RECIPE_IMPORT) {
+        composable(
+            route = Destinations.RECIPE_IMPORT,
+            arguments = listOf(
+                navArgument(Destinations.ARG_URL) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
             RecipeImportRoute(
                 onBack = { navController.popBackStack() },
                 onSaved = { recipeId ->
@@ -80,6 +99,13 @@ fun RezeptliNavHost(
                         popUpTo(Destinations.RECIPE_LIST)
                     }
                 },
+            )
+        }
+
+        composable(Destinations.WEB_SEARCH) {
+            WebSearchRoute(
+                onBack = { navController.popBackStack() },
+                onOpenResult = { url -> navController.navigate(Destinations.recipeImport(url)) },
             )
         }
 

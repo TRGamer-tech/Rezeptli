@@ -114,12 +114,19 @@ dependencies {
 
     implementation(libs.coil.compose)
 
+    // Web-Import: HTML lesen (jsoup) und die eingebetteten strukturierten Daten
+    // auswerten (kotlinx-serialization, nur die Laufzeit ohne Codegen).
+    implementation(libs.jsoup)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)

@@ -16,6 +16,9 @@ data class Recipe(
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
     val lastCookedAt: Long? = null,
+    /** Herkunft eines importierten Rezepts. Eigene Rezepte haben keine. */
+    val sourceUrl: String? = null,
+    val sourceName: String? = null,
 )
 
 /**

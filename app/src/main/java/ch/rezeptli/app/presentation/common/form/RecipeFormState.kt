@@ -77,6 +77,8 @@ data class RecipeFormState(
     val nextIngredientKey: Long = 1L,
     val createdAt: Long = 0L,
     val lastCookedAt: Long? = null,
+    val sourceUrl: String? = null,
+    val sourceName: String? = null,
     val titleError: Boolean = false,
     val prepTimeError: Boolean = false,
 ) {
@@ -98,6 +100,8 @@ data class RecipeFormState(
         photoUri = photoUri,
         createdAt = createdAt,
         lastCookedAt = lastCookedAt,
+        sourceUrl = sourceUrl,
+        sourceName = sourceName,
     )
 
     /** Fuegt eine leere Zutatenzeile an und vergibt dafuer einen stabilen Schluessel. */
@@ -154,6 +158,8 @@ data class RecipeFormState(
             nextIngredientKey = recipe.ingredients.size.toLong() + 1,
             createdAt = recipe.createdAt,
             lastCookedAt = recipe.lastCookedAt,
+            sourceUrl = recipe.sourceUrl,
+            sourceName = recipe.sourceName,
         )
     }
 }

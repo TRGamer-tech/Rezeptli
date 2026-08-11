@@ -1,13 +1,18 @@
 package ch.rezeptli.app.presentation.recipeimport
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ch.rezeptli.app.domain.repository.WebImportError
+import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ParseRecipeTextUseCase
 import ch.rezeptli.app.domain.usecase.RecipeValidationError
 import ch.rezeptli.app.domain.usecase.SaveRecipeResult
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
+import ch.rezeptli.app.domain.usecase.WebImportOutcome
 import ch.rezeptli.app.presentation.common.form.IngredientDraft
 import ch.rezeptli.app.presentation.common.form.RecipeFormState
+import ch.rezeptli.app.presentation.navigation.Destinations
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,12 +35,18 @@ data class RecipeImportUiState(
     val form: RecipeFormState? = null,
     val isSaving: Boolean = false,
     val nothingFound: Boolean = false,
+    val isLoadingFromWeb: Boolean = false,
+    val webError: WebImportError? = null,
 ) {
     val isPreviewVisible: Boolean get() = form != null
 
     val recognisedIngredientCount: Int get() = form?.ingredients?.size ?: 0
 
     val hasUncertainLines: Boolean get() = form?.hasUncertainIngredients == true
+
+    /** Der eingefuegte Text ist ein Link - dann wird geladen statt geparst. */
+    val looksLikeUrl: Boolean
+        get() = rawText.trim().let { it.startsWith("http://") || it.startsWith("https://") }
 }
 
 sealed interface RecipeImportEvent {
@@ -44,7 +55,9 @@ sealed interface RecipeImportEvent {
 
 @HiltViewModel
 class RecipeImportViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val parseRecipeText: ParseRecipeTextUseCase,
+    private val loadWebRecipe: LoadWebRecipeUseCase,
     private val saveRecipe: SaveRecipeUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RecipeImportUiState())
@@ -52,6 +65,16 @@ class RecipeImportViewModel @Inject constructor(
 
     private val _events = Channel<RecipeImportEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
+
+    init {
+        // Aus der Web-Suche oder ueber "Teilen" kommt eine Adresse mit - dann wird
+        // direkt geladen, statt erst nach einem Text zu fragen.
+        val sharedUrl = savedStateHandle.get<String>(Destinations.ARG_URL).orEmpty()
+        if (sharedUrl.isNotBlank()) {
+            _uiState.update { it.copy(rawText = sharedUrl) }
+            loadFromUrl(sharedUrl)
+        }
+    }
 
     fun onTextChange(text: String) {
         _uiState.update { it.copy(rawText = text, nothingFound = false) }
@@ -62,9 +85,37 @@ class RecipeImportViewModel @Inject constructor(
     }
 
     /**
-     * Wertet den eingefuegten Text aus. Das Ergebnis wird nur angezeigt, nie direkt
-     * gespeichert - erst die Bestaetigung der Nutzerin legt das Rezept an.
+     * Wertet den eingefuegten Inhalt aus - je nachdem als Link oder als Text.
+     *
+     * Das Ergebnis wird in beiden Faellen nur angezeigt, nie direkt gespeichert: Erst
+     * die Bestaetigung der Nutzerin legt das Rezept an.
      */
+    fun onAnalyse() {
+        if (_uiState.value.looksLikeUrl) {
+            loadFromUrl(_uiState.value.rawText.trim())
+        } else {
+            onParse()
+        }
+    }
+
+    private fun loadFromUrl(url: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingFromWeb = true, webError = null, nothingFound = false) }
+            when (val outcome = loadWebRecipe(url)) {
+                is WebImportOutcome.Loaded -> _uiState.update {
+                    it.copy(
+                        form = RecipeFormState.from(outcome.recipe),
+                        isLoadingFromWeb = false,
+                    )
+                }
+
+                is WebImportOutcome.Failed -> _uiState.update {
+                    it.copy(isLoadingFromWeb = false, webError = outcome.error)
+                }
+            }
+        }
+    }
+
     fun onParse() {
         val parsed = parseRecipeText(_uiState.value.rawText)
         if (parsed.isEmpty) {
@@ -81,7 +132,7 @@ class RecipeImportViewModel @Inject constructor(
     }
 
     fun onBackToText() {
-        _uiState.update { it.copy(form = null) }
+        _uiState.update { it.copy(form = null, webError = null) }
     }
 
     fun onTitleChange(title: String) = updateForm { it.copy(title = title, titleError = false) }

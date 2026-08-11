@@ -28,6 +28,8 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     createdAt = recipe.createdAt,
     updatedAt = recipe.updatedAt,
     lastCookedAt = recipe.lastCookedAt,
+    sourceUrl = recipe.sourceUrl,
+    sourceName = recipe.sourceName,
 )
 
 fun IngredientEntity.toDomain(): Ingredient = Ingredient(
@@ -61,6 +63,8 @@ fun Recipe.toEntity(now: Long): RecipeEntity = RecipeEntity(
     createdAt = if (createdAt == 0L) now else createdAt,
     updatedAt = now,
     lastCookedAt = lastCookedAt,
+    sourceUrl = sourceUrl,
+    sourceName = sourceName,
 )
 
 fun RecipeSummaryProjection.toDomain(): RecipeSummary = RecipeSummary(

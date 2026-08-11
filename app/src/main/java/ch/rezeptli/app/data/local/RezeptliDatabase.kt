@@ -32,7 +32,7 @@ import ch.rezeptli.app.data.local.entity.SwipeSessionEntity
         SwipeResultEntity::class,
         ShoppingItemEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -75,7 +75,18 @@ abstract class RezeptliDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 3 haelt fest, woher ein importiertes Rezept stammt. Bestehende
+         * Rezepte bekommen keine Quelle - sie sind selbst geschrieben.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `recipes` ADD COLUMN `sourceUrl` TEXT")
+                db.execSQL("ALTER TABLE `recipes` ADD COLUMN `sourceName` TEXT")
+            }
+        }
+
         /** Alle Migrationen in aufsteigender Reihenfolge. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
     }
 }

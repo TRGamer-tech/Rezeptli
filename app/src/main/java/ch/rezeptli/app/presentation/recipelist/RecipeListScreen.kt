@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
@@ -86,6 +87,7 @@ fun RecipeListRoute(
         onRecipeClick = onRecipeClick,
         onCreateRecipe = onCreateRecipe,
         onImportRecipe = onImportRecipe,
+        onSearchWeb = onSearchWeb,
         onOpenShoppingList = onOpenShoppingList,
         onStartSwipe = {
             if (uiState.hasAnyRecipes) {
@@ -111,6 +113,7 @@ fun RecipeListScreen(
     onRecipeClick: (Long) -> Unit,
     onCreateRecipe: () -> Unit,
     onImportRecipe: () -> Unit,
+    onSearchWeb: () -> Unit,
     onOpenShoppingList: () -> Unit,
     onStartSwipe: () -> Unit,
     modifier: Modifier = Modifier,
@@ -136,6 +139,12 @@ fun RecipeListScreen(
                                 )
                             }
                         }
+                    }
+                    IconButton(onClick = onSearchWeb) {
+                        Icon(
+                            imageVector = Icons.Filled.Language,
+                            contentDescription = stringResource(R.string.websearch_open),
+                        )
                     }
                     IconButton(onClick = onImportRecipe) {
                         Icon(
@@ -209,6 +218,7 @@ fun RecipeListScreen(
                 onRecipeClick = onRecipeClick,
                 onCreateRecipe = onCreateRecipe,
                 onImportRecipe = onImportRecipe,
+                onSearchWeb = onSearchWeb,
                 onResetFilter = onResetFilter,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -223,6 +233,7 @@ private fun RecipeListContent(
     onRecipeClick: (Long) -> Unit,
     onCreateRecipe: () -> Unit,
     onImportRecipe: () -> Unit,
+    onSearchWeb: () -> Unit,
     onResetFilter: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -236,8 +247,8 @@ private fun RecipeListContent(
             message = stringResource(R.string.recipes_empty_message),
             primaryActionLabel = stringResource(R.string.recipes_empty_action_create),
             onPrimaryAction = onCreateRecipe,
-            secondaryActionLabel = stringResource(R.string.recipes_empty_action_import),
-            onSecondaryAction = onImportRecipe,
+            secondaryActionLabel = stringResource(R.string.websearch_open),
+            onSecondaryAction = onSearchWeb,
             modifier = modifier,
         )
 

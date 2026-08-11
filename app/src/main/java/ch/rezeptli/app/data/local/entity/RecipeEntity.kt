@@ -21,6 +21,8 @@ data class RecipeEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val lastCookedAt: Long?,
+    val sourceUrl: String? = null,
+    val sourceName: String? = null,
 )
 
 @Entity(

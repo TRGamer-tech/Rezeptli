@@ -1,5 +1,6 @@
 package ch.rezeptli.app.presentation
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -20,15 +21,32 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // Ein aus dem Browser geteilter Link fuehrt direkt in den Import.
+        val sharedUrl = intent.sharedRecipeUrl()
+
         setContent {
             RezeptliTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    RezeptliNavHost()
+                    RezeptliNavHost(sharedUrl = sharedUrl)
                 }
             }
         }
+    }
+
+    /** Der geteilte Text, sofern sich darin eine Adresse findet. */
+    private fun Intent?.sharedRecipeUrl(): String? {
+        if (this?.action != Intent.ACTION_SEND || type != "text/plain") return null
+        val text = getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+        // Manche Apps teilen "Titel https://..." - dann zaehlt der erste Link darin.
+        return text
+            .split(WHITESPACE)
+            .firstOrNull { it.startsWith("http://") || it.startsWith("https://") }
+    }
+
+    private companion object {
+        val WHITESPACE = Regex("\\s+")
     }
 }
