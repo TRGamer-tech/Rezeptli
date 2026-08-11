@@ -65,6 +65,7 @@ fun RecipeListRoute(
     onRecipeClick: (Long) -> Unit,
     onCreateRecipe: () -> Unit,
     onImportRecipe: () -> Unit,
+    onSearchWeb: () -> Unit,
     onStartSwipe: () -> Unit,
     onOpenShoppingList: () -> Unit,
     viewModel: RecipeListViewModel = hiltViewModel(),

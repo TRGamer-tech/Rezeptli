@@ -30,11 +30,18 @@ class RecipeWebClient @Inject constructor(
     private val mutex = Mutex()
 
     override suspend fun fetch(url: String, source: RecipeSource?): String = withContext(ioDispatcher) {
-        source?.let { respectCrawlDelay(it) }
+        val target = normalize(url)
+        val rules = robotsFor(target)
+
+        if (!rules.isAllowed(pathOf(target))) {
+            throw WebFetchException(WebFetchError.Disallowed, "robots.txt untersagt $target")
+        }
+
+        respectCrawlDelay(source, rules)
 
         val request = Request
             .Builder()
-            .url(url)
+            .url(target)
             .header("User-Agent", USER_AGENT)
             .header("Accept-Language", "de-CH,de;q=0.9")
             .build()
