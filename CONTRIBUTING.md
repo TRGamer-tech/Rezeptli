@@ -80,6 +80,24 @@ Die CI meldet einen Fehler, wenn das erzeugte Schema von einer eingecheckten Dat
 abweicht. Ist noch keine eingecheckt, hängt sie das erzeugte Schema als Artefakt
 `room-schema` an den Workflow-Lauf – von dort lässt es sich herunterladen und einchecken.
 
+## Web-Quellen
+
+Der Import liest strukturierte Daten nach schema.org – nicht das HTML-Gerüst der Seiten.
+Wer eine Quelle ergänzen will, trägt sie in `RecipeSourceCatalog` ein und prüft vorher:
+
+1. Erlaubt die `robots.txt` das Abrufen der Rezeptseiten? Gibt es ein `Crawl-delay`?
+2. Liefert eine Rezeptseite `Recipe`- oder `HowTo`-Daten als JSON-LD oder Microdata?
+3. Gibt es eine Sitemap mit Rezept-Links? Ohne sie ist nur Import über einen Link möglich,
+   keine Suche.
+
+Der CI-Workflow beantwortet das: Actions → *Android CI* → *Run workflow* → Aufgabe
+`quellen-pruefen`. Der Job analysiert alle hinterlegten Quellen und eignet sich auch als
+Frühwarnung, wenn eine Seite ihre strukturierten Daten ändert.
+
+Die Regeln der Anbieter sind nicht verhandelbar: keine Umgehung von Bot-Erkennung, keine
+Abfrage von Endpunkten, die die `robots.txt` ausschliesst, und kein Abrufen im Hintergrund
+ohne Zutun der Nutzerin.
+
 ## Architektur
 
 Bitte die Schichtung beibehalten:
