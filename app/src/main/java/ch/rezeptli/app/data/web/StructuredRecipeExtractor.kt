@@ -60,7 +60,7 @@ class StructuredRecipeExtractor @Inject constructor() {
             ingredientLines = ingredients,
             instructions = recipe["recipeInstructions"].toInstructions(),
             instructionSteps = recipe["recipeInstructions"].toInstructionSteps(),
-            imageUrl = recipe["image"].toImageUrl(),
+            imageUrl = WebUrl.absolute(recipe["image"].toImageUrl(), sourceUrl),
             totalMinutes = IsoDuration.toMinutes(recipe.stringOrNull("totalTime"))
                 ?: sumOf(recipe.stringOrNull("prepTime"), recipe.stringOrNull("cookTime")),
             servings = recipe["recipeYield"].toYield(),
@@ -87,7 +87,10 @@ class StructuredRecipeExtractor @Inject constructor() {
                 .ifEmpty { document.microdataIngredients() },
             instructions = howTo["step"].toInstructions(),
             instructionSteps = howTo["step"].toInstructionSteps(),
-            imageUrl = howTo["image"].toImageUrl() ?: document.metaImage(),
+            imageUrl = WebUrl.absolute(
+                howTo["image"].toImageUrl() ?: document.metaImage(),
+                sourceUrl,
+            ),
             totalMinutes = IsoDuration.toMinutes(howTo.stringOrNull("totalTime")),
             servings = howTo["yield"].toYield(),
             keywords = howTo.toKeywords(),
@@ -118,7 +121,7 @@ class StructuredRecipeExtractor @Inject constructor() {
             ingredientLines = ingredients,
             instructions = steps.joinToString("\n"),
             instructionSteps = steps,
-            imageUrl = document.metaImage(),
+            imageUrl = WebUrl.absolute(document.metaImage(), sourceUrl),
             sourceUrl = sourceUrl,
             sourceName = sourceName,
         ).takeIf { it.isUsable }

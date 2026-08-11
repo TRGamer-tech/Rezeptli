@@ -1,6 +1,7 @@
 package ch.rezeptli.app.data.web
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -235,6 +236,59 @@ class StructuredRecipeExtractorTest {
             val instructions = extractor.extract(html, "https://example.ch/", "Q")?.instructions
             assertTrue(instructions!!.contains("rühren"), "Entities werden aufgeloest: $instructions")
             assertTrue(!instructions.contains("<p>"), "HTML-Reste bleiben nicht stehen")
+        }
+    }
+
+    @Nested
+    @DisplayName("Bildadressen")
+    inner class Bildadressen {
+        /**
+         * Kochrezepte.at liefert kein JSON-LD, nur Microdata - und die Bildadresse
+         * ohne Protokoll. Genau daran sind dort die Bilder gescheitert.
+         */
+        @Test
+        fun `macht die schemalose Adresse von kochrezepte punkt at vollstaendig`() {
+            val seite = """
+                <html><head>
+                  <meta property="og:image"
+                        content="//img2.kochrezepte.at/use/5/marinaden_5446.jpg">
+                </head><body>
+                  <h1 itemprop="name">Marinaden für Schweinekoteletts</h1>
+                  <span itemprop="recipeIngredient">4 Schweinekoteletts</span>
+                  <span itemprop="recipeIngredient">2 EL Olivenöl</span>
+                  <div itemprop="recipeInstructions">Fleisch einlegen.</div>
+                </body></html>
+            """.trimIndent()
+
+            val rezept = extractor.extract(
+                seite,
+                "https://www.kochrezepte.at/marinaden-rezept-4456",
+                "Kochrezepte.at",
+            )
+
+            assertNotNull(rezept)
+            assertEquals(
+                "https://img2.kochrezepte.at/use/5/marinaden_5446.jpg",
+                rezept?.imageUrl,
+                "Ohne Protokoll kann der Bildlader die Adresse nicht oeffnen",
+            )
+            assertEquals(2, rezept?.ingredientLines?.size)
+        }
+
+        @Test
+        fun `macht auch eine wurzelrelative Adresse aus JSON-LD vollstaendig`() {
+            val seite = page(
+                """
+                {"@context":"https://schema.org","@type":"Recipe","name":"Rösti",
+                 "image":"/bilder/roesti.jpg",
+                 "recipeIngredient":["1 kg Kartoffeln"],
+                 "recipeInstructions":"Raffeln und braten."}
+                """.trimIndent(),
+            )
+
+            val rezept = extractor.extract(seite, "https://example.ch/rezepte/roesti", "Beispiel")
+
+            assertEquals("https://example.ch/bilder/roesti.jpg", rezept?.imageUrl)
         }
     }
 }

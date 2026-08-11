@@ -17,6 +17,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,35 +104,51 @@ fun RecipeImage(
     title: String,
     modifier: Modifier = Modifier,
 ) {
-    if (photoUri.isNullOrBlank()) {
-        // Statt einer grauen Flaeche ein Farbverlauf aus der Mesh-Palette des Kits.
-        // Er haengt am Titel, ist also fuer dasselbe Rezept immer derselbe - eine
-        // Karte, die bei jedem Blaettern die Farbe wechselt, waere nur unruhig.
-        val mesh = Tokens.Mesh.All[abs(title.hashCode()) % Tokens.Mesh.All.size]
-        Box(
-            modifier = modifier.background(
-                Brush.linearGradient(
-                    listOf(
-                        mesh.copy(alpha = 0.45f),
-                        MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                ),
-            ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Restaurant,
-                contentDescription = stringResource(R.string.recipe_photo_placeholder),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(48.dp),
-            )
-        }
+    // Ein Bild kann auch dann fehlen, wenn eine Adresse da ist: Die Seite kann sie
+    // zurueckziehen, das Netz kann weg sein, der Anbieter kann fremdes Einbinden
+    // sperren. Dann soll dieselbe Flaeche erscheinen wie ohne Foto - eine Luecke oder
+    // ein kaputtes Bildsymbol waere schlechter als eine ruhige Farbe.
+    var fehlgeschlagen by remember(photoUri) { mutableStateOf(false) }
+
+    if (photoUri.isNullOrBlank() || fehlgeschlagen) {
+        RecipePhotoPlaceholder(title = title, modifier = modifier)
     } else {
         AsyncImage(
             model = photoUri,
             contentDescription = stringResource(R.string.recipe_photo_description, title),
             contentScale = ContentScale.Crop,
+            onError = { fehlgeschlagen = true },
             modifier = modifier,
+        )
+    }
+}
+
+/**
+ * Die Flaeche fuer ein Rezept ohne brauchbares Foto.
+ *
+ * Statt einer grauen Flaeche ein Farbverlauf aus der Mesh-Palette des Kits. Er haengt am
+ * Titel, ist also fuer dasselbe Rezept immer derselbe - eine Karte, die bei jedem
+ * Blaettern die Farbe wechselt, waere nur unruhig.
+ */
+@Composable
+private fun RecipePhotoPlaceholder(title: String, modifier: Modifier = Modifier) {
+    val mesh = Tokens.Mesh.All[abs(title.hashCode()) % Tokens.Mesh.All.size]
+    Box(
+        modifier = modifier.background(
+            Brush.linearGradient(
+                listOf(
+                    mesh.copy(alpha = 0.45f),
+                    MaterialTheme.colorScheme.surfaceContainer,
+                ),
+            ),
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Restaurant,
+            contentDescription = stringResource(R.string.recipe_photo_placeholder),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(48.dp),
         )
     }
 }

@@ -66,7 +66,9 @@ object RecipeSourceCatalog {
         name = "Gutekueche",
         homeUrl = "https://www.gutekueche.ch",
         urlPattern = Regex("gutekueche\\.ch/[^/]+-rezept-\\d+", RegexOption.IGNORE_CASE),
-        sitemapUrls = listOf("https://www.gutekueche.ch/sitemap.xml.gz"),
+        // Die robots.txt verweist auf das CDN; unter www liegt die Datei nicht.
+        // Mit der falschen Adresse lieferte die Quelle gar nichts.
+        sitemapUrls = listOf("https://cdn.gutekueche.ch/sitemaps/sitemap.xml.gz"),
     )
 
     val MIGUSTO = RecipeSource(
