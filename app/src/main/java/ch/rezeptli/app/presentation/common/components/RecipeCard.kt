@@ -7,73 +7,86 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.presentation.common.theme.Tokens
+import ch.rezeptli.app.presentation.common.theme.cardSurface
 import coil.compose.AsyncImage
+import kotlin.math.abs
 
-/** Eintrag in der Rezeptliste: Bild (falls vorhanden), Titel, Zeit und Tags. */
+/**
+ * Eintrag in der Rezeptliste: kleines Bild, Titel, Zeit und Tags in einer Zeile.
+ *
+ * Bewusst kompakt statt gross: Diese Liste sieht man am haeufigsten, und bei einer
+ * Sammlung von achtzig Rezepten zaehlt die Uebersicht mehr als die Bildgroesse. Die
+ * grossen Bilder haben ihren Platz im Wisch-Modus.
+ */
 @Composable
 fun RecipeListCard(
     recipe: RecipeSummary,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            .cardSurface(Tokens.Radius.LgShape)
+            .clickable(onClick = onClick)
+            // 48 dp waere die Untergrenze fuer eine Tippflaeche; hier sind es mehr,
+            // weil das Bild ohnehin quadratisch ist.
+            .heightIn(min = 88.dp)
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
-            RecipeImage(
-                photoUri = recipe.photoUri,
-                title = recipe.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
+        RecipeImage(
+            photoUri = recipe.photoUri,
+            title = recipe.title,
+            modifier = Modifier
+                .size(72.dp)
+                .clip(Tokens.Radius.MdShape),
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = recipe.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = recipe.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    recipe.prepTimeMinutes?.let { minutes -> PrepTimeLabel(minutes) }
-                    if (recipe.tags.isNotEmpty()) {
-                        Text(
-                            text = recipe.tags.joinToString(" · "),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                recipe.prepTimeMinutes?.let { minutes -> PrepTimeLabel(minutes) }
+                if (recipe.tags.isNotEmpty()) {
+                    Text(
+                        text = recipe.tags.joinToString(" · "),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -88,14 +101,25 @@ fun RecipeImage(
     modifier: Modifier = Modifier,
 ) {
     if (photoUri.isNullOrBlank()) {
+        // Statt einer grauen Flaeche ein Farbverlauf aus der Mesh-Palette des Kits.
+        // Er haengt am Titel, ist also fuer dasselbe Rezept immer derselbe - eine
+        // Karte, die bei jedem Blaettern die Farbe wechselt, waere nur unruhig.
+        val mesh = Tokens.Mesh.All[abs(title.hashCode()) % Tokens.Mesh.All.size]
         Box(
-            modifier = modifier.background(MaterialTheme.colorScheme.secondaryContainer),
+            modifier = modifier.background(
+                Brush.linearGradient(
+                    listOf(
+                        mesh.copy(alpha = 0.45f),
+                        MaterialTheme.colorScheme.surfaceContainer,
+                    ),
+                ),
+            ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.Restaurant,
                 contentDescription = stringResource(R.string.recipe_photo_placeholder),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(48.dp),
             )
         }
