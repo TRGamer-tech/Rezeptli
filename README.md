@@ -16,6 +16,11 @@ Tracking – und quelloffen unter der MIT-Lizenz.
 - **Text-Import** – ein aus Google Docs, einer Notiz-App oder einer Website kopiertes
   Rezept einfügen; ein regelbasierter Parser erkennt Titel, Zutaten, Zubereitung und
   Zubereitungszeit. Jede erkannte Zeile lässt sich vor dem Speichern korrigieren.
+- **Rezepte im Web finden** – Suche bei Betty Bossi, Swissmilk, Gutekueche, Migusto,
+  Bettys Küchenschätze und Le Menu; Import per Link zusätzlich von Fooby und Chefkoch.
+  Ein Rezept aus dem Browser lässt sich über "Teilen" direkt an Rezeptli schicken.
+- **Einkaufsliste** – nach dem Swipen die Zutaten aller Treffer übernehmen:
+  zusammengefasst, nach Warengruppen sortiert und zum Abhaken.
 - **Swipe-Modus** – Kartenstapel mit deinen Rezepten, wischen für Ja/Nein, mit Undo und
   optionalem Vorab-Filter nach Tags und Zeit
 - **Ergebnisliste** – alle Treffer einer Session auf einen Blick, samt vollständiger
@@ -41,9 +46,15 @@ zu ihrer hochdeutschen Normalform.
 
 ## Datenschutz
 
-Alle Daten bleiben auf dem Gerät. Die App hat keine Internet-Berechtigung, kein Analytics-
-SDK, keinen Absturzbericht-Dienst und kein Nutzerkonto. Was du in Rezeptli eingibst,
-verlässt dein Telefon nicht.
+Deine Rezepte, deine Einkaufsliste und deine Swipe-Entscheidungen bleiben auf dem Gerät.
+Es gibt kein Nutzerkonto, kein Analytics-SDK und keinen Absturzbericht-Dienst.
+
+Seit der Web-Suche braucht die App die Berechtigung `INTERNET`. Sie wird ausschliesslich
+benutzt, wenn du selbst suchst oder ein Rezept von einer Adresse lädst – dann ruft die App
+die betreffende Seite ab, sonst nie. Dabei meldet sie sich unter eigenem Namen
+(`Rezeptli/1.0` mit Link auf dieses Repository), liest die robots.txt der Seite und hält
+sich an deren Regeln samt `Crawl-delay`. Ohne die Web-Funktionen läuft die App weiterhin
+vollständig offline.
 
 ## Build
 
@@ -91,7 +102,7 @@ Die folgenden Funktionen sind bewusst noch nicht Teil von Version 1.0, die Daten
 ist aber darauf vorbereitet:
 
 - **Vorrats-Abgleich** – "das habe ich zuhause" mit den Zutaten abgleichen
-- **Einkaufsliste** – deduplizierte, kategorisierte Liste aus den Treffern, teilbar
+- **Einkaufsliste teilen** – die Liste als Text an andere Apps weitergeben
 - **Mehrspieler-Swipe** – zwei Geräte über einen Freundschaftscode verbinden und nur die
   gemeinsamen Treffer anzeigen (lokal über QR-Code/Nearby, ohne kostenpflichtige Cloud)
 - **Rezept-Historie** – Wiederholungen vermeiden, indem die App weiss, was zuletzt auf

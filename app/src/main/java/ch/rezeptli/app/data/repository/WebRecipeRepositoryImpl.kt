@@ -46,6 +46,7 @@ class WebRecipeRepositoryImpl @Inject constructor(
     private fun WebFetchError.toDomain(): WebImportError = when (this) {
         WebFetchError.NoConnection -> WebImportError.NO_CONNECTION
         WebFetchError.Rejected -> WebImportError.REJECTED
+        WebFetchError.Disallowed -> WebImportError.DISALLOWED
         WebFetchError.NotFound -> WebImportError.NOT_FOUND
         is WebFetchError.Unexpected -> WebImportError.UNKNOWN
     }

@@ -1,12 +1,15 @@
 package ch.rezeptli.app.presentation.recipeimport
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.parser.RecipeTextParser
+import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ParseRecipeTextUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.fake.FakeRecipeRepository
+import ch.rezeptli.app.fake.FakeWebRecipeRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -27,10 +30,13 @@ class RecipeImportViewModelTest {
 
     private val repository = FakeRecipeRepository()
 
-    private fun createViewModel() = RecipeImportViewModel(
-        parseRecipeText = ParseRecipeTextUseCase(RecipeTextParser(IngredientTextParser())),
-        saveRecipe = SaveRecipeUseCase(repository),
-    )
+    private fun createViewModel(savedStateHandle: SavedStateHandle = SavedStateHandle()) =
+        RecipeImportViewModel(
+            savedStateHandle = savedStateHandle,
+            parseRecipeText = ParseRecipeTextUseCase(RecipeTextParser(IngredientTextParser())),
+            loadWebRecipe = LoadWebRecipeUseCase(FakeWebRecipeRepository(), IngredientTextParser()),
+            saveRecipe = SaveRecipeUseCase(repository),
+        )
 
     private val sampleText =
         """
@@ -53,7 +59,7 @@ class RecipeImportViewModelTest {
         viewModel.onTextChange(sampleText)
         assertNull(viewModel.uiState.value.form, "Vor dem Auswerten gibt es keinen Vorschlag")
 
-        viewModel.onParse()
+        viewModel.onAnalyse()
 
         val form = viewModel.uiState.value.form
         assertNotNull(form)
@@ -69,7 +75,7 @@ class RecipeImportViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onTextChange(sampleText)
-        viewModel.onParse()
+        viewModel.onAnalyse()
 
         val salt = viewModel.uiState.value.form!!
             .ingredients
@@ -82,7 +88,7 @@ class RecipeImportViewModelTest {
     fun `eine korrigierte Zeile gilt als geprueft`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTextChange(sampleText)
-        viewModel.onParse()
+        viewModel.onAnalyse()
 
         val index = viewModel.uiState.value.form!!
             .ingredients
@@ -102,7 +108,7 @@ class RecipeImportViewModelTest {
     fun `speichert den korrigierten Vorschlag und meldet die neue ID`() = runTest {
         val viewModel = createViewModel()
         viewModel.onTextChange(sampleText)
-        viewModel.onParse()
+        viewModel.onAnalyse()
 
         viewModel.events.test {
             viewModel.onSave()
@@ -121,7 +127,7 @@ class RecipeImportViewModelTest {
         val viewModel = createViewModel()
 
         viewModel.onTextChange("   \n  ")
-        viewModel.onParse()
+        viewModel.onAnalyse()
 
         assertTrue(viewModel.uiState.value.nothingFound)
         assertNull(viewModel.uiState.value.form)

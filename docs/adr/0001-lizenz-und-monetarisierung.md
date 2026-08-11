@@ -21,6 +21,7 @@ wiegt die niedrigere Einstiegshürde schwerer als dieser Schutz.
 
 - Jede Abhängigkeit muss lizenzkompatibel und kostenlos sein.
 - Keine Firebase-, Ads- oder Payment-SDKs, auch nicht "nur für Crash-Reports".
+- Netzzugriffe nur dort, wo die Nutzerin sie ausdrücklich auslöst (siehe ADR 0005).
 - Wer eine geschlossene Variante bauen will, darf das. Das ist bewusst in Kauf genommen.
 - Wenn später doch Copyleft gewünscht ist, ist der Wechsel nur mit Zustimmung aller
   Beitragenden möglich – der Entscheid ist also faktisch dauerhaft.

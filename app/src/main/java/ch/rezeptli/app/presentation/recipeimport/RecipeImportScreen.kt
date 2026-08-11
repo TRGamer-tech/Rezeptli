@@ -322,6 +322,7 @@ private fun InfoCard(
 private fun WebImportError.messageRes(): Int = when (this) {
     WebImportError.NO_CONNECTION -> R.string.error_no_connection
     WebImportError.REJECTED -> R.string.error_rejected
+    WebImportError.DISALLOWED -> R.string.error_disallowed
     WebImportError.NOT_FOUND -> R.string.error_not_found
     WebImportError.NO_RECIPE_FOUND -> R.string.error_no_recipe
     WebImportError.UNKNOWN -> R.string.error_unknown

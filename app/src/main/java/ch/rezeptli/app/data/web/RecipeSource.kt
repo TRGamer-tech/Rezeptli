@@ -96,9 +96,12 @@ object RecipeSourceCatalog {
     )
 
     /**
-     * Chefkoch beantwortet Anfragen ausserhalb eines Browsers teilweise mit 403.
-     * Der Import ist deshalb nicht garantiert - er wird versucht und meldet sauber,
-     * wenn die Seite ihn abweist.
+     * Chefkochs robots.txt erlaubt Rezeptseiten ausdruecklich; ausgenommen sind unter
+     * anderem Kommentare, Bewertungen und Adressen mit Abfrageparametern. Letztere
+     * entfernt der Client ohnehin, bevor er laedt.
+     *
+     * Aus Rechenzentren beantwortet Chefkoch Anfragen teilweise mit 403. Vom Handy aus
+     * klappt der Import in der Regel; wenn nicht, meldet die App das sauber.
      */
     val CHEFKOCH = RecipeSource(
         id = "chefkoch",

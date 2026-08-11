@@ -10,6 +10,9 @@ enum class WebImportError {
     /** Die Seite weist automatisierte Zugriffe ab. */
     REJECTED,
 
+    /** Die robots.txt der Seite untersagt genau diesen Abruf. */
+    DISALLOWED,
+
     NOT_FOUND,
 
     /** Die Seite war erreichbar, enthaelt aber kein maschinenlesbares Rezept. */

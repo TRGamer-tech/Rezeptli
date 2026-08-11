@@ -21,8 +21,11 @@ interface WebIndexStore {
 sealed interface WebFetchError {
     data object NoConnection : WebFetchError
 
-    /** Die Seite weist den Zugriff ab (etwa Chefkoch mit 403). */
+    /** Die Seite weist den Zugriff ab (etwa mit 403). */
     data object Rejected : WebFetchError
+
+    /** Die robots.txt der Seite untersagt den Abruf dieser Adresse. */
+    data object Disallowed : WebFetchError
 
     data object NotFound : WebFetchError
 

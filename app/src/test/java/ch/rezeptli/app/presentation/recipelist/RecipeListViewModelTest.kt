@@ -1,10 +1,12 @@
 package ch.rezeptli.app.presentation.recipelist
 
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.usecase.ObserveOpenShoppingCountUseCase
 import ch.rezeptli.app.domain.usecase.ObservePagedRecipesUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRecipeCountUseCase
 import ch.rezeptli.app.domain.usecase.ObserveTagsUseCase
 import ch.rezeptli.app.fake.FakeRecipeRepository
+import ch.rezeptli.app.fake.FakeShoppingListRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,10 +30,13 @@ class RecipeListViewModelTest {
         ),
     )
 
+    private val shoppingRepository = FakeShoppingListRepository()
+
     private fun createViewModel() = RecipeListViewModel(
         observePagedRecipes = ObservePagedRecipesUseCase(repository),
         observeRecipeCount = ObserveRecipeCountUseCase(repository),
         observeTags = ObserveTagsUseCase(repository),
+        observeOpenShoppingCount = ObserveOpenShoppingCountUseCase(shoppingRepository),
     )
 
     @Test
@@ -99,6 +104,7 @@ class RecipeListViewModelTest {
             observePagedRecipes = ObservePagedRecipesUseCase(emptyRepository),
             observeRecipeCount = ObserveRecipeCountUseCase(emptyRepository),
             observeTags = ObserveTagsUseCase(emptyRepository),
+            observeOpenShoppingCount = ObserveOpenShoppingCountUseCase(FakeShoppingListRepository()),
         )
         advanceUntilIdle()
 

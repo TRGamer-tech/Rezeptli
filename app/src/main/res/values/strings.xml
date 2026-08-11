@@ -187,6 +187,7 @@
     <string name="import_open_source">Original ansehen</string>
     <string name="error_no_connection">Keine Verbindung. Prüf dein Internet und versuch es nochmal.</string>
     <string name="error_rejected">Diese Seite lässt sich nicht automatisch auslesen – sie weist die Anfrage ab. Kopier stattdessen den Rezepttext und füg ihn hier ein.</string>
+    <string name="error_disallowed">Diese Seite möchte nicht, dass Programme sie abrufen – das steht so in ihrer robots.txt. Kopier den Rezepttext und füg ihn hier ein.</string>
     <string name="error_not_found">Diese Seite gibt es nicht (mehr).</string>
     <string name="error_no_recipe">Auf dieser Seite ist kein maschinenlesbares Rezept hinterlegt. Kopier den Text und füg ihn hier ein.</string>
     <string name="error_unknown">Das hat nicht geklappt. Versuch es später nochmal.</string>
