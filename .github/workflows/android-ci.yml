@@ -172,7 +172,13 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew connectedDebugAndroidTest --console=plain
+          script: ./gradlew connectedDebugAndroidTest --console=plain 2>&1 | tee /tmp/ui.log
+
+      - name: Fehler zusammenfassen
+        if: failure()
+        run: |
+          echo "=== Kompilier- und Testfehler ==="
+          grep -E "^e: |FAILED|Exception" /tmp/ui.log | head -30 || echo "keine gefunden"
 
       - name: Testberichte hochladen
         if: always()

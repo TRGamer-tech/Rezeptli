@@ -26,7 +26,7 @@ class MigrationTest {
     )
 
     @Test
-    fun migriertVonVersion1Auf2UndBehaeltRezepte() {
+    fun migriertVonDerErstenFassungBisHeuteUndBehaeltRezepte() {
         helper.createDatabase(TEST_DB, 1).use { db ->
             db.execSQL(
                 """
@@ -37,7 +37,9 @@ class MigrationTest {
             )
         }
 
-        val db = helper.runMigrationsAndValidate(TEST_DB, 2, true, *RezeptliDatabase.MIGRATIONS)
+        // Geprueft wird bis zur aktuellen Version: Room exportiert nur das Schema der
+        // jeweils aktuellen Fassung, und ein Update springt ohnehin bis ganz nach vorne.
+        val db = helper.runMigrationsAndValidate(TEST_DB, CURRENT_VERSION, true, *RezeptliDatabase.MIGRATIONS)
 
         db.query("SELECT title FROM recipes").use { cursor ->
             assertTrue("Das Rezept muss die Migration ueberleben", cursor.moveToFirst())
@@ -47,9 +49,14 @@ class MigrationTest {
             assertTrue(cursor.moveToFirst())
             assertEquals("Die Einkaufsliste startet leer", 0, cursor.getInt(0))
         }
+        db.query("SELECT sourceUrl FROM recipes").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue("Selbst erfasste Rezepte haben keine Quelle", cursor.isNull(0))
+        }
     }
 
     private companion object {
         const val TEST_DB = "migration-test"
+        const val CURRENT_VERSION = 3
     }
 }
