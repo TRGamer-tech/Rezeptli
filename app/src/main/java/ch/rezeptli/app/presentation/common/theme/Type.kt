@@ -1,6 +1,7 @@
 package ch.rezeptli.app.presentation.common.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -24,6 +25,7 @@ import ch.rezeptli.app.R
  * Hausschrift und in fremden Apps nicht lizenziert. Bedienelemente nutzen deshalb
  * ebenfalls Roboto Flex, nur in einer schmaleren optischen Groesse.
  */
+@OptIn(ExperimentalTextApi::class)
 private fun robotoFlex(
     weight: FontWeight,
     width: Float = WIDTH_NORMAL,

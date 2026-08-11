@@ -8,11 +8,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.rezeptli.app.presentation.onboarding.OnboardingRoute
 import ch.rezeptli.app.presentation.recipedetail.RecipeDetailRoute
 import ch.rezeptli.app.presentation.recipeedit.RecipeEditRoute
 import ch.rezeptli.app.presentation.recipeimport.RecipeImportRoute
 import ch.rezeptli.app.presentation.recipelist.RecipeListRoute
 import ch.rezeptli.app.presentation.results.ResultsRoute
+import ch.rezeptli.app.presentation.settings.SettingsRoute
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListRoute
 import ch.rezeptli.app.presentation.swipe.SwipeRoute
 import ch.rezeptli.app.presentation.swipe.SwipeSetupRoute
@@ -22,6 +24,7 @@ import ch.rezeptli.app.presentation.websearch.WebSearchRoute
 @Composable
 fun RezeptliNavHost(
     sharedUrl: String? = null,
+    startDestination: String = Destinations.RECIPE_LIST,
     navController: NavHostController = rememberNavController(),
 ) {
     // Ein geteilter Link fuehrt einmalig direkt in den Import.
@@ -33,8 +36,23 @@ fun RezeptliNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = Destinations.RECIPE_LIST,
+        startDestination = startDestination,
     ) {
+        composable(Destinations.ONBOARDING) {
+            OnboardingRoute(
+                onFinished = {
+                    navController.navigate(Destinations.RECIPE_LIST) {
+                        // Das Onboarding soll nicht ueber "Zurueck" wiederkehren.
+                        popUpTo(Destinations.ONBOARDING) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(Destinations.SETTINGS) {
+            SettingsRoute(onBack = { navController.popBackStack() })
+        }
+
         composable(Destinations.RECIPE_LIST) {
             RecipeListRoute(
                 onRecipeClick = { recipeId ->
@@ -45,6 +63,7 @@ fun RezeptliNavHost(
                 onSearchWeb = { navController.navigate(Destinations.WEB_SEARCH) },
                 onStartSwipe = { navController.navigate(Destinations.SWIPE_SETUP) },
                 onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
+                onOpenSettings = { navController.navigate(Destinations.SETTINGS) },
             )
         }
 

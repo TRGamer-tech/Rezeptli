@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwipeRight
 import androidx.compose.material3.Badge
@@ -68,6 +69,7 @@ fun RecipeListRoute(
     onSearchWeb: () -> Unit,
     onStartSwipe: () -> Unit,
     onOpenShoppingList: () -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: RecipeListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -90,6 +92,7 @@ fun RecipeListRoute(
         onImportRecipe = onImportRecipe,
         onSearchWeb = onSearchWeb,
         onOpenShoppingList = onOpenShoppingList,
+        onOpenSettings = onOpenSettings,
         onStartSwipe = {
             if (uiState.hasAnyRecipes) {
                 onStartSwipe()
@@ -116,6 +119,7 @@ fun RecipeListScreen(
     onImportRecipe: () -> Unit,
     onSearchWeb: () -> Unit,
     onOpenShoppingList: () -> Unit,
+    onOpenSettings: () -> Unit,
     onStartSwipe: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -124,7 +128,15 @@ fun RecipeListScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.recipes_title)) },
+                title = {
+                    Text(
+                        if (uiState.firstName.isBlank()) {
+                            stringResource(R.string.recipes_title)
+                        } else {
+                            stringResource(R.string.begruessung_mit_name, uiState.firstName)
+                        },
+                    )
+                },
                 actions = {
                     if (uiState.openShoppingItems > 0) {
                         BadgedBox(
@@ -151,6 +163,12 @@ fun RecipeListScreen(
                         Icon(
                             imageVector = Icons.Filled.ContentPaste,
                             contentDescription = stringResource(R.string.recipes_import),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.einstellungen_oeffnen),
                         )
                     }
                     IconButton(onClick = { onFilterVisibilityChange(!uiState.isFilterVisible) }) {

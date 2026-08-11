@@ -191,4 +191,77 @@
     <string name="error_not_found">Diese Seite gibt es nicht (mehr).</string>
     <string name="error_no_recipe">Auf dieser Seite ist kein maschinenlesbares Rezept hinterlegt. Kopier den Text und füg ihn hier ein.</string>
     <string name="error_unknown">Das hat nicht geklappt. Versuch es später nochmal.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_schritt">Schritt %1$d von %2$d</string>
+    <string name="onboarding_ueberspringen">Überspringen</string>
+    <string name="onboarding_weiter">Weiter</string>
+    <string name="onboarding_zurueck">Zurück</string>
+    <string name="onboarding_fertig">Los geht\'s</string>
+
+    <string name="onboarding_willkommen_titel">Willkommen bei Rezeptli</string>
+    <string name="onboarding_willkommen_text">Vier kurze Fragen, dann kannst du loslegen. Du kannst alles überspringen und später in den Einstellungen ändern.</string>
+    <string name="onboarding_vorname">Vorname</string>
+    <string name="onboarding_vorname_hinweis">Nur für die Begrüssung. Bleibt auf deinem Gerät.</string>
+    <string name="onboarding_land_frage">Wo kochst du?</string>
+    <string name="onboarding_land_hinweis">Rezepte aus deiner Gegend erscheinen weiter oben.</string>
+
+    <string name="onboarding_kuechen_titel">Was isst du gern?</string>
+    <string name="onboarding_kuechen_text">Wähle so viel du magst – oder nichts. Das verschiebt nur die Reihenfolge der Vorschläge, nie was du findest.</string>
+
+    <string name="onboarding_ernaehrung_titel">Ernährst du dich besonders?</string>
+    <string name="onboarding_ernaehrung_text">Passende Rezepte rücken nach oben.</string>
+    <string name="onboarding_unvertraeglichkeiten_frage">Verträgst du etwas nicht?</string>
+    <string name="onboarding_unvertraeglichkeiten_hinweis">Wichtig: Rezeptli kann nicht prüfen, ob ein Rezept wirklich frei davon ist – Spuren und Fertigprodukte sieht die App nicht. Verlass dich auf die Zutatenliste, nicht auf uns.</string>
+
+    <string name="onboarding_haushalt_titel">Für wie viele kochst du?</string>
+    <string name="onboarding_haushalt_text">Später kann Rezeptli damit Mengen umrechnen.</string>
+    <string name="onboarding_haushalt_label">Personen</string>
+
+    <!-- Länder -->
+    <string name="land_schweiz">Schweiz</string>
+    <string name="land_deutschland">Deutschland</string>
+    <string name="land_oesterreich">Österreich</string>
+    <string name="land_frankreich">Frankreich</string>
+    <string name="land_italien">Italien</string>
+    <string name="land_anderswo">Anderswo</string>
+
+    <!-- Küchen -->
+    <string name="kueche_schweizer_klassiker">Schweizer Klassiker</string>
+    <string name="kueche_deutsch_oesterreichisch">Deutsch &amp; Österreichisch</string>
+    <string name="kueche_italienisch">Italienisch</string>
+    <string name="kueche_franzoesisch">Französisch</string>
+    <string name="kueche_mediterran">Mediterran</string>
+    <string name="kueche_asiatisch">Asiatisch</string>
+    <string name="kueche_orientalisch">Orientalisch</string>
+    <string name="kueche_amerikanisch">Amerikanisch</string>
+    <string name="kueche_lateinamerikanisch">Lateinamerikanisch</string>
+
+    <!-- Ernährungsform -->
+    <string name="ernaehrung_vegetarisch">Vegetarisch</string>
+    <string name="ernaehrung_vegan">Vegan</string>
+    <string name="ernaehrung_pescetarisch">Pescetarisch</string>
+    <string name="ernaehrung_kohlenhydratarm">Wenig Kohlenhydrate</string>
+
+    <!-- Unverträglichkeiten -->
+    <string name="unvertraeglichkeit_gluten">Gluten</string>
+    <string name="unvertraeglichkeit_laktose">Laktose</string>
+    <string name="unvertraeglichkeit_nuesse">Nüsse</string>
+    <string name="unvertraeglichkeit_eier">Eier</string>
+    <string name="unvertraeglichkeit_soja">Soja</string>
+    <string name="unvertraeglichkeit_meeresfruechte">Meeresfrüchte</string>
+
+    <!-- Einstellungen -->
+    <string name="einstellungen_titel">Einstellungen</string>
+    <string name="einstellungen_oeffnen">Einstellungen öffnen</string>
+    <string name="einstellungen_profil">Dein Profil</string>
+    <string name="einstellungen_profil_text">Diese Angaben bleiben auf deinem Gerät und beeinflussen nur die Reihenfolge der Vorschläge.</string>
+    <string name="einstellungen_zuruecksetzen">Angaben zurücksetzen</string>
+    <string name="einstellungen_zuruecksetzen_frage">Alle Angaben löschen?</string>
+    <string name="einstellungen_zuruecksetzen_text">Vorname, Land und Vorlieben werden gelöscht. Deine Rezepte bleiben unberührt.</string>
+    <string name="einstellungen_gespeichert">Gespeichert</string>
+
+    <!-- Begrüssung -->
+    <string name="begruessung_mit_name">Hallo %1$s</string>
+    <string name="begruessung_ohne_name">Was kochst du heute?</string>
 </resources>

@@ -100,6 +100,10 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
 
+    // Einstellungen und Onboarding-Antworten - schlanker als eine Tabelle,
+    // und die Werte werden als Flow beobachtbar.
+    implementation(libs.androidx.datastore.preferences)
+
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
