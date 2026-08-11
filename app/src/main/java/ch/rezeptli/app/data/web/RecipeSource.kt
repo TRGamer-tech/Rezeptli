@@ -1,5 +1,8 @@
 package ch.rezeptli.app.data.web
 
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.ranking.SourceOrigin
+
 /**
  * Eine Rezeptquelle im Web.
  *
@@ -10,12 +13,16 @@ package ch.rezeptli.app.data.web
  * eigenen Suche sogar ausdruecklich.
  *
  * [minRequestIntervalMs] setzt das Crawl-delay der jeweiligen robots.txt um.
+ *
+ * [country] bestimmt, fuer wen die Quelle zuerst vorgeschlagen wird - siehe
+ * SourceRankingService.
  */
 data class RecipeSource(
     val id: String,
     val name: String,
     val homeUrl: String,
     val urlPattern: Regex,
+    val country: Country,
     val sitemapUrls: List<String> = emptyList(),
     val minRequestIntervalMs: Long = 0L,
     val note: String? = null,
@@ -24,6 +31,8 @@ data class RecipeSource(
     val supportsSearch: Boolean get() = sitemapUrls.isNotEmpty()
 
     fun matches(url: String): Boolean = urlPattern.containsMatchIn(url)
+
+    val origin: SourceOrigin get() = SourceOrigin(sourceId = id, country = country)
 }
 
 /**
@@ -35,6 +44,7 @@ data class RecipeSource(
 object RecipeSourceCatalog {
     val BETTY_BOSSI = RecipeSource(
         id = "bettybossi",
+        country = Country.SCHWEIZ,
         name = "Betty Bossi",
         homeUrl = "https://www.bettybossi.ch",
         urlPattern = Regex("bettybossi\\.ch/de/rezepte/rezept/", RegexOption.IGNORE_CASE),
@@ -43,6 +53,7 @@ object RecipeSourceCatalog {
 
     val SWISSMILK = RecipeSource(
         id = "swissmilk",
+        country = Country.SCHWEIZ,
         name = "Swissmilk",
         homeUrl = "https://www.swissmilk.ch",
         urlPattern = Regex("swissmilk\\.ch/de/rezepte-kochideen/rezepte/", RegexOption.IGNORE_CASE),
@@ -51,6 +62,7 @@ object RecipeSourceCatalog {
 
     val GUTEKUECHE = RecipeSource(
         id = "gutekueche",
+        country = Country.SCHWEIZ,
         name = "Gutekueche",
         homeUrl = "https://www.gutekueche.ch",
         urlPattern = Regex("gutekueche\\.ch/[^/]+-rezept-\\d+", RegexOption.IGNORE_CASE),
@@ -59,6 +71,7 @@ object RecipeSourceCatalog {
 
     val MIGUSTO = RecipeSource(
         id = "migusto",
+        country = Country.SCHWEIZ,
         name = "Migusto",
         homeUrl = "https://migusto.migros.ch",
         urlPattern = Regex("migusto\\.migros\\.ch/de/rezepte/", RegexOption.IGNORE_CASE),
@@ -67,18 +80,26 @@ object RecipeSourceCatalog {
 
     val BETTYS_KUECHENSCHAETZE = RecipeSource(
         id = "bettyskuechenschaetze",
+        country = Country.SCHWEIZ,
         name = "Bettys Küchenschätze",
         homeUrl = "https://bettyskuechenschaetze.ch",
         urlPattern = Regex("bettyskuechenschaetze\\.ch/[^/]+/?$", RegexOption.IGNORE_CASE),
         sitemapUrls = listOf("https://bettyskuechenschaetze.ch/sitemap_index.xml"),
     )
 
+    /**
+     * Le Menu veroeffentlicht auf seinen Seiten keine Rezeptdaten - die Analyse fand
+     * dort nur `ItemList`, kein `Recipe`. Ein Import wuerde also immer scheitern,
+     * deshalb steht die Quelle nicht mehr zur Suche bereit. Der Eintrag bleibt, damit
+     * ein geteilter Link wenigstens der richtigen Quelle zugeordnet wird.
+     */
     val LE_MENU = RecipeSource(
         id = "lemenu",
+        country = Country.SCHWEIZ,
         name = "Le Menu",
         homeUrl = "https://lemenu.ch",
         urlPattern = Regex("lemenu\\.ch/de/", RegexOption.IGNORE_CASE),
-        sitemapUrls = listOf("https://lemenu.ch/post-sitemap.xml"),
+        note = "keine Rezeptdaten auf der Seite",
     )
 
     /**
@@ -88,6 +109,7 @@ object RecipeSourceCatalog {
      */
     val FOOBY = RecipeSource(
         id = "fooby",
+        country = Country.SCHWEIZ,
         name = "Fooby",
         homeUrl = "https://fooby.ch",
         urlPattern = Regex("fooby\\.ch/de/rezepte/", RegexOption.IGNORE_CASE),
@@ -105,10 +127,73 @@ object RecipeSourceCatalog {
      */
     val CHEFKOCH = RecipeSource(
         id = "chefkoch",
+        country = Country.DEUTSCHLAND,
         name = "Chefkoch",
         homeUrl = "https://www.chefkoch.de",
         urlPattern = Regex("chefkoch\\.de/rezepte/\\d+", RegexOption.IGNORE_CASE),
         note = "nur ueber einen Link",
+    )
+
+    // ------------------------------------------------------------- Deutschland
+
+    val EINFACH_KOCHEN = RecipeSource(
+        id = "einfachkochen",
+        country = Country.DEUTSCHLAND,
+        name = "Einfach Kochen",
+        homeUrl = "https://www.einfachkochen.de",
+        urlPattern = Regex("einfachkochen\\.de/rezepte/", RegexOption.IGNORE_CASE),
+        sitemapUrls = listOf("https://www.einfachkochen.de/sitemap.xml"),
+    )
+
+    // --------------------------------------------------------------- Oesterreich
+
+    val ICHKOCHE = RecipeSource(
+        id = "ichkoche",
+        country = Country.OESTERREICH,
+        name = "ichkoche.at",
+        homeUrl = "https://www.ichkoche.at",
+        urlPattern = Regex("ichkoche\\.at/[^/]+-rezept-\\d+", RegexOption.IGNORE_CASE),
+        sitemapUrls = listOf("https://www.ichkoche.at/sitemap.xml"),
+    )
+
+    val KOCHREZEPTE_AT = RecipeSource(
+        id = "kochrezepte",
+        country = Country.OESTERREICH,
+        name = "Kochrezepte.at",
+        homeUrl = "https://www.kochrezepte.at",
+        urlPattern = Regex("kochrezepte\\.at/[^/]+-rezept-\\d+", RegexOption.IGNORE_CASE),
+        sitemapUrls = listOf("https://www.kochrezepte.at/sitemap.xml"),
+    )
+
+    // ------------------------------------------------------------- Frankreich
+
+    val CUISINE_AZ = RecipeSource(
+        id = "cuisineaz",
+        country = Country.FRANKREICH,
+        name = "CuisineAZ",
+        homeUrl = "https://www.cuisineaz.com",
+        urlPattern = Regex("cuisineaz\\.com/recettes/[^/]+-\\d+\\.aspx", RegexOption.IGNORE_CASE),
+        sitemapUrls = listOf("https://www.cuisineaz.com/xml/sitemap.xml"),
+    )
+
+    val PTITCHEF = RecipeSource(
+        id = "ptitchef",
+        country = Country.FRANKREICH,
+        name = "Ptitchef",
+        homeUrl = "https://www.ptitchef.com",
+        urlPattern = Regex("ptitchef\\.com/recettes/", RegexOption.IGNORE_CASE),
+        sitemapUrls = listOf("https://www.ptitchef.com/sitemap.xml"),
+    )
+
+    // ---------------------------------------------------------------- Italien
+
+    val COOKAROUND = RecipeSource(
+        id = "cookaround",
+        country = Country.ITALIEN,
+        name = "Cookaround",
+        homeUrl = "https://www.cookaround.com",
+        urlPattern = Regex("cookaround\\.com/ricetta/", RegexOption.IGNORE_CASE),
+        sitemapUrls = listOf("https://www.cookaround.com/sitemap/ricette.xml"),
     )
 
     val ALL: List<RecipeSource> = listOf(
@@ -120,6 +205,12 @@ object RecipeSourceCatalog {
         LE_MENU,
         FOOBY,
         CHEFKOCH,
+        EINFACH_KOCHEN,
+        ICHKOCHE,
+        KOCHREZEPTE_AT,
+        CUISINE_AZ,
+        PTITCHEF,
+        COOKAROUND,
     )
 
     val SEARCHABLE: List<RecipeSource> = ALL.filter { it.supportsSearch }

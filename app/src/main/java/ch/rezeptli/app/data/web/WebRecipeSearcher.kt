@@ -44,6 +44,7 @@ class WebRecipeSearcher @Inject constructor(
                     url = entry.url,
                     sourceId = source.id,
                     sourceName = source.name,
+                    country = source.country,
                 )
             }
     }

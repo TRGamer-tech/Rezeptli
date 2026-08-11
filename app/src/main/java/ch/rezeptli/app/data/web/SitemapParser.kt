@@ -44,7 +44,7 @@ class SitemapParser @Inject constructor() {
             .trimEnd('/')
             .substringAfterLast('/')
             .substringBefore('?')
-            .removeSuffix(".html")
+            .replace(PAGE_SUFFIX, "")
             .replace(TRAILING_ID, "")
             .replace(TRAILING_NOISE, "")
 
@@ -59,8 +59,13 @@ class SitemapParser @Inject constructor() {
     private companion object {
         val LOC = Regex("<loc>\\s*([^<\\s]+)\\s*</loc>", RegexOption.IGNORE_CASE)
 
+        /** Cookaround endet auf .html, CuisineAZ auf .aspx. */
+        val PAGE_SUFFIX = Regex("\\.(html?|aspx)$", RegexOption.IGNORE_CASE)
+
         /** Gutekueche haengt "-rezept-6" an, Betty Bossi eine lange Nummer. */
         val TRAILING_ID = Regex("-\\d+$")
-        val TRAILING_NOISE = Regex("-(rezept|recipe|recette|ricetta)$", RegexOption.IGNORE_CASE)
+
+        /** Ptitchef schreibt "-fid" vor die Nummer. */
+        val TRAILING_NOISE = Regex("-(rezept|recipe|recette|ricetta|fid)$", RegexOption.IGNORE_CASE)
     }
 }

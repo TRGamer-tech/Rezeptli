@@ -4,17 +4,32 @@ import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.domain.parser.IngredientTextParser
+import ch.rezeptli.app.domain.ranking.SourceRankingService
+import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 class SearchWebRecipesUseCase @Inject constructor(
     private val repository: WebRecipeRepository,
+    private val profileRepository: UserProfileRepository,
+    private val ranking: SourceRankingService,
 ) {
+    /**
+     * Sucht und bringt die Treffer in die Reihenfolge, die zum Profil passt.
+     *
+     * Die Quelle bestimmt die Reihenfolge, nicht der Treffer selbst: Wer in der Schweiz
+     * kocht, sieht Schweizer Quellen zuerst. Innerhalb derselben Quelle bleibt die
+     * Reihenfolge der Suche erhalten.
+     */
     suspend operator fun invoke(query: String, sourceIds: Set<String>): List<WebSearchResult> {
         if (query.isBlank() || sourceIds.isEmpty()) return emptyList()
-        return repository.search(query.trim(), sourceIds)
+
+        val results = repository.search(query.trim(), sourceIds)
+        val profile = profileRepository.profile.first()
+        return ranking.rankItems(results, profile) { it.origin }
     }
 }
 

@@ -1,5 +1,8 @@
 package ch.rezeptli.app.domain.model
 
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.ranking.SourceOrigin
+
 /**
  * Ein Rezept, wie es von einer Website gelesen wurde - noch unverarbeitet.
  *
@@ -28,4 +31,8 @@ data class WebSearchResult(
     val url: String,
     val sourceId: String,
     val sourceName: String,
-)
+    /** Woher die Quelle stammt - Grundlage der Reihenfolge in der Trefferliste. */
+    val country: Country,
+) {
+    val origin: SourceOrigin get() = SourceOrigin(sourceId = sourceId, country = country)
+}
