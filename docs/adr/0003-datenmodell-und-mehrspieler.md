@@ -40,3 +40,18 @@ Cloud-Dienst nötig wird.
   Zeile. Das ist der Preis dafür, später keine Migration zu brauchen.
 - Tags liegen normalisiert in einer eigenen Tabelle, damit nach mehreren Tags gleichzeitig
   gefiltert werden kann (UND-Semantik) und die Filter-Chips direkt aus der Datenbank kommen.
+
+
+## Nachtrag: umgesetzt in Version 1.1
+
+Der Mehrspieler-Modus ist gebaut. Die hier vorbereitete Struktur hat gehalten:
+`participantId` gehörte von Anfang an zum Primärschlüssel, und `SwipeMatcher`
+rechnete bereits mit mehreren Beteiligten.
+
+Eine Annahme war allerdings falsch. Rezept-Kennungen sind auf jedem Gerät andere,
+also lässt sich eine Runde nicht durch den Austausch von Kennungen teilen - die
+Runde selbst muss geteilt werden. Der Gastgeber schickt deshalb Titel, Bild und
+Zeit an den Pairing-Dienst, und die zweite Person stimmt über diese Liste ab statt
+über ihre eigene Sammlung.
+
+Siehe [0006](0006-online-first.md).
