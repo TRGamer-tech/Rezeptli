@@ -7,6 +7,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
+import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 
 @Entity(tableName = "recipes")
@@ -90,4 +91,28 @@ data class RecipeSummaryProjection(
     val lastCookedAt: Long?,
     @ColumnInfo(name = "tags")
     val tags: String?,
+)
+
+/**
+ * Ein Posten der Einkaufsliste.
+ *
+ * Die Liste ist bewusst nicht an eine Swipe-Session gebunden: Man geht einmal
+ * einkaufen, egal aus wie vielen Runden die Zutaten stammen.
+ */
+@Entity(
+    tableName = "shopping_items",
+    indices = [Index("matchKey")],
+)
+data class ShoppingItemEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val name: String,
+    val matchKey: String,
+    val amount: Double?,
+    val unit: IngredientUnit,
+    val category: IngredientCategory,
+    val isChecked: Boolean,
+    val isManual: Boolean,
+    val sourceNote: String?,
+    val addedAt: Long,
 )

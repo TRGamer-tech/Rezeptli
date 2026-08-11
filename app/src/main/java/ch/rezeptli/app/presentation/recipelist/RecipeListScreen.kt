@@ -19,7 +19,10 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwipeRight
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -62,6 +65,7 @@ fun RecipeListRoute(
     onCreateRecipe: () -> Unit,
     onImportRecipe: () -> Unit,
     onStartSwipe: () -> Unit,
+    onOpenShoppingList: () -> Unit,
     viewModel: RecipeListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,6 +86,7 @@ fun RecipeListRoute(
         onRecipeClick = onRecipeClick,
         onCreateRecipe = onCreateRecipe,
         onImportRecipe = onImportRecipe,
+        onOpenShoppingList = onOpenShoppingList,
         onStartSwipe = {
             if (uiState.hasAnyRecipes) {
                 onStartSwipe()
@@ -106,6 +111,7 @@ fun RecipeListScreen(
     onRecipeClick: (Long) -> Unit,
     onCreateRecipe: () -> Unit,
     onImportRecipe: () -> Unit,
+    onOpenShoppingList: () -> Unit,
     onStartSwipe: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -116,6 +122,21 @@ fun RecipeListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.recipes_title)) },
                 actions = {
+                    if (uiState.openShoppingItems > 0) {
+                        BadgedBox(
+                            badge = { Badge { Text(uiState.openShoppingItems.toString()) } },
+                        ) {
+                            IconButton(onClick = onOpenShoppingList) {
+                                Icon(
+                                    imageVector = Icons.Filled.ShoppingCart,
+                                    contentDescription = stringResource(
+                                        R.string.shopping_open_badge,
+                                        uiState.openShoppingItems,
+                                    ),
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = onImportRecipe) {
                         Icon(
                             imageVector = Icons.Filled.ContentPaste,

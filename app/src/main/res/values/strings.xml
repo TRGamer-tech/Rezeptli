@@ -140,4 +140,33 @@
     <string name="unit_scheibe">Scheibe</string>
     <string name="unit_tasse">Tasse</string>
     <string name="unit_messerspitze">Msp.</string>
+
+    <!-- Einkaufsliste -->
+    <string name="shopping_title">Einkaufsliste</string>
+    <string name="shopping_summary">%1$d von %2$d noch zu besorgen</string>
+    <string name="shopping_empty_title">Die Liste ist leer</string>
+    <string name="shopping_empty_message">Swipe dich durch deine Rezepte und übernimm am Ende die Zutaten – oder trag hier direkt ein, was noch fehlt.</string>
+    <string name="shopping_add">Auf die Liste setzen</string>
+    <string name="shopping_add_hint">Was fehlt noch?</string>
+    <string name="shopping_delete_item">"%1$s" von der Liste nehmen</string>
+    <string name="shopping_remove_checked">Erledigte entfernen</string>
+    <string name="shopping_clear">Liste leeren</string>
+    <string name="shopping_clear_title">Ganze Liste leeren?</string>
+    <string name="shopping_clear_message">Alle Posten werden entfernt, auch die noch offenen.</string>
+    <string name="shopping_open_badge">%1$d offene Posten auf der Einkaufsliste</string>
+    <string name="results_add_to_shopping">Zutaten auf die Einkaufsliste</string>
+    <string name="results_added_to_shopping">Zutaten übernommen – die Liste hat jetzt %1$d Posten</string>
+
+    <!-- Warengruppen der Einkaufsliste -->
+    <string name="category_gemuese">Gemüse</string>
+    <string name="category_fruechte">Früchte</string>
+    <string name="category_milchprodukte">Milchprodukte und Eier</string>
+    <string name="category_fleisch_fisch">Fleisch und Fisch</string>
+    <string name="category_teigwaren">Teigwaren, Reis und Brot</string>
+    <string name="category_konserven">Konserven, Saucen und Öle</string>
+    <string name="category_backen">Backen und Süsses</string>
+    <string name="category_gewuerze">Gewürze und Kräuter</string>
+    <string name="category_tiefkuehl">Tiefkühl</string>
+    <string name="category_getraenke">Getränke</string>
+    <string name="category_sonstiges">Sonstiges</string>
 </resources>

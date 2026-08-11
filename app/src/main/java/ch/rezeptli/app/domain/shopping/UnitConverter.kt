@@ -27,7 +27,6 @@ enum class UnitDimension {
  * die still falsche Mengen ausweist, ist schlimmer als eine mit zwei Zeilen.
  */
 object UnitConverter {
-
     val IngredientUnit.dimension: UnitDimension
         get() = when (this) {
             IngredientUnit.GRAMM, IngredientUnit.KILOGRAMM -> UnitDimension.MASS

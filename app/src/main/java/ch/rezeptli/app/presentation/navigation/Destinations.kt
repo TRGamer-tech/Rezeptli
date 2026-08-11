@@ -27,6 +27,7 @@ object Destinations {
     const val SWIPE =
         "swipe/session?$ARG_QUERY={$ARG_QUERY}&$ARG_TAGS={$ARG_TAGS}&$ARG_MAX_PREP_TIME={$ARG_MAX_PREP_TIME}"
     const val RESULTS = "results/{$ARG_SESSION_ID}"
+    const val SHOPPING_LIST = "shopping"
 
     fun recipeDetail(recipeId: Long): String = "recipes/$recipeId"
 

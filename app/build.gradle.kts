@@ -58,6 +58,10 @@ android {
         }
     }
 
+    // Die exportierten Schemas liegen als Assets im androidTest-Quellsatz, damit der
+    // Migrationstest gegen die tatsaechliche Vorgaengerversion laufen kann.
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test
 private const val DELTA = 0.001
 
 class ShoppingListAggregatorTest {
-
     private val aggregator = ShoppingListAggregator()
 
     private fun ingredient(

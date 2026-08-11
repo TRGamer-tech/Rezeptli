@@ -10,7 +10,6 @@ import org.junit.jupiter.params.provider.CsvSource
 private const val DELTA = 0.001
 
 class UnitConverterTest {
-
     @ParameterizedTest(name = "{0} -> {1}")
     @CsvSource(
         "GRAMM, MASS",
@@ -46,8 +45,14 @@ class UnitConverterTest {
 
     @Test
     fun `waehlt Kilogramm ab tausend Gramm`() {
-        assertEquals(1.5 to IngredientUnit.KILOGRAMM, UnitConverter.fromBase(1500.0, UnitDimension.MASS, IngredientUnit.GRAMM))
-        assertEquals(999.0 to IngredientUnit.GRAMM, UnitConverter.fromBase(999.0, UnitDimension.MASS, IngredientUnit.GRAMM))
+        assertEquals(
+            1.5 to IngredientUnit.KILOGRAMM,
+            UnitConverter.fromBase(1500.0, UnitDimension.MASS, IngredientUnit.GRAMM),
+        )
+        assertEquals(
+            999.0 to IngredientUnit.GRAMM,
+            UnitConverter.fromBase(999.0, UnitDimension.MASS, IngredientUnit.GRAMM),
+        )
     }
 
     @Test
@@ -68,7 +73,10 @@ class UnitConverterTest {
 
     @Test
     fun `behaelt bei Stueckzahlen und Sondereinheiten die Ausgangseinheit`() {
-        assertEquals(3.0 to IngredientUnit.BUND, UnitConverter.fromBase(3.0, UnitDimension.DISCRETE, IngredientUnit.BUND))
+        assertEquals(
+            3.0 to IngredientUnit.BUND,
+            UnitConverter.fromBase(3.0, UnitDimension.DISCRETE, IngredientUnit.BUND),
+        )
         assertEquals(4.0 to IngredientUnit.NONE, UnitConverter.fromBase(4.0, UnitDimension.COUNT, IngredientUnit.NONE))
     }
 }

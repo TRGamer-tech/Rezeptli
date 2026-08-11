@@ -4,11 +4,13 @@ import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
 import ch.rezeptli.app.data.local.entity.RecipeSummaryProjection
 import ch.rezeptli.app.data.local.entity.RecipeWithDetails
+import ch.rezeptli.app.data.local.entity.ShoppingItemEntity
 import ch.rezeptli.app.data.local.entity.SwipeResultEntity
 import ch.rezeptli.app.data.local.entity.SwipeSessionEntity
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.model.ShoppingItem
 import ch.rezeptli.app.domain.model.SwipeDecision
 import ch.rezeptli.app.domain.model.SwipeSession
 
@@ -96,4 +98,30 @@ fun SwipeDecision.toEntity(): SwipeResultEntity = SwipeResultEntity(
     recipeId = recipeId,
     liked = liked,
     decidedAt = decidedAt,
+)
+
+fun ShoppingItemEntity.toDomain(): ShoppingItem = ShoppingItem(
+    id = id,
+    name = name,
+    matchKey = matchKey,
+    amount = amount,
+    unit = unit,
+    category = category,
+    isChecked = isChecked,
+    isManual = isManual,
+    sourceNote = sourceNote,
+    addedAt = addedAt,
+)
+
+fun ShoppingItem.toEntity(): ShoppingItemEntity = ShoppingItemEntity(
+    id = id,
+    name = name.trim(),
+    matchKey = matchKey,
+    amount = amount,
+    unit = unit,
+    category = category,
+    isChecked = isChecked,
+    isManual = isManual,
+    sourceNote = sourceNote,
+    addedAt = addedAt,
 )

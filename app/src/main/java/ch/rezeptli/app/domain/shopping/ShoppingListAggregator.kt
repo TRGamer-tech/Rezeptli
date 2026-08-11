@@ -17,7 +17,6 @@ import javax.inject.Inject
  * moeglich ist, bleiben zwei Zeilen stehen statt einer falschen.
  */
 class ShoppingListAggregator @Inject constructor() {
-
     /** Fasst die Zutaten aller [recipes] zu Einkaufsposten zusammen. */
     fun aggregate(recipes: List<Recipe>): List<ShoppingItem> {
         val entries = recipes.flatMap { recipe ->
@@ -139,7 +138,10 @@ class ShoppingListAggregator @Inject constructor() {
             amount = amount,
             unit = unit,
             category = IngredientCategory.forIngredient(first.canonicalName ?: displayName),
-            sourceNote = group.map { it.second }.distinct().filter { it.isNotBlank() }
+            sourceNote = group
+                .map { it.second }
+                .distinct()
+                .filter { it.isNotBlank() }
                 .takeIf { it.isNotEmpty() }
                 ?.joinToString(", "),
         )
