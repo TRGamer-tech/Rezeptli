@@ -121,7 +121,7 @@ jobs:
           }
 
           pruefe "/" '__bundler/template' "die Bundle-Daten"
-          pruefe "/Datenschutz.dc.html" '__bundler/template' "die Bundle-Daten"
+          pruefe "/Datenschutz.html" '__bundler/template' "die Bundle-Daten"
           pruefe "/index/manifest.json" 'gebautAm' "das Manifest"
 
           {
