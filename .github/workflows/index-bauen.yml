@@ -34,6 +34,24 @@ jobs:
           set -o pipefail
           python3 tools/index-bauen.py 2>&1 | tee /tmp/index.log
 
+      - name: Seite zusammenstellen
+        run: |
+          # Die Website liegt an der Wurzel, der Rezeptindex darunter. Vorher hat
+          # dieser Workflow nur den Index hochgeladen - und damit die Website
+          # ueberschrieben, was rezeptli.app einen 404 lieferte.
+          mkdir -p build/pages
+          cp -r site/. build/pages/
+          mkdir -p build/pages/index
+          cp build/index/* build/pages/index/
+
+          echo "Veroeffentlicht wird:"
+          find build/pages -maxdepth 2 -type f -printf '  %P (%s Bytes)\n' | sort
+
+          # Ohne index.html an der Wurzel antwortet Pages mit 404 - genau der Fehler,
+          # der hier behoben wird. Also pruefen, bevor hochgeladen wird.
+          test -f build/pages/index.html || { echo "::error::index.html fehlt"; exit 1; }
+          test -f build/pages/CNAME || { echo "::error::CNAME fehlt"; exit 1; }
+
       - name: Ergebnis zusammenfassen
         if: always()
         run: |
@@ -68,11 +86,50 @@ jobs:
       - name: Pages einrichten
         uses: actions/configure-pages@v5
 
-      - name: Index hochladen
+      - name: Seite hochladen
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/index
+          path: build/pages
 
       - name: Veröffentlichen
         id: veroeffentlichen
         uses: actions/deploy-pages@v4
+
+      - name: Prüfen, ob die Seite wirklich etwas anzeigt
+        run: |
+          # Ein erfolgreicher Deploy ist kein Beweis, dass die Seite laedt. Die
+          # Startseite entpackt sich selbst per JavaScript, deshalb wird hier
+          # geprueft, dass die Bundle-Daten wirklich ankommen - nicht nur ein
+          # HTTP 200 auf irgendwas.
+          BASIS="${{ steps.veroeffentlichen.outputs.page_url }}"
+          BASIS="${BASIS%/}"
+          echo "Prüfe $BASIS"
+
+          fehler=0
+          pruefe() {
+            pfad="$1"; muster="$2"; beschreibung="$3"
+            code=$(curl -sSL -o /tmp/seite -w '%{http_code}' "$BASIS$pfad" || echo 000)
+            if [ "$code" != "200" ]; then
+              echo "  FEHLER $pfad: HTTP $code"
+              fehler=1
+            elif ! grep -q "$muster" /tmp/seite; then
+              echo "  FEHLER $pfad: HTTP 200, aber $beschreibung fehlt"
+              fehler=1
+            else
+              echo "  ok $pfad ($(stat -c%s /tmp/seite) Bytes, $beschreibung vorhanden)"
+            fi
+          }
+
+          pruefe "/" '__bundler/template' "die Bundle-Daten"
+          pruefe "/Datenschutz.dc.html" '__bundler/template' "die Bundle-Daten"
+          pruefe "/index/manifest.json" 'gebautAm' "das Manifest"
+
+          {
+            echo "### Website"
+            echo
+            echo "Adresse: $BASIS"
+            [ "$fehler" = "0" ] && echo "Startseite, Datenschutz und Index liefern Inhalt." \
+              || echo "**Es fehlt etwas — siehe Protokoll.**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit $fehler
