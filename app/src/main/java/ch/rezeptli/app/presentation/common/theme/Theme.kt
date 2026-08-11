@@ -1,113 +1,103 @@
 package ch.rezeptli.app.presentation.common.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-
-private val LightColors = lightColorScheme(
-    primary = HerbGreen40,
-    onPrimary = Color.White,
-    primaryContainer = HerbGreen90,
-    onPrimaryContainer = HerbGreen10,
-    secondary = Sage40,
-    onSecondary = Color.White,
-    secondaryContainer = Sage90,
-    onSecondaryContainer = Sage10,
-    tertiary = Carrot40,
-    onTertiary = Color.White,
-    tertiaryContainer = Carrot90,
-    onTertiaryContainer = Carrot10,
-    error = Tomato40,
-    onError = Color.White,
-    errorContainer = Tomato90,
-    onErrorContainer = Tomato10,
-    background = Cream99,
-    onBackground = Charcoal10,
-    surface = Cream99,
-    onSurface = Charcoal10,
-    surfaceVariant = Cream90,
-    onSurfaceVariant = Stone30,
-    outline = Stone50,
-    outlineVariant = Stone80,
-    surfaceContainer = Cream95,
-    surfaceContainerHigh = Cream90,
-)
+import androidx.compose.ui.text.TextStyle
 
 private val DarkColors = darkColorScheme(
-    primary = HerbGreen80,
-    onPrimary = HerbGreen20,
-    primaryContainer = HerbGreen30,
-    onPrimaryContainer = HerbGreen90,
-    secondary = Sage80,
-    onSecondary = Sage20,
-    secondaryContainer = Sage30,
-    onSecondaryContainer = Sage90,
-    tertiary = Carrot80,
-    onTertiary = Carrot20,
-    tertiaryContainer = Carrot30,
-    onTertiaryContainer = Carrot90,
-    error = Tomato80,
-    onError = Tomato20,
-    errorContainer = Tomato30,
-    onErrorContainer = Tomato90,
-    background = Charcoal10,
-    onBackground = Charcoal90,
-    surface = Charcoal10,
-    onSurface = Charcoal90,
-    surfaceVariant = Charcoal30,
-    onSurfaceVariant = Stone80,
-    outline = Stone50,
-    outlineVariant = Charcoal30,
-    surfaceContainer = Charcoal20,
-    surfaceContainerHigh = Charcoal30,
+    primary = AccentPrimary,
+    onPrimary = OnAccent,
+    primaryContainer = AccentPressed,
+    onPrimaryContainer = AccentLight,
+    secondary = AccentSoft,
+    onSecondary = OnAccent,
+    secondaryContainer = SurfaceElevated,
+    onSecondaryContainer = AccentLight,
+    tertiary = Tokens.Mesh.Teal,
+    onTertiary = Tokens.Neutral.Charcoal900,
+    tertiaryContainer = SurfaceElevated,
+    onTertiaryContainer = TextPrimary,
+    error = ErrorColor,
+    onError = OnErrorColor,
+    errorContainer = ErrorSurface,
+    onErrorContainer = Color(0xFFFFDAD6),
+    background = SurfaceBackground,
+    onBackground = TextPrimary,
+    surface = SurfaceBackground,
+    onSurface = TextPrimary,
+    surfaceVariant = SurfaceCard,
+    onSurfaceVariant = TextSecondary,
+    outline = SurfaceLine,
+    outlineVariant = Tokens.Border.Hairline,
+    surfaceContainer = SurfaceCard,
+    surfaceContainerHigh = SurfaceElevated,
+    surfaceContainerHighest = SurfaceElevated,
+    surfaceContainerLow = SurfaceRaised,
+    scrim = Tokens.Neutral.Black,
 )
 
-/** Farben, die es im Material-Schema nicht gibt, die Rezeptli aber braucht. */
+/**
+ * Werte, die Material nicht kennt, die aber im ganzen Design gebraucht werden.
+ *
+ * Sie liegen bewusst neben dem Material-Farbschema statt darin: Material haette keinen
+ * passenden Platz fuer sie, und ein eigener Zugriffspunkt macht im Bildschirmcode
+ * sichtbar, dass hier eine App-eigene Entscheidung sichtbar wird.
+ */
 data class RezeptliAccentColors(
     val swipeYes: Color,
     val swipeNo: Color,
+    val glow: Color,
+    val glassFill: Color,
+    val hairline: Color,
+    val accentBorder: Color,
 )
 
-private val LightAccents = RezeptliAccentColors(swipeYes = SwipeYes, swipeNo = SwipeNo)
-
-/** Im Dunkelmodus etwas heller, damit die Rueckmeldung auf dunklem Grund lesbar bleibt. */
 private val DarkAccents = RezeptliAccentColors(
-    swipeYes = Color(0xFF6BD69B),
-    swipeNo = Color(0xFFFF8A7A),
+    swipeYes = SwipeYes,
+    swipeNo = SwipeNo,
+    glow = Tokens.Purple.Vivid,
+    // Glas ist eine Flaeche, durch die der Hintergrund schimmert - deshalb halbtransparent.
+    glassFill = Tokens.Neutral.Charcoal850.copy(alpha = 0.72f),
+    hairline = Tokens.Border.Hairline,
+    accentBorder = Tokens.Border.Accent,
 )
 
-private val LocalAccentColors = staticCompositionLocalOf { LightAccents }
+private val LocalAccentColors = staticCompositionLocalOf { DarkAccents }
 
 object RezeptliTheme {
     val accents: RezeptliAccentColors
         @Composable
         @ReadOnlyComposable
         get() = LocalAccentColors.current
+
+    /** Mengenangaben in Ziffern gleicher Breite. */
+    val amountStyle: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = AmountTextStyle
 }
 
 /**
  * Das Theme der App.
  *
- * Dynamic Color (Material You) wird bewusst nicht verwendet: Die Farbwelt aus Gruen und
- * Orange ist Teil der Identitaet der App, und die Wisch-Rueckmeldung braucht verlaessliche
- * Gruen- und Rottoene, die sich nicht mit dem Hintergrundbild des Geraets aendern.
+ * Die App ist dunkel angelegt und folgt nicht der Hell-Dunkel-Einstellung des Geraets:
+ * Die Farbwelt des UI-Kits ist als dunkles Design definiert, und eine daraus abgeleitete
+ * helle Variante waere geraten, nicht vorgegeben.
+ *
+ * Dynamic Color (Material You) bleibt bewusst aus: Die Wisch-Rueckmeldung braucht
+ * verlaessliche Gruen- und Rottoene, die sich nicht mit dem Hintergrundbild des Geraets
+ * aendern.
  */
 @Composable
-fun RezeptliTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
-    CompositionLocalProvider(
-        LocalAccentColors provides if (darkTheme) DarkAccents else LightAccents,
-    ) {
+fun RezeptliTheme(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalAccentColors provides DarkAccents) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
+            colorScheme = DarkColors,
             typography = RezeptliTypography,
             shapes = RezeptliShapes,
             content = content,

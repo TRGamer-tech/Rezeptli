@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Basis-Theme der Activity. Das eigentliche Aussehen kommt aus Compose. -->
-    <style name="Theme.Rezeptli" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Basis-Theme der Activity. Das eigentliche Aussehen kommt aus Compose.
+         Bewusst dunkel und ohne values-night-Variante: Die App folgt der
+         Hell-Dunkel-Einstellung des Geraets nicht, sonst blitzt beim Start kurz
+         eine helle Flaeche auf. -->
+    <style name="Theme.Rezeptli" parent="android:Theme.Material.NoActionBar" />
 
     <!-- Startbildschirm ueber androidx.core.splashscreen. -->
     <style name="Theme.Rezeptli.Starting" parent="Theme.SplashScreen">
