@@ -2,6 +2,7 @@ package ch.rezeptli.app.presentation.common.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -76,7 +77,7 @@ fun Modifier.cardSurface(shape: Shape): Modifier = composed {
     val accents = RezeptliTheme.accents
     this
         .clip(shape)
-        .background(SurfaceCard)
+        .background(MaterialTheme.colorScheme.surfaceContainer)
         .border(width = 1.dp, color = accents.hairline, shape = shape)
 }
 
