@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import ch.rezeptli.app.presentation.cooking.CookingRoute
+import ch.rezeptli.app.presentation.multiplayer.MultiplayerRoute
 import ch.rezeptli.app.presentation.onboarding.OnboardingRoute
 import ch.rezeptli.app.presentation.recipedetail.RecipeDetailRoute
 import ch.rezeptli.app.presentation.recipeedit.RecipeEditRoute
@@ -145,6 +146,37 @@ fun RezeptliNavHost(
                         popUpTo(Destinations.SWIPE_SETUP) { inclusive = true }
                     }
                 },
+                onStartTogether = { filter ->
+                    navController.navigate(Destinations.multiplayer(filter))
+                },
+            )
+        }
+
+        composable(
+            route = Destinations.MULTIPLAYER,
+            arguments = listOf(
+                navArgument(Destinations.ARG_QUERY) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(Destinations.ARG_TAGS) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(Destinations.ARG_MAX_PREP_TIME) {
+                    type = NavType.IntType
+                    defaultValue = 0
+                },
+            ),
+        ) { entry ->
+            val filter = Destinations.filterFrom(
+                query = entry.arguments?.getString(Destinations.ARG_QUERY),
+                tags = entry.arguments?.getString(Destinations.ARG_TAGS),
+                maxPrepTime = entry.arguments?.getInt(Destinations.ARG_MAX_PREP_TIME),
+            )
+            MultiplayerRoute(
+                filter = filter,
+                onBack = { navController.popBackStack() },
             )
         }
 
