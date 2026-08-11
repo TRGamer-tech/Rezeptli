@@ -24,7 +24,7 @@ android {
         buildConfigField(
             "String",
             "PAIRING_URL",
-            "\"https://rezeptli-pairing.workers.dev\"",
+            "\"https://rezeptli-pairing.rezeptli.workers.dev\"",
         )
 
         // Das taeglich gebaute Rezeptverzeichnis. Ist es nicht erreichbar,
