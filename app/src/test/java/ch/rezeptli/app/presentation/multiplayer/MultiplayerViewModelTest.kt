@@ -16,6 +16,7 @@ import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -39,13 +40,30 @@ class MultiplayerViewModelTest {
     private val recipeRepository = FakeRecipeRepository(rezepte)
     private val pairing = FakePairingRepository(pool = pool)
 
+    /** Alle im Test erzeugten ViewModels, damit sie danach aufgeraeumt werden. */
+    private val angelegte = mutableListOf<MultiplayerViewModel>()
+
     private fun createViewModel() = MultiplayerViewModel(
         startSession = StartSharedSessionUseCase(pairing, recipeRepository),
         joinSession = JoinSharedSessionUseCase(pairing),
         sendVotes = SendSharedVotesUseCase(pairing),
         closeSession = CloseSharedSessionUseCase(pairing),
         observeSession = ObserveSharedSessionUseCase(pairing),
-    )
+    ).also { angelegte += it }
+
+    /**
+     * Beendet nach jedem Test die Abfrageschleife.
+     *
+     * Das ViewModel fragt den Stand der Runde wiederholt ab und hoert erst auf, wenn
+     * alle fertig sind. In Tests, die das absichtlich nicht erreichen - Warten auf die
+     * zweite Person zum Beispiel -, laeuft die Schleife sonst weiter, und `runTest`
+     * wartet am Ende darauf, bis gar nichts mehr geht.
+     */
+    @AfterEach
+    fun beendeLaufendeAbfragen() {
+        angelegte.forEach { it.onLeave() }
+        angelegte.clear()
+    }
 
     @Test
     fun `eroeffnen liefert einen Code und wartet auf die andere Person`() = runTest {
