@@ -19,6 +19,14 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
+        // Adresse des Pairing-Dienstes. Nur der Mehrspieler-Modus nutzt sie;
+        // alles andere in der App kommt ohne Server aus.
+        buildConfigField(
+            "String",
+            "PAIRING_URL",
+            "\"https://rezeptli-pairing.workers.dev\"",
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -48,6 +56,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
