@@ -6,6 +6,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -157,3 +160,80 @@ jobs:
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
           retention-days: 7
+
+  publish-apk:
+    name: Debug-APK veröffentlichen
+    runs-on: ubuntu-latest
+    # Laeuft bewusst nur auf Zuruf: bei jedem Push waere ein Release blosses Rauschen.
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Debug-APK bauen
+        run: ./gradlew assembleDebug --console=plain
+
+      - name: APK benennen
+        id: apk
+        run: |
+          version="$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)"
+          target="rezeptli-${version}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$target"
+          echo "name=$target" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          sha256sum "$target"
+
+      - name: Release veröffentlichen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: apk-debug
+          APK: ${{ steps.apk.outputs.name }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          COMMIT: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          notes=$(cat <<NOTES
+          **Debug-Build zum Ausprobieren - kein fertiges Release.**
+
+          Diese APK ist mit dem Android-Debug-Schlüssel signiert und nicht optimiert.
+          Sie ist zum Testen gedacht, nicht zur Weitergabe.
+
+          - Version: \`$VERSION\`
+          - Paketname: \`ch.rezeptli.app.debug\` (läuft parallel zu einem späteren Release-Build)
+          - Stand: \`$COMMIT\`
+
+          **Installation:** APK auf dem Handy herunterladen und öffnen. Android fragt einmalig,
+          ob Browser bzw. Datei-Manager Apps installieren dürfen - das muss erlaubt werden.
+
+          Die App hat keine Internet-Berechtigung: alle Rezepte bleiben auf dem Gerät.
+          NOTES
+          )
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+            gh release edit "$TAG" --notes "$notes" --prerelease
+          else
+            gh release create "$TAG" "$APK" \
+              --title "Rezeptli $VERSION (Debug-Build)" \
+              --notes "$notes" \
+              --prerelease
+          fi
+
+          {
+            echo "### APK bereit"
+            echo "https://github.com/$REPO/releases/download/$TAG/$APK"
+          } >> "$GITHUB_STEP_SUMMARY"

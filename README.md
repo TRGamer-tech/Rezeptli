@@ -28,8 +28,12 @@ Noch keine – die App ist gerade erst gebaut. Wer sie auf einem Gerät laufen l
 gerne welche beisteuern: Rezeptliste, Swipe-Karte und Ergebnisliste als PNG in `docs/img/`
 legen und hier einbinden. Für den Swipe-Flow eignet sich ein kurzes GIF am besten.
 
-Bis dahin: Die CI baut bei jedem Push eine Debug-APK und hängt sie als Artefakt an den
-Workflow-Lauf – damit lässt sich die App ohne eigene Build-Umgebung ausprobieren.
+## Ausprobieren ohne Build
+
+Unter [Releases](https://github.com/TRGamer-tech/Rezeptli/releases) liegt eine Debug-APK
+zum direkten Herunterladen aufs Handy. Sie ist mit dem Android-Debug-Schlüssel signiert
+und nicht optimiert – zum Testen gedacht, nicht zur Weitergabe. Zusätzlich hängt die CI
+bei jedem Push eine Debug-APK als Artefakt an den Workflow-Lauf.
 
 Schweizer Eigenheiten sind eingebaut: **dl** und **KL** sind vollwertige Einheiten, und
 regionale Begriffe wie *Rüebli*, *Peperoni* oder *Zucchetti* kennt die App als Synonyme
