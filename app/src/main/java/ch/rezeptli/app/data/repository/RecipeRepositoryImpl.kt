@@ -81,6 +81,9 @@ class RecipeRepositoryImpl @Inject constructor(
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .distinct(),
+            steps = recipe.steps.mapIndexed { index, step ->
+                step.toEntity(recipeId = recipe.id, position = index)
+            },
         )
     }
 

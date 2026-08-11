@@ -137,7 +137,13 @@ class RecipeImportViewModel @Inject constructor(
 
     fun onTitleChange(title: String) = updateForm { it.copy(title = title, titleError = false) }
 
-    fun onInstructionsChange(instructions: String) = updateForm { it.copy(instructions = instructions) }
+    /**
+     * Wird der Zubereitungstext bearbeitet, verfaellt eine mitgebrachte Gliederung.
+     * Sie gehoerte zum alten Text; beim Speichern wird der neue frisch aufgeteilt.
+     */
+    fun onInstructionsChange(instructions: String) = updateForm {
+        it.copy(instructions = instructions, importedSteps = emptyList())
+    }
 
     fun onPrepTimeChange(text: String) = updateForm {
         it.copy(prepTimeText = text.filter { char -> char.isDigit() }, prepTimeError = false)

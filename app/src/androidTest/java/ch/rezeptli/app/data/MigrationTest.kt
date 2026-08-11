@@ -32,7 +32,12 @@ class MigrationTest {
                 """
                 INSERT INTO recipes
                     (title, instructions, prepTimeMinutes, photoUri, createdAt, updatedAt, lastCookedAt)
-                VALUES ('Rösti', 'Raffeln und braten.', 30, NULL, 1, 1, NULL)
+                VALUES (
+                    'Rösti',
+                    '1. Kartoffeln raffeln.
+2. 20 Minuten braten.',
+                    30, NULL, 1, 1, NULL
+                )
                 """.trimIndent(),
             )
         }
@@ -53,10 +58,24 @@ class MigrationTest {
             assertTrue(cursor.moveToFirst())
             assertTrue("Selbst erfasste Rezepte haben keine Quelle", cursor.isNull(0))
         }
+
+        // Version 4 teilt bestehende Zubereitungen in Schritte auf. Ein Rezept, das
+        // vor dem Update angelegt wurde, muss danach im Kochmodus funktionieren.
+        db.query("SELECT text, timerMinutes FROM recipe_steps ORDER BY position").use { cursor ->
+            assertTrue("Der alte Text muss in Schritte zerlegt sein", cursor.moveToFirst())
+            assertEquals("Kartoffeln raffeln.", cursor.getString(0))
+            assertTrue("Der erste Schritt hat keine Wartezeit", cursor.isNull(1))
+
+            assertTrue(cursor.moveToNext())
+            assertEquals("20 Minuten braten.", cursor.getString(0))
+            assertEquals("Die Wartezeit wird als Timer erkannt", 20, cursor.getInt(1))
+
+            assertEquals("Genau zwei Schritte", 2, cursor.count)
+        }
     }
 
     private companion object {
         const val TEST_DB = "migration-test"
-        const val CURRENT_VERSION = 3
+        const val CURRENT_VERSION = 4
     }
 }

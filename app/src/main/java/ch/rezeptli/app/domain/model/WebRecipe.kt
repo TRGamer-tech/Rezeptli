@@ -14,6 +14,13 @@ data class WebRecipe(
     val title: String,
     val ingredientLines: List<String> = emptyList(),
     val instructions: String = "",
+    /**
+     * Die Schritte, wie die Quelle sie selbst gegliedert hat.
+     *
+     * Leer, wenn die Seite die Zubereitung als einen Block liefert - dann teilt sie
+     * spaeter der InstructionSplitter auf.
+     */
+    val instructionSteps: List<String> = emptyList(),
     val imageUrl: String? = null,
     val totalMinutes: Int? = null,
     val servings: String? = null,

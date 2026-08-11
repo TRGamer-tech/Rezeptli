@@ -8,6 +8,7 @@ import ch.rezeptli.app.domain.model.SwissIngredientSynonyms
 import ch.rezeptli.app.domain.parser.ParseConfidence
 import ch.rezeptli.app.domain.parser.ParsedIngredient
 import ch.rezeptli.app.domain.parser.ParsedRecipe
+import ch.rezeptli.app.domain.steps.RecipeStep
 
 /**
  * Eine Zutatenzeile im Formular.
@@ -79,6 +80,14 @@ data class RecipeFormState(
     val lastCookedAt: Long? = null,
     val sourceUrl: String? = null,
     val sourceName: String? = null,
+    /**
+     * Die vom Anbieter gegliederten Schritte eines importierten Rezepts.
+     *
+     * Sie werden unveraendert weitergereicht, solange der Zubereitungstext nicht
+     * angefasst wird. Wer den Text bearbeitet, bekommt eine neue Aufteilung - eine
+     * Gliederung, die zu einem anderen Text gehoert, waere schlechter als keine.
+     */
+    val importedSteps: List<RecipeStep> = emptyList(),
     val titleError: Boolean = false,
     val prepTimeError: Boolean = false,
 ) {
@@ -102,6 +111,7 @@ data class RecipeFormState(
         lastCookedAt = lastCookedAt,
         sourceUrl = sourceUrl,
         sourceName = sourceName,
+        steps = importedSteps,
     )
 
     /** Fuegt eine leere Zutatenzeile an und vergibt dafuer einen stabilen Schluessel. */
@@ -160,6 +170,7 @@ data class RecipeFormState(
             lastCookedAt = recipe.lastCookedAt,
             sourceUrl = recipe.sourceUrl,
             sourceName = recipe.sourceName,
+            importedSteps = recipe.steps,
         )
     }
 }

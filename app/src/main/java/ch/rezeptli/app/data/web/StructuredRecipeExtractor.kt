@@ -59,6 +59,7 @@ class StructuredRecipeExtractor @Inject constructor() {
             title = recipe.stringOrNull("name")?.cleanText().orEmpty(),
             ingredientLines = ingredients,
             instructions = recipe["recipeInstructions"].toInstructions(),
+            instructionSteps = recipe["recipeInstructions"].toInstructionSteps(),
             imageUrl = recipe["image"].toImageUrl(),
             totalMinutes = IsoDuration.toMinutes(recipe.stringOrNull("totalTime"))
                 ?: sumOf(recipe.stringOrNull("prepTime"), recipe.stringOrNull("cookTime")),
@@ -85,6 +86,7 @@ class StructuredRecipeExtractor @Inject constructor() {
                 .stringList("supply")
                 .ifEmpty { document.microdataIngredients() },
             instructions = howTo["step"].toInstructions(),
+            instructionSteps = howTo["step"].toInstructionSteps(),
             imageUrl = howTo["image"].toImageUrl() ?: document.metaImage(),
             totalMinutes = IsoDuration.toMinutes(howTo.stringOrNull("totalTime")),
             servings = howTo["yield"].toYield(),
@@ -104,15 +106,18 @@ class StructuredRecipeExtractor @Inject constructor() {
             ?: document.selectFirst("h1")?.text()?.cleanText()
             ?: document.title().cleanText()
 
-        val instructions = document
+        // Mehrere Elemente mit recipeInstructions sind bereits die Gliederung der
+        // Seite - jedes davon ist ein Schritt.
+        val steps = document
             .select("[itemprop=recipeInstructions]")
-            .joinToString("\n") { it.text().cleanText() }
-            .trim()
+            .map { it.text().cleanText().trim() }
+            .filter { it.isNotBlank() }
 
         return WebRecipe(
             title = title,
             ingredientLines = ingredients,
-            instructions = instructions,
+            instructions = steps.joinToString("\n"),
+            instructionSteps = steps,
             imageUrl = document.metaImage(),
             sourceUrl = sourceUrl,
             sourceName = sourceName,
@@ -175,26 +180,37 @@ class StructuredRecipeExtractor @Inject constructor() {
      * Zubereitungsschritte, wie sie in freier Wildbahn vorkommen: als einzelner Text,
      * als Liste von Texten, als `HowToStep` oder als `HowToSection` mit Unterschritten.
      */
-    private fun JsonElement?.toInstructions(): String = when (this) {
-        null -> ""
-        is JsonPrimitive -> contentOrEmpty().cleanText()
-        is JsonArray -> mapNotNull { it.toStepText() }.filter { it.isNotBlank() }.joinToString("\n")
-        is JsonObject -> toStepText().orEmpty()
-        else -> ""
-    }.trim()
+    private fun JsonElement?.toInstructions(): String =
+        toInstructionSteps().joinToString("\n").trim()
 
-    private fun JsonElement.toStepText(): String? = when (this) {
-        is JsonPrimitive -> contentOrEmpty().cleanText()
+    /**
+     * Die Schritte einzeln - so, wie die Quelle sie gegliedert hat.
+     *
+     * Diese Gliederung ist von Menschen gesetzt und damit besser als jede spaetere
+     * Aufteilung eines Fliesstextes. Sie wird deshalb bis in die Datenbank
+     * durchgereicht, statt hier zu einem Block zusammengefasst zu werden.
+     */
+    private fun JsonElement?.toInstructionSteps(): List<String> = when (this) {
+        null -> emptyList()
+        is JsonPrimitive -> listOf(contentOrEmpty().cleanText())
+        is JsonArray -> flatMap { it.toStepTexts() }
+        is JsonObject -> toStepTexts()
+        else -> emptyList()
+    }.map { it.trim() }.filter { it.isNotBlank() }
+
+    private fun JsonElement.toStepTexts(): List<String> = when (this) {
+        is JsonPrimitive -> listOfNotNull(contentOrEmpty().cleanText())
         is JsonObject -> {
+            // Ein HowToSection buendelt weitere Schritte - die zaehlen einzeln.
             val nested = CONTAINER_KEYS.firstNotNullOfOrNull { key -> this[key] }
             when {
-                this["text"] != null -> stringOrNull("text")?.cleanText()
-                nested != null -> nested.toInstructions()
-                else -> stringOrNull("name")?.cleanText()
+                this["text"] != null -> listOfNotNull(stringOrNull("text")?.cleanText())
+                nested != null -> nested.toInstructionSteps()
+                else -> listOfNotNull(stringOrNull("name")?.cleanText())
             }
         }
 
-        else -> null
+        else -> emptyList()
     }
 
     private fun JsonElement?.toImageUrl(): String? = when (this) {

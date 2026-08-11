@@ -264,4 +264,23 @@
     <!-- Begrüssung -->
     <string name="begruessung_mit_name">Hallo %1$s</string>
     <string name="begruessung_ohne_name">Was kochst du heute?</string>
+
+    <!-- Kochmodus -->
+    <string name="kochmodus_starten">Kochmodus starten</string>
+    <string name="kochmodus_titel">Kochmodus</string>
+    <string name="kochmodus_schritt">Schritt %1$d von %2$d</string>
+    <string name="kochmodus_weiter">Weiter</string>
+    <string name="kochmodus_zurueck">Vorheriger Schritt</string>
+    <string name="kochmodus_naechster">Nächster Schritt</string>
+    <string name="kochmodus_beenden">Kochmodus beenden</string>
+    <string name="kochmodus_fertig">Fertig gekocht</string>
+    <string name="kochmodus_zutaten_fuer_schritt">Dafür brauchst du</string>
+    <string name="kochmodus_timer_starten">Timer starten</string>
+    <string name="kochmodus_timer_stoppen">Timer stoppen</string>
+    <string name="kochmodus_timer_abgelaufen">Zeit ist um</string>
+    <string name="kochmodus_keine_schritte">Für dieses Rezept ist keine Zubereitung hinterlegt.</string>
+    <plurals name="kochmodus_timer_minuten">
+        <item quantity="one">%d Minute</item>
+        <item quantity="other">%d Minuten</item>
+    </plurals>
 </resources>

@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.parser.RecipeTextParser
+import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ParseRecipeTextUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
@@ -34,8 +35,12 @@ class RecipeImportViewModelTest {
         RecipeImportViewModel(
             savedStateHandle = savedStateHandle,
             parseRecipeText = ParseRecipeTextUseCase(RecipeTextParser(IngredientTextParser())),
-            loadWebRecipe = LoadWebRecipeUseCase(FakeWebRecipeRepository(), IngredientTextParser()),
-            saveRecipe = SaveRecipeUseCase(repository),
+            loadWebRecipe = LoadWebRecipeUseCase(
+                FakeWebRecipeRepository(),
+                IngredientTextParser(),
+                InstructionSplitter(),
+            ),
+            saveRecipe = SaveRecipeUseCase(repository, InstructionSplitter()),
         )
 
     private val sampleText =

@@ -2,6 +2,7 @@ package ch.rezeptli.app.data.mapper
 
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.data.local.entity.RecipeSummaryProjection
 import ch.rezeptli.app.data.local.entity.RecipeWithDetails
 import ch.rezeptli.app.data.local.entity.ShoppingItemEntity
@@ -13,6 +14,7 @@ import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.model.ShoppingItem
 import ch.rezeptli.app.domain.model.SwipeDecision
 import ch.rezeptli.app.domain.model.SwipeSession
+import ch.rezeptli.app.domain.steps.RecipeStep
 
 /** Trennzeichen der zusammengefassten Tag-Spalte aus [RecipeSummaryProjection]. */
 private const val TAG_SEPARATOR = "|"
@@ -21,6 +23,7 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     id = recipe.id,
     title = recipe.title,
     instructions = recipe.instructions,
+    steps = steps.sortedBy { it.position }.map { it.toDomain() },
     ingredients = ingredients.sortedBy { it.position }.map { it.toDomain() },
     tags = tags.map { it.tag }.sorted(),
     prepTimeMinutes = recipe.prepTimeMinutes,
@@ -30,6 +33,22 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     lastCookedAt = recipe.lastCookedAt,
     sourceUrl = recipe.sourceUrl,
     sourceName = recipe.sourceName,
+)
+
+fun RecipeStepEntity.toDomain(): RecipeStep = RecipeStep(
+    id = id,
+    recipeId = recipeId,
+    position = position,
+    text = text,
+    timerMinutes = timerMinutes,
+)
+
+fun RecipeStep.toEntity(recipeId: Long, position: Int): RecipeStepEntity = RecipeStepEntity(
+    id = id,
+    recipeId = recipeId,
+    position = position,
+    text = text.trim(),
+    timerMinutes = timerMinutes,
 )
 
 fun IngredientEntity.toDomain(): Ingredient = Ingredient(

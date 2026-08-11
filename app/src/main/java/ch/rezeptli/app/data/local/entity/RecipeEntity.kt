@@ -72,6 +72,35 @@ data class RecipeTagEntity(
     val tag: String,
 )
 
+/**
+ * Ein Arbeitsschritt eines Rezepts.
+ *
+ * Die Schritte liegen strukturiert vor, statt sie beim Anzeigen aus dem Fliesstext zu
+ * raten: Bei importierten Rezepten liefert die Quelle sie bereits gegliedert, und diese
+ * Gliederung soll nicht verloren gehen. Fuer selbst erfasste Rezepte schlaegt der
+ * InstructionSplitter eine Aufteilung vor, die sich vor dem Speichern korrigieren laesst.
+ */
+@Entity(
+    tableName = "recipe_steps",
+    foreignKeys = [
+        ForeignKey(
+            entity = RecipeEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["recipeId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("recipeId")],
+)
+data class RecipeStepEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val recipeId: Long,
+    val position: Int,
+    val text: String,
+    val timerMinutes: Int?,
+)
+
 /** Rezept mit allen abhaengigen Datensaetzen - fuer Detail- und Bearbeitungsansicht. */
 data class RecipeWithDetails(
     @Embedded val recipe: RecipeEntity,
@@ -79,6 +108,8 @@ data class RecipeWithDetails(
     val ingredients: List<IngredientEntity>,
     @Relation(parentColumn = "id", entityColumn = "recipeId")
     val tags: List<RecipeTagEntity>,
+    @Relation(parentColumn = "id", entityColumn = "recipeId")
+    val steps: List<RecipeStepEntity>,
 )
 
 /**

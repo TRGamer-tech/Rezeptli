@@ -9,6 +9,8 @@ import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
+import ch.rezeptli.app.domain.steps.InstructionSplitter
+import ch.rezeptli.app.domain.steps.RecipeStep
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -50,6 +52,7 @@ sealed interface WebImportOutcome {
 class LoadWebRecipeUseCase @Inject constructor(
     private val repository: WebRecipeRepository,
     private val ingredientParser: IngredientTextParser,
+    private val splitter: InstructionSplitter,
 ) {
     suspend operator fun invoke(url: String): WebImportOutcome =
         when (val result = repository.loadRecipe(url.trim())) {
@@ -60,6 +63,16 @@ class LoadWebRecipeUseCase @Inject constructor(
     private fun WebRecipe.toRecipe(): Recipe = Recipe(
         title = title,
         instructions = instructions,
+        // Die Gliederung der Quelle stammt von Menschen und ist damit besser als jede
+        // Aufteilung, die die App selbst vornehmen koennte. Nur wenn die Seite die
+        // Zubereitung als einen Block liefert, wird sie spaeter aufgeteilt.
+        steps = instructionSteps.mapIndexed { index, text ->
+            RecipeStep(
+                position = index,
+                text = text,
+                timerMinutes = splitter.timerMinutesIn(text),
+            )
+        },
         ingredients = ingredientLines
             .mapNotNull { line -> ingredientParser.parseLine(line) }
             .mapIndexed { index, parsed -> parsed.toIngredient(index) },

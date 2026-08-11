@@ -10,10 +10,12 @@ import ch.rezeptli.app.data.local.dao.ShoppingListDao
 import ch.rezeptli.app.data.local.dao.SwipeSessionDao
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.data.local.entity.RecipeTagEntity
 import ch.rezeptli.app.data.local.entity.ShoppingItemEntity
 import ch.rezeptli.app.data.local.entity.SwipeResultEntity
 import ch.rezeptli.app.data.local.entity.SwipeSessionEntity
+import ch.rezeptli.app.domain.steps.InstructionSplitter
 
 /**
  * Die lokale Datenbank der App. Rezeptli speichert alles auf dem Geraet - es gibt
@@ -31,8 +33,9 @@ import ch.rezeptli.app.data.local.entity.SwipeSessionEntity
         SwipeSessionEntity::class,
         SwipeResultEntity::class,
         ShoppingItemEntity::class,
+        RecipeStepEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -86,7 +89,58 @@ abstract class RezeptliDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 4 speichert die Zubereitung zusaetzlich in einzelnen Schritten.
+         *
+         * Die Spalte `instructions` bleibt unveraendert bestehen: Sie ist weiterhin das,
+         * was beim Bearbeiten im Textfeld steht. Die Schritte sind die gegliederte
+         * Fassung davon - fuer den Kochmodus, der immer nur einen Schritt zeigt.
+         *
+         * Bestehende Rezepte werden hier einmalig aufgeteilt. Das geschieht mit
+         * demselben InstructionSplitter, den auch die Bearbeitung verwendet, damit ein
+         * altes und ein neues Rezept hinterher gleich aussehen.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `recipe_steps` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `recipeId` INTEGER NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `timerMinutes` INTEGER,
+                        FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_recipe_steps_recipeId` " +
+                        "ON `recipe_steps` (`recipeId`)",
+                )
+
+                val splitter = InstructionSplitter()
+                val cursor = db.query("SELECT `id`, `instructions` FROM `recipes`")
+                cursor.use {
+                    while (it.moveToNext()) {
+                        val recipeId = it.getLong(0)
+                        val instructions = if (it.isNull(1)) "" else it.getString(1)
+
+                        splitter.split(instructions).forEach { step ->
+                            db.execSQL(
+                                "INSERT INTO `recipe_steps` " +
+                                    "(`recipeId`, `position`, `text`, `timerMinutes`) " +
+                                    "VALUES (?, ?, ?, ?)",
+                                arrayOf(recipeId, step.position, step.text, step.timerMinutes),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         /** Alle Migrationen in aufsteigender Reihenfolge. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
     }
 }

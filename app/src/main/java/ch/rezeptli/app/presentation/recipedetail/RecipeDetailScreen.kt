@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.displayText
@@ -286,14 +288,47 @@ private fun RecipeDetailContent(
             SectionHeader(text = stringResource(R.string.recipe_instructions))
         }
 
-        item(key = "instructions") {
-            Text(
-                text = recipe.instructions.ifBlank {
-                    stringResource(R.string.recipe_no_instructions)
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
+        if (recipe.steps.isEmpty()) {
+            item(key = "instructions") {
+                Text(
+                    text = recipe.instructions.ifBlank {
+                        stringResource(R.string.recipe_no_instructions)
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+        } else {
+            items(recipe.steps, key = { "step-${it.position}" }) { step ->
+                StepRow(step = step)
+            }
+        }
+    }
+}
+
+/** Ein nummerierter Schritt in der Detailansicht. */
+@Composable
+private fun StepRow(step: RecipeStep) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "${step.position + 1}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = step.text, style = MaterialTheme.typography.bodyLarge)
+            step.timerMinutes?.let { minutes ->
+                Text(
+                    text = pluralStringResource(R.plurals.kochmodus_timer_minuten, minutes, minutes),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
