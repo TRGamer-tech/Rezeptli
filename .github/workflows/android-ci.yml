@@ -25,6 +25,9 @@ jobs:
   build:
     name: Build und Tests
     runs-on: ubuntu-latest
+    # Ohne Obergrenze kann ein haengender Test den Lauf stundenlang blockieren,
+    # ohne je fehlzuschlagen - genau das ist passiert. Lieber ein klarer Abbruch.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -46,6 +49,8 @@ jobs:
         run: ./gradlew ktlintCheck --stacktrace
 
       - name: Unit-Tests
+        # Enger als das Job-Limit: So bleibt Zeit, den Fehlerbericht zu schreiben.
+        timeout-minutes: 12
         run: |
           set -o pipefail
           ./gradlew testDebugUnitTest --console=plain 2>&1 | tee /tmp/build.log

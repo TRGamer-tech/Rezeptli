@@ -14,9 +14,10 @@ import ch.rezeptli.app.fake.FakePairingRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -40,8 +41,26 @@ class MultiplayerViewModelTest {
     private val recipeRepository = FakeRecipeRepository(rezepte)
     private val pairing = FakePairingRepository(pool = pool)
 
-    /** Alle im Test erzeugten ViewModels, damit sie danach aufgeraeumt werden. */
-    private val angelegte = mutableListOf<MultiplayerViewModel>()
+    /**
+     * Stellt ein ViewModel bereit und beendet danach seine Abfrageschleife.
+     *
+     * Das ViewModel fragt den Stand der Runde wiederholt ab und hoert erst auf, wenn
+     * alle fertig sind. Tests, die genau das absichtlich nicht erreichen - Warten auf
+     * die zweite Person etwa -, wuerden `runTest` sonst ewig beschaeftigen: Es wartet
+     * am Ende des Testrumpfs darauf, dass keine Coroutine mehr laeuft.
+     *
+     * Wichtig ist, dass das Aufraeumen *innerhalb* des Rumpfs geschieht. Ein
+     * `@AfterEach` kommt zu spaet - da wartet `runTest` bereits.
+     */
+    private fun TestScope.mitViewModel(block: (MultiplayerViewModel) -> Unit) {
+        val viewModel = createViewModel()
+        try {
+            block(viewModel)
+        } finally {
+            viewModel.onLeave()
+            advanceUntilIdle()
+        }
+    }
 
     private fun createViewModel() = MultiplayerViewModel(
         startSession = StartSharedSessionUseCase(pairing, recipeRepository),
@@ -49,95 +68,85 @@ class MultiplayerViewModelTest {
         sendVotes = SendSharedVotesUseCase(pairing),
         closeSession = CloseSharedSessionUseCase(pairing),
         observeSession = ObserveSharedSessionUseCase(pairing),
-    ).also { angelegte += it }
-
-    /**
-     * Beendet nach jedem Test die Abfrageschleife.
-     *
-     * Das ViewModel fragt den Stand der Runde wiederholt ab und hoert erst auf, wenn
-     * alle fertig sind. In Tests, die das absichtlich nicht erreichen - Warten auf die
-     * zweite Person zum Beispiel -, laeuft die Schleife sonst weiter, und `runTest`
-     * wartet am Ende darauf, bis gar nichts mehr geht.
-     */
-    @AfterEach
-    fun beendeLaufendeAbfragen() {
-        angelegte.forEach { it.onLeave() }
-        angelegte.clear()
-    }
+    )
 
     @Test
     fun `eroeffnen liefert einen Code und wartet auf die andere Person`() = runTest {
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
 
-        viewModel.onHost(RecipeFilter.NONE)
-
-        val state = viewModel.uiState.value
-        assertEquals(FakePairingRepository.CODE, state.code)
-        assertEquals(MultiplayerStep.WARTET_AUF_PERSON, state.step)
-        assertTrue(state.isHost)
-        assertEquals(rezepte.size, pairing.createdSession?.recipes?.size)
+            val state = viewModel.uiState.value
+            assertEquals(FakePairingRepository.CODE, state.code)
+            assertEquals(MultiplayerStep.WARTET_AUF_PERSON, state.step)
+            assertTrue(state.isHost)
+            assertEquals(rezepte.size, pairing.createdSession?.recipes?.size)
+        }
     }
 
     @Test
     fun `geteilt werden nur Titel und Bild, keine Zutaten`() = runTest {
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
 
-        viewModel.onHost(RecipeFilter.NONE)
-
-        val geteilt = pairing.createdSession?.recipes.orEmpty()
-        assertEquals(setOf("Rösti", "Risotto", "Älplermagronen"), geteilt.map { it.title }.toSet())
-        // SharedRecipe hat schlicht kein Feld fuer Zutaten oder Zubereitung.
-        assertTrue(geteilt.all { it.sourceUrl == null })
+            val geteilt = pairing.createdSession?.recipes.orEmpty()
+            assertEquals(
+                setOf("Rösti", "Risotto", "Älplermagronen"),
+                geteilt.map { it.title }.toSet(),
+            )
+            // SharedRecipe hat schlicht kein Feld fuer Zutaten oder Zubereitung.
+            assertTrue(geteilt.all { it.sourceUrl == null })
+        }
     }
 
     @Test
     fun `beitreten mit falschem Code meldet einen verstaendlichen Fehler`() = runTest {
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange("XXXXXX")
+            viewModel.onJoin()
 
-        viewModel.onCodeInputChange("XXXXXX")
-        viewModel.onJoin()
-
-        assertEquals(PairingError.UNKNOWN_CODE, viewModel.uiState.value.error)
-        assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+            assertEquals(PairingError.UNKNOWN_CODE, viewModel.uiState.value.error)
+            assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+        }
     }
 
     @Test
     fun `beitreten holt den Rezeptstapel und beginnt sofort`() = runTest {
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange(FakePairingRepository.CODE)
+            viewModel.onJoin()
 
-        viewModel.onCodeInputChange(FakePairingRepository.CODE)
-        viewModel.onJoin()
-
-        val state = viewModel.uiState.value
-        assertEquals(MultiplayerStep.WISCHEN, state.step)
-        assertEquals(pool.size, state.pool.size)
-        assertFalse(state.isHost)
+            val state = viewModel.uiState.value
+            assertEquals(MultiplayerStep.WISCHEN, state.step)
+            assertEquals(pool.size, state.pool.size)
+            assertFalse(state.isHost)
+        }
     }
 
     @Test
     fun `der Code wird in Grossbuchstaben uebernommen`() = runTest {
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange("abc123")
 
-        viewModel.onCodeInputChange("abc123")
-
-        assertEquals("ABC123", viewModel.uiState.value.codeInput)
+            assertEquals("ABC123", viewModel.uiState.value.codeInput)
+        }
     }
 
     @Test
     fun `nach dem letzten Rezept gehen alle Stimmen auf einmal raus`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.onCodeInputChange(FakePairingRepository.CODE)
-        viewModel.onJoin()
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange(FakePairingRepository.CODE)
+            viewModel.onJoin()
 
-        viewModel.onSwiped(1L, liked = true)
-        viewModel.onSwiped(2L, liked = false)
-        assertTrue(pairing.sentVotes.isEmpty(), "Zwischendurch wird nichts gesendet")
+            viewModel.onSwiped(1L, liked = true)
+            viewModel.onSwiped(2L, liked = false)
+            assertTrue(pairing.sentVotes.isEmpty(), "Zwischendurch wird nichts gesendet")
 
-        viewModel.onSwiped(3L, liked = true)
+            viewModel.onSwiped(3L, liked = true)
 
-        assertEquals(3, pairing.sentVotes.size)
-        assertTrue(pairing.markedFinished)
-        assertEquals(MultiplayerStep.WARTET_AUF_ENTSCHEIDUNGEN, viewModel.uiState.value.step)
+            assertEquals(3, pairing.sentVotes.size)
+            assertTrue(pairing.markedFinished)
+            assertEquals(MultiplayerStep.WARTET_AUF_ENTSCHEIDUNGEN, viewModel.uiState.value.step)
+        }
     }
 
     @Test
@@ -148,14 +157,15 @@ class MultiplayerViewModelTest {
             finished = 1,
             allFinished = false,
         )
-        val viewModel = createViewModel()
-        viewModel.onCodeInputChange(FakePairingRepository.CODE)
-        viewModel.onJoin()
-        advanceTimeBy(FIVE_SECONDS)
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange(FakePairingRepository.CODE)
+            viewModel.onJoin()
+            advanceTimeBy(FIVE_SECONDS)
 
-        val state = viewModel.uiState.value
-        assertTrue(state.matches.isEmpty())
-        assertFalse(state.step == MultiplayerStep.TREFFER)
+            val state = viewModel.uiState.value
+            assertTrue(state.matches.isEmpty())
+            assertFalse(state.step == MultiplayerStep.TREFFER)
+        }
     }
 
     @Test
@@ -167,14 +177,15 @@ class MultiplayerViewModelTest {
             allFinished = true,
             matches = listOf(SharedRecipe(recipeId = 2L, title = "Risotto")),
         )
-        val viewModel = createViewModel()
-        viewModel.onCodeInputChange(FakePairingRepository.CODE)
-        viewModel.onJoin()
-        advanceTimeBy(FIVE_SECONDS)
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange(FakePairingRepository.CODE)
+            viewModel.onJoin()
+            advanceTimeBy(FIVE_SECONDS)
 
-        val state = viewModel.uiState.value
-        assertEquals(MultiplayerStep.TREFFER, state.step)
-        assertEquals(listOf("Risotto"), state.matches.map { it.title })
+            val state = viewModel.uiState.value
+            assertEquals(MultiplayerStep.TREFFER, state.step)
+            assertEquals(listOf("Risotto"), state.matches.map { it.title })
+        }
     }
 
     @Test
@@ -185,47 +196,49 @@ class MultiplayerViewModelTest {
             finished = 0,
             allFinished = false,
         )
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
+            advanceTimeBy(FIVE_SECONDS)
 
-        viewModel.onHost(RecipeFilter.NONE)
-        advanceTimeBy(FIVE_SECONDS)
-
-        assertEquals(MultiplayerStep.WISCHEN, viewModel.uiState.value.step)
+            assertEquals(MultiplayerStep.WISCHEN, viewModel.uiState.value.step)
+        }
     }
 
     @Test
     fun `verlassen schliesst die Runde des Gastgebers beim Dienst`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.onHost(RecipeFilter.NONE)
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
 
-        viewModel.onLeave()
+            viewModel.onLeave()
 
-        assertEquals(FakePairingRepository.CODE, pairing.closedCode)
-        assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
-        assertEquals("", viewModel.uiState.value.code)
+            assertEquals(FakePairingRepository.CODE, pairing.closedCode)
+            assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+            assertEquals("", viewModel.uiState.value.code)
+        }
     }
 
     @Test
     fun `ein Gast schliesst die Runde nicht - sie gehoert ihm nicht`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.onCodeInputChange(FakePairingRepository.CODE)
-        viewModel.onJoin()
+        mitViewModel { viewModel ->
+            viewModel.onCodeInputChange(FakePairingRepository.CODE)
+            viewModel.onJoin()
 
-        viewModel.onLeave()
+            viewModel.onLeave()
 
-        assertNull(pairing.closedCode)
+            assertNull(pairing.closedCode)
+        }
     }
 
     @Test
     fun `ohne Verbindung bleibt die Runde beim Start stehen`() = runTest {
         pairing.failWith = PairingError.NO_CONNECTION
-        val viewModel = createViewModel()
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
 
-        viewModel.onHost(RecipeFilter.NONE)
-
-        assertEquals(PairingError.NO_CONNECTION, viewModel.uiState.value.error)
-        assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
-        assertFalse(viewModel.uiState.value.isBusy)
+            assertEquals(PairingError.NO_CONNECTION, viewModel.uiState.value.error)
+            assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+            assertFalse(viewModel.uiState.value.isBusy)
+        }
     }
 
     private companion object {
