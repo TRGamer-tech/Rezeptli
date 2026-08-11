@@ -1,37 +1,71 @@
 package ch.rezeptli.app.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.rezeptli.app.presentation.cooking.CookingRoute
+import ch.rezeptli.app.presentation.multiplayer.MultiplayerRoute
+import ch.rezeptli.app.presentation.onboarding.OnboardingRoute
 import ch.rezeptli.app.presentation.recipedetail.RecipeDetailRoute
 import ch.rezeptli.app.presentation.recipeedit.RecipeEditRoute
 import ch.rezeptli.app.presentation.recipeimport.RecipeImportRoute
 import ch.rezeptli.app.presentation.recipelist.RecipeListRoute
 import ch.rezeptli.app.presentation.results.ResultsRoute
+import ch.rezeptli.app.presentation.settings.SettingsRoute
+import ch.rezeptli.app.presentation.shoppinglist.ShoppingListRoute
 import ch.rezeptli.app.presentation.swipe.SwipeRoute
 import ch.rezeptli.app.presentation.swipe.SwipeSetupRoute
+import ch.rezeptli.app.presentation.websearch.WebSearchRoute
 
 /** Der Navigationsgraph der App. */
 @Composable
 fun RezeptliNavHost(
+    sharedUrl: String? = null,
+    startDestination: String = Destinations.RECIPE_LIST,
     navController: NavHostController = rememberNavController(),
 ) {
+    // Ein geteilter Link fuehrt einmalig direkt in den Import.
+    LaunchedEffect(sharedUrl) {
+        if (!sharedUrl.isNullOrBlank()) {
+            navController.navigate(Destinations.recipeImport(sharedUrl))
+        }
+    }
+
     NavHost(
         navController = navController,
-        startDestination = Destinations.RECIPE_LIST,
+        startDestination = startDestination,
     ) {
+        composable(Destinations.ONBOARDING) {
+            OnboardingRoute(
+                onFinished = {
+                    navController.navigate(Destinations.RECIPE_LIST) {
+                        // Das Onboarding soll nicht ueber "Zurueck" wiederkehren.
+                        popUpTo(Destinations.ONBOARDING) { inclusive = true }
+                    }
+                },
+            )
+        }
+
+        composable(Destinations.SETTINGS) {
+            SettingsRoute(onBack = { navController.popBackStack() })
+        }
+
         composable(Destinations.RECIPE_LIST) {
             RecipeListRoute(
                 onRecipeClick = { recipeId ->
                     navController.navigate(Destinations.recipeDetail(recipeId))
                 },
                 onCreateRecipe = { navController.navigate(Destinations.recipeEdit()) },
-                onImportRecipe = { navController.navigate(Destinations.RECIPE_IMPORT) },
+                onImportRecipe = { navController.navigate(Destinations.recipeImport()) },
+                onSearchWeb = { navController.navigate(Destinations.WEB_SEARCH) },
                 onStartSwipe = { navController.navigate(Destinations.SWIPE_SETUP) },
+                onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
+                onOpenSettings = { navController.navigate(Destinations.SETTINGS) },
             )
         }
 
@@ -42,7 +76,15 @@ fun RezeptliNavHost(
             RecipeDetailRoute(
                 onBack = { navController.popBackStack() },
                 onEdit = { recipeId -> navController.navigate(Destinations.recipeEdit(recipeId)) },
+                onStartCooking = { recipeId -> navController.navigate(Destinations.cooking(recipeId)) },
             )
+        }
+
+        composable(
+            route = Destinations.COOKING,
+            arguments = listOf(navArgument(Destinations.ARG_RECIPE_ID) { type = NavType.LongType }),
+        ) {
+            CookingRoute(onClose = { navController.popBackStack() })
         }
 
         composable(
@@ -70,7 +112,15 @@ fun RezeptliNavHost(
             )
         }
 
-        composable(Destinations.RECIPE_IMPORT) {
+        composable(
+            route = Destinations.RECIPE_IMPORT,
+            arguments = listOf(
+                navArgument(Destinations.ARG_URL) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
             RecipeImportRoute(
                 onBack = { navController.popBackStack() },
                 onSaved = { recipeId ->
@@ -78,6 +128,13 @@ fun RezeptliNavHost(
                         popUpTo(Destinations.RECIPE_LIST)
                     }
                 },
+            )
+        }
+
+        composable(Destinations.WEB_SEARCH) {
+            WebSearchRoute(
+                onBack = { navController.popBackStack() },
+                onOpenResult = { url -> navController.navigate(Destinations.recipeImport(url)) },
             )
         }
 
@@ -89,6 +146,37 @@ fun RezeptliNavHost(
                         popUpTo(Destinations.SWIPE_SETUP) { inclusive = true }
                     }
                 },
+                onStartTogether = { filter ->
+                    navController.navigate(Destinations.multiplayer(filter))
+                },
+            )
+        }
+
+        composable(
+            route = Destinations.MULTIPLAYER,
+            arguments = listOf(
+                navArgument(Destinations.ARG_QUERY) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(Destinations.ARG_TAGS) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(Destinations.ARG_MAX_PREP_TIME) {
+                    type = NavType.IntType
+                    defaultValue = 0
+                },
+            ),
+        ) { entry ->
+            val filter = Destinations.filterFrom(
+                query = entry.arguments?.getString(Destinations.ARG_QUERY),
+                tags = entry.arguments?.getString(Destinations.ARG_TAGS),
+                maxPrepTime = entry.arguments?.getInt(Destinations.ARG_MAX_PREP_TIME),
+            )
+            MultiplayerRoute(
+                filter = filter,
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -135,7 +223,12 @@ fun RezeptliNavHost(
                         popUpTo(Destinations.RECIPE_LIST)
                     }
                 },
+                onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
             )
+        }
+
+        composable(Destinations.SHOPPING_LIST) {
+            ShoppingListRoute(onBack = { navController.popBackStack() })
         }
     }
 }

@@ -1,5 +1,7 @@
 package ch.rezeptli.app.domain.model
 
+import ch.rezeptli.app.domain.steps.RecipeStep
+
 /**
  * Ein vollstaendiges Rezept inklusive Zutaten.
  *
@@ -9,6 +11,14 @@ data class Recipe(
     val id: Long = 0L,
     val title: String,
     val instructions: String = "",
+    /**
+     * Die Zubereitung in einzelnen Schritten - Grundlage des Kochmodus.
+     *
+     * Bei importierten Rezepten stammt die Gliederung von der Quelle, bei selbst
+     * erfassten aus dem InstructionSplitter. Ist die Liste leer, wurde noch nie
+     * aufgeteilt; [instructions] bleibt in beiden Faellen der massgebliche Text.
+     */
+    val steps: List<RecipeStep> = emptyList(),
     val ingredients: List<Ingredient> = emptyList(),
     val tags: List<String> = emptyList(),
     val prepTimeMinutes: Int? = null,
@@ -16,6 +26,9 @@ data class Recipe(
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
     val lastCookedAt: Long? = null,
+    /** Herkunft eines importierten Rezepts. Eigene Rezepte haben keine. */
+    val sourceUrl: String? = null,
+    val sourceName: String? = null,
 )
 
 /**

@@ -2,15 +2,19 @@ package ch.rezeptli.app.data.mapper
 
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.data.local.entity.RecipeSummaryProjection
 import ch.rezeptli.app.data.local.entity.RecipeWithDetails
+import ch.rezeptli.app.data.local.entity.ShoppingItemEntity
 import ch.rezeptli.app.data.local.entity.SwipeResultEntity
 import ch.rezeptli.app.data.local.entity.SwipeSessionEntity
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.model.ShoppingItem
 import ch.rezeptli.app.domain.model.SwipeDecision
 import ch.rezeptli.app.domain.model.SwipeSession
+import ch.rezeptli.app.domain.steps.RecipeStep
 
 /** Trennzeichen der zusammengefassten Tag-Spalte aus [RecipeSummaryProjection]. */
 private const val TAG_SEPARATOR = "|"
@@ -19,6 +23,7 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     id = recipe.id,
     title = recipe.title,
     instructions = recipe.instructions,
+    steps = steps.sortedBy { it.position }.map { it.toDomain() },
     ingredients = ingredients.sortedBy { it.position }.map { it.toDomain() },
     tags = tags.map { it.tag }.sorted(),
     prepTimeMinutes = recipe.prepTimeMinutes,
@@ -26,6 +31,24 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     createdAt = recipe.createdAt,
     updatedAt = recipe.updatedAt,
     lastCookedAt = recipe.lastCookedAt,
+    sourceUrl = recipe.sourceUrl,
+    sourceName = recipe.sourceName,
+)
+
+fun RecipeStepEntity.toDomain(): RecipeStep = RecipeStep(
+    id = id,
+    recipeId = recipeId,
+    position = position,
+    text = text,
+    timerMinutes = timerMinutes,
+)
+
+fun RecipeStep.toEntity(recipeId: Long, position: Int): RecipeStepEntity = RecipeStepEntity(
+    id = id,
+    recipeId = recipeId,
+    position = position,
+    text = text.trim(),
+    timerMinutes = timerMinutes,
 )
 
 fun IngredientEntity.toDomain(): Ingredient = Ingredient(
@@ -59,6 +82,8 @@ fun Recipe.toEntity(now: Long): RecipeEntity = RecipeEntity(
     createdAt = if (createdAt == 0L) now else createdAt,
     updatedAt = now,
     lastCookedAt = lastCookedAt,
+    sourceUrl = sourceUrl,
+    sourceName = sourceName,
 )
 
 fun RecipeSummaryProjection.toDomain(): RecipeSummary = RecipeSummary(
@@ -96,4 +121,30 @@ fun SwipeDecision.toEntity(): SwipeResultEntity = SwipeResultEntity(
     recipeId = recipeId,
     liked = liked,
     decidedAt = decidedAt,
+)
+
+fun ShoppingItemEntity.toDomain(): ShoppingItem = ShoppingItem(
+    id = id,
+    name = name,
+    matchKey = matchKey,
+    amount = amount,
+    unit = unit,
+    category = category,
+    isChecked = isChecked,
+    isManual = isManual,
+    sourceNote = sourceNote,
+    addedAt = addedAt,
+)
+
+fun ShoppingItem.toEntity(): ShoppingItemEntity = ShoppingItemEntity(
+    id = id,
+    name = name.trim(),
+    matchKey = matchKey,
+    amount = amount,
+    unit = unit,
+    category = category,
+    isChecked = isChecked,
+    isManual = isManual,
+    sourceNote = sourceNote,
+    addedAt = addedAt,
 )

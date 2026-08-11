@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import ch.rezeptli.app.data.local.RezeptliDatabase
 import ch.rezeptli.app.data.local.dao.RecipeDao
+import ch.rezeptli.app.data.local.dao.ShoppingListDao
 import ch.rezeptli.app.data.local.dao.SwipeSessionDao
 import dagger.Module
 import dagger.Provides
@@ -30,4 +31,7 @@ object DatabaseModule {
 
     @Provides
     fun provideSwipeSessionDao(database: RezeptliDatabase): SwipeSessionDao = database.swipeSessionDao()
+
+    @Provides
+    fun provideShoppingListDao(database: RezeptliDatabase): ShoppingListDao = database.shoppingListDao()
 }

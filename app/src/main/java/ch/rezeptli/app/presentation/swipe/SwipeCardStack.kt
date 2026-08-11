@@ -2,13 +2,14 @@ package ch.rezeptli.app.presentation.swipe
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,6 +30,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -45,6 +47,10 @@ import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.presentation.common.components.PrepTimeLabel
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
+import ch.rezeptli.app.presentation.common.theme.Tokens
+import ch.rezeptli.app.presentation.common.theme.cardSurface
+import ch.rezeptli.app.presentation.common.theme.glassPanel
+import ch.rezeptli.app.presentation.common.theme.glowRing
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -231,53 +237,69 @@ private fun SwipeCardContent(
         else -> MaterialTheme.colorScheme.outlineVariant
     }
 
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        border = BorderStroke(
-            width = if (decisionProgress == 0f) 1.dp else 3.dp,
-            color = borderColor.copy(alpha = if (decisionProgress == 0f) 1f else abs(decisionProgress)),
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isInteractive) 8.dp else 2.dp),
+    // Das Foto traegt die Karte; Titel und Angaben liegen auf einer Glasflaeche
+    // darueber. Der Leuchtring folgt der Geste und faerbt sich gruen oder rot.
+    Box(
+        modifier = modifier
+            .cardSurface(Tokens.Radius.XxlShape)
+            .glowRing(
+                shape = Tokens.Radius.XxlShape,
+                intensity = if (isInteractive) abs(decisionProgress).coerceAtLeast(IDLE_GLOW) else 0f,
+                glowColor = borderColor,
+            ),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                RecipeImage(
-                    photoUri = card.photoUri,
-                    title = card.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = card.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    card.prepTimeMinutes?.let { minutes -> PrepTimeLabel(minutes) }
-                    if (card.tags.isNotEmpty()) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            card.tags.take(MAX_VISIBLE_TAGS).forEach { tag ->
-                                AssistChip(onClick = {}, label = { Text(tag) })
-                            }
-                        }
+        RecipeImage(
+            photoUri = card.photoUri,
+            title = card.title,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        // Ein dunkler Verlauf unter der Glasflaeche - sonst verschwindet weisse
+        // Schrift auf einem hellen Foto.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(SCRIM_FRACTION)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                    ),
+                ),
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(12.dp)
+                .fillMaxWidth()
+                .glassPanel(Tokens.Radius.LgShape)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = card.title,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            card.prepTimeMinutes?.let { minutes -> PrepTimeLabel(minutes) }
+            if (card.tags.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    card.tags.take(MAX_VISIBLE_TAGS).forEach { tag ->
+                        AssistChip(onClick = {}, label = { Text(tag) })
                     }
                 }
             }
+        }
 
-            if (isInteractive && decisionProgress != 0f) {
-                DecisionBadge(
-                    progress = decisionProgress,
-                    modifier = Modifier
-                        .align(if (decisionProgress > 0f) Alignment.TopStart else Alignment.TopEnd)
-                        .padding(24.dp),
-                )
-            }
+        if (isInteractive && decisionProgress != 0f) {
+            DecisionBadge(
+                progress = decisionProgress,
+                modifier = Modifier
+                    .align(if (decisionProgress > 0f) Alignment.TopStart else Alignment.TopEnd)
+                    .padding(24.dp),
+            )
         }
     }
 }
@@ -314,3 +336,9 @@ private const val MAX_ROTATION = 12f
 private const val BACKGROUND_SCALE_STEP = 0.05f
 private const val BACKGROUND_OFFSET_PX = 24f
 private const val MAX_VISIBLE_TAGS = 3
+
+/** Ein Hauch Leuchten auch ohne Geste - die Karte soll nicht tot wirken. */
+private const val IDLE_GLOW = 0.25f
+
+/** Anteil der Karte, ueber den der dunkle Verlauf laeuft. */
+private const val SCRIM_FRACTION = 0.45f

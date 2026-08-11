@@ -3,6 +3,7 @@ package ch.rezeptli.app.domain.usecase
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.fake.FakeRecipeRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -11,7 +12,7 @@ import org.junit.jupiter.api.Test
 
 class SaveRecipeUseCaseTest {
     private val repository = FakeRecipeRepository()
-    private val saveRecipe = SaveRecipeUseCase(repository)
+    private val saveRecipe = SaveRecipeUseCase(repository, InstructionSplitter())
 
     @Test
     fun `speichert ein gueltiges Rezept und liefert dessen ID`() = runTest {

@@ -1,6 +1,7 @@
 package ch.rezeptli.app.data.local
 
 import androidx.room.TypeConverter
+import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.SwipeMode
 
@@ -15,6 +16,14 @@ class Converters {
 
     @TypeConverter
     fun fromIngredientUnit(unit: IngredientUnit): String = unit.name
+
+    @TypeConverter
+    fun toIngredientCategory(value: String?): IngredientCategory =
+        value?.let { name -> IngredientCategory.entries.firstOrNull { it.name == name } }
+            ?: IngredientCategory.SONSTIGES
+
+    @TypeConverter
+    fun fromIngredientCategory(category: IngredientCategory): String = category.name
 
     @TypeConverter
     fun toSwipeMode(value: String?): SwipeMode =

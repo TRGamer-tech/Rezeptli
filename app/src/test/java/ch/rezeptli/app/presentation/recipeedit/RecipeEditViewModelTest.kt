@@ -6,6 +6,7 @@ import ch.rezeptli.app.data.local.PhotoStorage
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.domain.usecase.ObserveRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.fake.FakeRecipeRepository
@@ -44,7 +45,7 @@ class RecipeEditViewModelTest {
     private fun createViewModel(recipeId: Long) = RecipeEditViewModel(
         savedStateHandle = SavedStateHandle(mapOf(Destinations.ARG_RECIPE_ID to recipeId)),
         observeRecipe = ObserveRecipeUseCase(repository),
-        saveRecipe = SaveRecipeUseCase(repository),
+        saveRecipe = SaveRecipeUseCase(repository, InstructionSplitter()),
         photoStorage = photoStorage,
     )
 

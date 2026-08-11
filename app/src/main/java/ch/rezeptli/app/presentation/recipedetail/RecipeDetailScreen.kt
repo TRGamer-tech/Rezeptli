@@ -21,16 +21,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -42,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.displayText
@@ -59,6 +63,7 @@ import kotlinx.coroutines.launch
 fun RecipeDetailRoute(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
+    onStartCooking: (Long) -> Unit,
     viewModel: RecipeDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -80,6 +85,7 @@ fun RecipeDetailRoute(
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onEdit = { uiState.recipe?.let { onEdit(it.id) } },
+        onStartCooking = { uiState.recipe?.let { onStartCooking(it.id) } },
         onDeleteRequest = viewModel::onDeleteRequest,
         onDeleteDismiss = viewModel::onDeleteDismiss,
         onDeleteConfirm = viewModel::onDeleteConfirm,
@@ -94,6 +100,7 @@ fun RecipeDetailScreen(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onEdit: () -> Unit,
+    onStartCooking: () -> Unit,
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
@@ -142,11 +149,29 @@ fun RecipeDetailScreen(
         },
         floatingActionButton = {
             if (recipe != null) {
-                FloatingActionButton(onClick = onEdit) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = stringResource(R.string.action_edit),
-                    )
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SmallFloatingActionButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = stringResource(R.string.action_edit),
+                        )
+                    }
+                    // Der Kochmodus ist das, was man am Herd will - deshalb der grosse Knopf.
+                    if (recipe.steps.isNotEmpty()) {
+                        ExtendedFloatingActionButton(
+                            onClick = onStartCooking,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Restaurant,
+                                    contentDescription = null,
+                                )
+                            },
+                            text = { Text(stringResource(R.string.kochmodus_starten)) },
+                        )
+                    }
                 }
             }
         },
@@ -286,14 +311,47 @@ private fun RecipeDetailContent(
             SectionHeader(text = stringResource(R.string.recipe_instructions))
         }
 
-        item(key = "instructions") {
-            Text(
-                text = recipe.instructions.ifBlank {
-                    stringResource(R.string.recipe_no_instructions)
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
+        if (recipe.steps.isEmpty()) {
+            item(key = "instructions") {
+                Text(
+                    text = recipe.instructions.ifBlank {
+                        stringResource(R.string.recipe_no_instructions)
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+        } else {
+            items(recipe.steps, key = { "step-${it.position}" }) { step ->
+                StepRow(step = step)
+            }
+        }
+    }
+}
+
+/** Ein nummerierter Schritt in der Detailansicht. */
+@Composable
+private fun StepRow(step: RecipeStep) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "${step.position + 1}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = step.text, style = MaterialTheme.typography.bodyLarge)
+            step.timerMinutes?.let { minutes ->
+                Text(
+                    text = pluralStringResource(R.plurals.kochmodus_timer_minuten, minutes, minutes),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
+import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 
 @Entity(tableName = "recipes")
@@ -20,6 +21,8 @@ data class RecipeEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val lastCookedAt: Long?,
+    val sourceUrl: String? = null,
+    val sourceName: String? = null,
 )
 
 @Entity(
@@ -69,6 +72,35 @@ data class RecipeTagEntity(
     val tag: String,
 )
 
+/**
+ * Ein Arbeitsschritt eines Rezepts.
+ *
+ * Die Schritte liegen strukturiert vor, statt sie beim Anzeigen aus dem Fliesstext zu
+ * raten: Bei importierten Rezepten liefert die Quelle sie bereits gegliedert, und diese
+ * Gliederung soll nicht verloren gehen. Fuer selbst erfasste Rezepte schlaegt der
+ * InstructionSplitter eine Aufteilung vor, die sich vor dem Speichern korrigieren laesst.
+ */
+@Entity(
+    tableName = "recipe_steps",
+    foreignKeys = [
+        ForeignKey(
+            entity = RecipeEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["recipeId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("recipeId")],
+)
+data class RecipeStepEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val recipeId: Long,
+    val position: Int,
+    val text: String,
+    val timerMinutes: Int?,
+)
+
 /** Rezept mit allen abhaengigen Datensaetzen - fuer Detail- und Bearbeitungsansicht. */
 data class RecipeWithDetails(
     @Embedded val recipe: RecipeEntity,
@@ -76,6 +108,8 @@ data class RecipeWithDetails(
     val ingredients: List<IngredientEntity>,
     @Relation(parentColumn = "id", entityColumn = "recipeId")
     val tags: List<RecipeTagEntity>,
+    @Relation(parentColumn = "id", entityColumn = "recipeId")
+    val steps: List<RecipeStepEntity>,
 )
 
 /**
@@ -90,4 +124,28 @@ data class RecipeSummaryProjection(
     val lastCookedAt: Long?,
     @ColumnInfo(name = "tags")
     val tags: String?,
+)
+
+/**
+ * Ein Posten der Einkaufsliste.
+ *
+ * Die Liste ist bewusst nicht an eine Swipe-Session gebunden: Man geht einmal
+ * einkaufen, egal aus wie vielen Runden die Zutaten stammen.
+ */
+@Entity(
+    tableName = "shopping_items",
+    indices = [Index("matchKey")],
+)
+data class ShoppingItemEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val name: String,
+    val matchKey: String,
+    val amount: Double?,
+    val unit: IngredientUnit,
+    val category: IngredientCategory,
+    val isChecked: Boolean,
+    val isManual: Boolean,
+    val sourceNote: String?,
+    val addedAt: Long,
 )

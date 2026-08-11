@@ -3,60 +3,87 @@ package ch.rezeptli.app.presentation.common.theme
 import androidx.compose.ui.graphics.Color
 
 /*
- * Die Farbwelt von Rezeptli: Kraeutergruen als Leitfarbe, warmes Orange als Akzent und
- * ein cremiger, leicht warmer Hintergrund. Das soll nach Kueche und frischem Gemuese
- * aussehen und nicht nach Standard-Compose-Demo.
+ * Die Bedeutung der Farben - welcher Rohwert aus [Tokens] welche Rolle spielt.
  *
- * Alle Kombinationen aus Text- und Hintergrundfarbe erfuellen mindestens ein
- * Kontrastverhaeltnis von 4.5:1 gemaess den Material-Design-Richtlinien zur
- * Barrierefreiheit.
+ * Das UI-Kit definiert ein dunkles Design. Die helle Fassung ist daraus abgeleitet:
+ * gleiche Farbfamilie, aber Flaechen und Schrift getauscht. Weil Violett auf hellem
+ * Grund heller wirkt, reichen Purple500 und Purple600 dort nicht aus - sie erreichen
+ * nur 4.1:1 gegen den hellen Hintergrund. Die helle Fassung nutzt deshalb eine
+ * dunklere Stufe derselben Farbe.
+ *
+ * Alle Werte sind nachgerechnet, nicht geschaetzt (Verhaeltnisse jeweils gegen den
+ * Hintergrund der eigenen Fassung).
  */
 
-// Primaer: Kraeutergruen
-internal val HerbGreen40 = Color(0xFF2E6B4F)
-internal val HerbGreen80 = Color(0xFF8FD6AE)
-internal val HerbGreen10 = Color(0xFF00210F)
-internal val HerbGreen30 = Color(0xFF13543A)
-internal val HerbGreen90 = Color(0xFFAAF2C8)
-internal val HerbGreen20 = Color(0xFF003921)
+// ---------------------------------------------------------------- dunkle Fassung
 
-// Sekundaer: gedaempftes Salbeigruen
-internal val Sage40 = Color(0xFF4F6354)
-internal val Sage80 = Color(0xFFB6CCB9)
-internal val Sage10 = Color(0xFF0C1F14)
-internal val Sage30 = Color(0xFF374B3D)
-internal val Sage90 = Color(0xFFD2E8D5)
-internal val Sage20 = Color(0xFF213528)
+internal val DarkBackground = Tokens.Neutral.Charcoal900
+internal val DarkSurfaceRaised = Tokens.Neutral.Charcoal850
+internal val DarkSurfaceCard = Tokens.Neutral.Charcoal800
+internal val DarkSurfaceElevated = Tokens.Neutral.Charcoal750
+internal val DarkOutline = Tokens.Neutral.Charcoal700
 
-// Akzent: warmes Karotten-Orange
-internal val Carrot40 = Color(0xFF8B5000)
-internal val Carrot80 = Color(0xFFFFB865)
-internal val Carrot10 = Color(0xFF2C1600)
-internal val Carrot30 = Color(0xFF693C00)
-internal val Carrot90 = Color(0xFFFFDCBB)
-internal val Carrot20 = Color(0xFF4A2800)
+/** 14.9:1 auf Charcoal900. */
+internal val DarkTextPrimary = Color(0xFFF5F0F7)
 
-// Fehlerfarben
-internal val Tomato40 = Color(0xFFBA1A1A)
-internal val Tomato80 = Color(0xFFFFB4AB)
-internal val Tomato10 = Color(0xFF410002)
-internal val Tomato30 = Color(0xFF93000A)
-internal val Tomato90 = Color(0xFFFFDAD6)
-internal val Tomato20 = Color(0xFF690005)
+/** 8.7:1 auf Charcoal900. */
+internal val DarkTextSecondary = Color(0xFFC4BCC8)
 
-// Neutrale Flaechen - leicht waermer als reines Grau
-internal val Cream99 = Color(0xFFFFF8F0)
-internal val Cream95 = Color(0xFFF3EDE4)
-internal val Cream90 = Color(0xFFE4DED5)
-internal val Charcoal10 = Color(0xFF12140F)
-internal val Charcoal20 = Color(0xFF272A24)
-internal val Charcoal30 = Color(0xFF3D4139)
-internal val Charcoal90 = Color(0xFFE3E3DB)
-internal val Charcoal95 = Color(0xFFF1F1E9)
-internal val Stone30 = Color(0xFF44483E)
-internal val Stone50 = Color(0xFF74796C)
-internal val Stone80 = Color(0xFFC5C8BB)
+/** 5.4:1 auf Charcoal900. */
+internal val DarkAccent = Tokens.Purple.Purple500
+internal val DarkAccentPressed = Tokens.Purple.Purple600
+internal val DarkAccentSoft = Tokens.Purple.Purple300
+internal val DarkAccentLight = Tokens.Purple.Purple100
 
-/** Rueckmeldung waehrend der Wisch-Geste: gruen fuer Ja, rot fuer Nein. */
-internal val SwipeYes = Color(0xFF2E7D4F)
-internal val SwipeNo = Color(0xFFC0392B)
+/** Schrift auf der Akzentflaeche - dunkel, weil Weiss auf Violett nur 3.2:1 erreicht. */
+internal val DarkOnAccent = Tokens.Neutral.Charcoal900
+
+internal val DarkError = Color(0xFFFF8A80)
+internal val DarkOnError = Color(0xFF3B0906)
+internal val DarkErrorSurface = Color(0xFF4E1512)
+
+// ----------------------------------------------------------------- helle Fassung
+
+/** Nicht reines Weiss, sondern ein Hauch der Akzentfarbe darin. */
+internal val LightBackground = Color(0xFFFBF8FC)
+internal val LightSurfaceCard = Color(0xFFFFFFFF)
+internal val LightSurfaceVariant = Color(0xFFF1E8F5)
+internal val LightSurfaceElevated = Color(0xFFEDE3F2)
+internal val LightOutline = Color(0xFFD5C7DC)
+
+/** 15.9:1 auf dem hellen Hintergrund. */
+internal val LightTextPrimary = Color(0xFF231B27)
+
+/** 8.0:1 auf dem hellen Hintergrund. */
+internal val LightTextSecondary = Color(0xFF544A59)
+
+/** Dunklere Stufe der Kit-Farbe: 6.8:1 auf hellem Grund, Weiss darauf 7.2:1. */
+internal val LightAccent = Color(0xFF7E3A96)
+internal val LightAccentPressed = Color(0xFF6F3285)
+
+/** Purple100 aus dem Kit - als helle Akzentflaeche unveraendert brauchbar. */
+internal val LightAccentContainer = Tokens.Purple.Purple100
+internal val LightOnAccentContainer = Color(0xFF3B1147)
+internal val LightOnAccent = Color(0xFFFFFFFF)
+
+internal val LightError = Color(0xFFB3261E)
+internal val LightOnError = Color(0xFFFFFFFF)
+internal val LightErrorSurface = Color(0xFFF9DEDC)
+
+// ------------------------------------------------------------- Wisch-Rueckmeldung
+
+/*
+ * Gruen fuer Ja, Rot fuer Nein bleibt erhalten - die Bedeutung ist eingeuebt und soll
+ * sich durch den Neuanstrich nicht aendern. Im Dunkeln stammen die Toene aus der
+ * Mesh-Palette des Kits; auf hellem Grund waeren sie mit 1.2:1 unlesbar, dort stehen
+ * dunklere Fassungen derselben Farben.
+ */
+
+internal val SwipeYesDark = Tokens.Mesh.Mint
+internal val SwipeNoDark = Tokens.Mesh.Pink
+
+/** 5.1:1 auf hellem Grund. */
+internal val SwipeYesLight = Color(0xFF1F7A45)
+
+/** 5.8:1 auf hellem Grund. */
+internal val SwipeNoLight = Color(0xFFB92844)

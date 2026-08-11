@@ -140,4 +140,176 @@
     <string name="unit_scheibe">Scheibe</string>
     <string name="unit_tasse">Tasse</string>
     <string name="unit_messerspitze">Msp.</string>
+
+    <!-- Einkaufsliste -->
+    <string name="shopping_title">Einkaufsliste</string>
+    <string name="shopping_summary">%1$d von %2$d noch zu besorgen</string>
+    <string name="shopping_empty_title">Die Liste ist leer</string>
+    <string name="shopping_empty_message">Swipe dich durch deine Rezepte und übernimm am Ende die Zutaten – oder trag hier direkt ein, was noch fehlt.</string>
+    <string name="shopping_add">Auf die Liste setzen</string>
+    <string name="shopping_add_hint">Was fehlt noch?</string>
+    <string name="shopping_delete_item">"%1$s" von der Liste nehmen</string>
+    <string name="shopping_remove_checked">Erledigte entfernen</string>
+    <string name="shopping_clear">Liste leeren</string>
+    <string name="shopping_clear_title">Ganze Liste leeren?</string>
+    <string name="shopping_clear_message">Alle Posten werden entfernt, auch die noch offenen.</string>
+    <string name="shopping_open_badge">%1$d offene Posten auf der Einkaufsliste</string>
+    <string name="results_add_to_shopping">Zutaten auf die Einkaufsliste</string>
+    <string name="results_added_to_shopping">Zutaten übernommen – die Liste hat jetzt %1$d Posten</string>
+
+    <!-- Warengruppen der Einkaufsliste -->
+    <string name="category_gemuese">Gemüse</string>
+    <string name="category_fruechte">Früchte</string>
+    <string name="category_milchprodukte">Milchprodukte und Eier</string>
+    <string name="category_fleisch_fisch">Fleisch und Fisch</string>
+    <string name="category_teigwaren">Teigwaren, Reis und Brot</string>
+    <string name="category_konserven">Konserven, Saucen und Öle</string>
+    <string name="category_backen">Backen und Süsses</string>
+    <string name="category_gewuerze">Gewürze und Kräuter</string>
+    <string name="category_tiefkuehl">Tiefkühl</string>
+    <string name="category_getraenke">Getränke</string>
+    <string name="category_sonstiges">Sonstiges</string>
+
+    <!-- Rezepte im Web suchen und importieren -->
+    <string name="websearch_title">Rezepte im Web finden</string>
+    <string name="websearch_hint">Wonach ist dir? z. B. Kürbis</string>
+    <string name="websearch_sources">Quellen</string>
+    <string name="websearch_loading">Beim ersten Mal wird das Rezeptverzeichnis der Quelle geladen. Danach geht es schnell.</string>
+    <string name="websearch_intro_title">Such dir was aus</string>
+    <string name="websearch_intro_message">Gib ein Stichwort ein und wähle die Quellen, die dich interessieren. Gefundene Rezepte kannst du prüfen, anpassen und in deine Sammlung übernehmen.</string>
+    <string name="websearch_no_results_title">Nichts gefunden</string>
+    <string name="websearch_no_results_message">Zu diesem Stichwort gibt es bei den gewählten Quellen kein Rezept. Versuch es mit einem anderen Wort oder wähle weitere Quellen.</string>
+    <string name="websearch_open">Im Web suchen</string>
+    <string name="import_url_hint">Rezepttext einfügen – oder einen Link zu einem Rezept</string>
+    <string name="import_loading_web">Rezept wird geladen…</string>
+    <string name="import_analyse_url">Rezept laden</string>
+    <string name="import_source">Quelle: %1$s</string>
+    <string name="import_open_source">Original ansehen</string>
+    <string name="error_no_connection">Keine Verbindung. Prüf dein Internet und versuch es nochmal.</string>
+    <string name="error_rejected">Diese Seite lässt sich nicht automatisch auslesen – sie weist die Anfrage ab. Kopier stattdessen den Rezepttext und füg ihn hier ein.</string>
+    <string name="error_disallowed">Diese Seite möchte nicht, dass Programme sie abrufen – das steht so in ihrer robots.txt. Kopier den Rezepttext und füg ihn hier ein.</string>
+    <string name="error_not_found">Diese Seite gibt es nicht (mehr).</string>
+    <string name="error_no_recipe">Auf dieser Seite ist kein maschinenlesbares Rezept hinterlegt. Kopier den Text und füg ihn hier ein.</string>
+    <string name="error_unknown">Das hat nicht geklappt. Versuch es später nochmal.</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_schritt">Schritt %1$d von %2$d</string>
+    <string name="onboarding_ueberspringen">Überspringen</string>
+    <string name="onboarding_weiter">Weiter</string>
+    <string name="onboarding_zurueck">Zurück</string>
+    <string name="onboarding_fertig">Los geht\'s</string>
+
+    <string name="onboarding_willkommen_titel">Willkommen bei Rezeptli</string>
+    <string name="onboarding_willkommen_text">Vier kurze Fragen, dann kannst du loslegen. Du kannst alles überspringen und später in den Einstellungen ändern.</string>
+    <string name="onboarding_vorname">Vorname</string>
+    <string name="onboarding_vorname_hinweis">Nur für die Begrüssung. Bleibt auf deinem Gerät.</string>
+    <string name="onboarding_land_frage">Wo kochst du?</string>
+    <string name="onboarding_land_hinweis">Rezepte aus deiner Gegend erscheinen weiter oben.</string>
+
+    <string name="onboarding_kuechen_titel">Was isst du gern?</string>
+    <string name="onboarding_kuechen_text">Wähle so viel du magst – oder nichts. Das verschiebt nur die Reihenfolge der Vorschläge, nie was du findest.</string>
+
+    <string name="onboarding_ernaehrung_titel">Ernährst du dich besonders?</string>
+    <string name="onboarding_ernaehrung_text">Passende Rezepte rücken nach oben.</string>
+    <string name="onboarding_unvertraeglichkeiten_frage">Verträgst du etwas nicht?</string>
+    <string name="onboarding_unvertraeglichkeiten_hinweis">Wichtig: Rezeptli kann nicht prüfen, ob ein Rezept wirklich frei davon ist – Spuren und Fertigprodukte sieht die App nicht. Verlass dich auf die Zutatenliste, nicht auf uns.</string>
+
+    <string name="onboarding_haushalt_titel">Für wie viele kochst du?</string>
+    <string name="onboarding_haushalt_text">Später kann Rezeptli damit Mengen umrechnen.</string>
+    <string name="onboarding_haushalt_label">Personen</string>
+
+    <!-- Länder -->
+    <string name="land_schweiz">Schweiz</string>
+    <string name="land_deutschland">Deutschland</string>
+    <string name="land_oesterreich">Österreich</string>
+    <string name="land_frankreich">Frankreich</string>
+    <string name="land_italien">Italien</string>
+    <string name="land_anderswo">Anderswo</string>
+
+    <!-- Küchen -->
+    <string name="kueche_schweizer_klassiker">Schweizer Klassiker</string>
+    <string name="kueche_deutsch_oesterreichisch">Deutsch &amp; Österreichisch</string>
+    <string name="kueche_italienisch">Italienisch</string>
+    <string name="kueche_franzoesisch">Französisch</string>
+    <string name="kueche_mediterran">Mediterran</string>
+    <string name="kueche_asiatisch">Asiatisch</string>
+    <string name="kueche_orientalisch">Orientalisch</string>
+    <string name="kueche_amerikanisch">Amerikanisch</string>
+    <string name="kueche_lateinamerikanisch">Lateinamerikanisch</string>
+
+    <!-- Ernährungsform -->
+    <string name="ernaehrung_vegetarisch">Vegetarisch</string>
+    <string name="ernaehrung_vegan">Vegan</string>
+    <string name="ernaehrung_pescetarisch">Pescetarisch</string>
+    <string name="ernaehrung_kohlenhydratarm">Wenig Kohlenhydrate</string>
+
+    <!-- Unverträglichkeiten -->
+    <string name="unvertraeglichkeit_gluten">Gluten</string>
+    <string name="unvertraeglichkeit_laktose">Laktose</string>
+    <string name="unvertraeglichkeit_nuesse">Nüsse</string>
+    <string name="unvertraeglichkeit_eier">Eier</string>
+    <string name="unvertraeglichkeit_soja">Soja</string>
+    <string name="unvertraeglichkeit_meeresfruechte">Meeresfrüchte</string>
+
+    <!-- Einstellungen -->
+    <string name="einstellungen_titel">Einstellungen</string>
+    <string name="einstellungen_oeffnen">Einstellungen öffnen</string>
+    <string name="einstellungen_profil">Dein Profil</string>
+    <string name="einstellungen_profil_text">Diese Angaben bleiben auf deinem Gerät und beeinflussen nur die Reihenfolge der Vorschläge.</string>
+    <string name="einstellungen_zuruecksetzen">Angaben zurücksetzen</string>
+    <string name="einstellungen_zuruecksetzen_frage">Alle Angaben löschen?</string>
+    <string name="einstellungen_zuruecksetzen_text">Vorname, Land und Vorlieben werden gelöscht. Deine Rezepte bleiben unberührt.</string>
+    <string name="einstellungen_gespeichert">Gespeichert</string>
+
+    <!-- Begrüssung -->
+    <string name="begruessung_mit_name">Hallo %1$s</string>
+    <string name="begruessung_ohne_name">Was kochst du heute?</string>
+
+    <!-- Kochmodus -->
+    <string name="kochmodus_starten">Kochmodus starten</string>
+    <string name="kochmodus_titel">Kochmodus</string>
+    <string name="kochmodus_schritt">Schritt %1$d von %2$d</string>
+    <string name="kochmodus_weiter">Weiter</string>
+    <string name="kochmodus_zurueck">Vorheriger Schritt</string>
+    <string name="kochmodus_naechster">Nächster Schritt</string>
+    <string name="kochmodus_beenden">Kochmodus beenden</string>
+    <string name="kochmodus_fertig">Fertig gekocht</string>
+    <string name="kochmodus_zutaten_fuer_schritt">Dafür brauchst du</string>
+    <string name="kochmodus_timer_starten">Timer starten</string>
+    <string name="kochmodus_timer_stoppen">Timer stoppen</string>
+    <string name="kochmodus_timer_abgelaufen">Zeit ist um</string>
+    <string name="kochmodus_keine_schritte">Für dieses Rezept ist keine Zubereitung hinterlegt.</string>
+    <plurals name="kochmodus_timer_minuten">
+        <item quantity="one">%d Minute</item>
+        <item quantity="other">%d Minuten</item>
+    </plurals>
+    <string name="websearch_quellen_fortschritt">%1$d von %2$d Quellen durchsucht</string>
+
+    <!-- Mehrspieler -->
+    <string name="mehrspieler_titel">Zu zweit entscheiden</string>
+    <string name="mehrspieler_starten">Zu zweit entscheiden</string>
+    <string name="mehrspieler_einleitung">Ihr wischt beide durch dieselben Rezepte. Am Schluss seht ihr, worauf ihr beide Lust habt – nicht, was die andere Person aussortiert hat.</string>
+    <string name="mehrspieler_datenschutz">Dafür gehen die Titel deiner Rezepte an unseren Pairing-Dienst. Zutaten und Zubereitung bleiben auf deinem Gerät, und nach zwölf Stunden wird die Runde gelöscht.</string>
+    <string name="mehrspieler_einladen">Jemanden einladen</string>
+    <string name="mehrspieler_oder">oder</string>
+    <string name="mehrspieler_code_eingeben">Code eingeben</string>
+    <string name="mehrspieler_beitreten">Beitreten</string>
+    <string name="mehrspieler_code_zeigen">Zeig diesen Code der anderen Person oder schick ihn ihr.</string>
+    <string name="mehrspieler_teilen">Teilen</string>
+    <string name="mehrspieler_teilen_text">Lass uns zusammen entscheiden, was wir kochen! Mein Rezeptli-Code: %1$s</string>
+    <string name="mehrspieler_schon_loswischen">Schon loswischen</string>
+    <string name="mehrspieler_warte_person_titel">Warte auf die andere Person</string>
+    <string name="mehrspieler_warte_person_text">Du kannst schon anfangen – sobald sie beitritt, läuft es zusammen weiter.</string>
+    <string name="mehrspieler_warten_titel">Du bist durch</string>
+    <string name="mehrspieler_warten_text">Sobald die andere Person fertig ist, seht ihr eure gemeinsamen Treffer.</string>
+    <string name="mehrspieler_treffer_titel">Darauf habt ihr beide Lust</string>
+    <string name="mehrspieler_keine_treffer_titel">Diesmal keine Übereinstimmung</string>
+    <string name="mehrspieler_keine_treffer_text">Kein Rezept, das euch beiden gefallen hat. Neue Runde?</string>
+    <string name="mehrspieler_fehler_verbindung">Keine Verbindung. Ohne Internet geht das gemeinsame Wischen leider nicht.</string>
+    <string name="mehrspieler_fehler_code">Diesen Code kennen wir nicht. Vertippt?</string>
+    <string name="mehrspieler_fehler_abgelaufen">Diese Runde ist abgelaufen. Macht einfach eine neue auf.</string>
+    <string name="mehrspieler_fehler_voll">Bei dieser Runde sind schon genug Leute dabei.</string>
+    <string name="mehrspieler_fehler_keine_rezepte">Zu deinem Filter gibt es keine Rezepte zum Teilen.</string>
+    <string name="mehrspieler_fehler_unbekannt">Das hat nicht geklappt. Versuch es gleich nochmal.</string>
+    <string name="action_ok">OK</string>
 </resources>

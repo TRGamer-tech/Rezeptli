@@ -2,6 +2,7 @@ package ch.rezeptli.app.domain.usecase
 
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.repository.RecipeRepository
+import ch.rezeptli.app.domain.steps.InstructionSplitter
 import javax.inject.Inject
 
 /** Gruende, weshalb ein Rezept nicht gespeichert werden kann. */
@@ -26,6 +27,7 @@ sealed interface SaveRecipeResult {
  */
 class SaveRecipeUseCase @Inject constructor(
     private val repository: RecipeRepository,
+    private val splitter: InstructionSplitter,
 ) {
     suspend operator fun invoke(recipe: Recipe): SaveRecipeResult {
         val errors = buildSet {
@@ -49,6 +51,13 @@ class SaveRecipeUseCase @Inject constructor(
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .distinctBy { it.lowercase() },
+            // Bringt das Rezept eigene Schritte mit - etwa aus einem Import, wo die
+            // Quelle sie selbst gegliedert hat -, bleiben die erhalten. Sonst wird der
+            // Text aufgeteilt, damit der Kochmodus immer etwas zu zeigen hat.
+            steps = recipe.steps
+                .filter { it.text.isNotBlank() }
+                .mapIndexed { index, step -> step.copy(text = step.text.trim(), position = index) }
+                .ifEmpty { splitter.split(recipe.instructions) },
         )
 
         return SaveRecipeResult.Saved(repository.saveRecipe(cleaned))

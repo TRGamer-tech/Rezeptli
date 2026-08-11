@@ -9,6 +9,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.data.local.entity.RecipeSummaryProjection
 import ch.rezeptli.app.data.local.entity.RecipeTagEntity
 import ch.rezeptli.app.data.local.entity.RecipeWithDetails
@@ -132,15 +133,22 @@ abstract class RecipeDao {
     @Query("DELETE FROM recipe_tags WHERE recipeId = :recipeId")
     abstract suspend fun deleteTagsOf(recipeId: Long)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertSteps(steps: List<RecipeStepEntity>)
+
+    @Query("DELETE FROM recipe_steps WHERE recipeId = :recipeId")
+    abstract suspend fun deleteStepsOf(recipeId: Long)
+
     /**
-     * Legt ein Rezept an oder aktualisiert es samt Zutaten und Tags - in einer
-     * Transaktion, damit nie ein halb gespeicherter Zustand entstehen kann.
+     * Legt ein Rezept an oder aktualisiert es samt Zutaten, Tags und Schritten - in
+     * einer Transaktion, damit nie ein halb gespeicherter Zustand entstehen kann.
      */
     @Transaction
     open suspend fun upsertRecipe(
         recipe: RecipeEntity,
         ingredients: List<IngredientEntity>,
         tags: List<String>,
+        steps: List<RecipeStepEntity> = emptyList(),
     ): Long {
         val recipeId = if (recipe.id == 0L) {
             insertRecipe(recipe)
@@ -151,6 +159,7 @@ abstract class RecipeDao {
 
         deleteIngredientsOf(recipeId)
         deleteTagsOf(recipeId)
+        deleteStepsOf(recipeId)
 
         if (ingredients.isNotEmpty()) {
             insertIngredients(
@@ -161,6 +170,13 @@ abstract class RecipeDao {
         }
         if (tags.isNotEmpty()) {
             insertTags(tags.map { RecipeTagEntity(recipeId = recipeId, tag = it) })
+        }
+        if (steps.isNotEmpty()) {
+            insertSteps(
+                steps.mapIndexed { index, step ->
+                    step.copy(id = 0L, recipeId = recipeId, position = index)
+                },
+            )
         }
 
         return recipeId

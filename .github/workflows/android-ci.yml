@@ -5,6 +5,17 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      aufgabe:
+        description: 'Was soll laufen?'
+        type: choice
+        default: apk
+        options:
+          - apk
+          - quellen-pruefen
+
+permissions:
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +25,9 @@ jobs:
   build:
     name: Build und Tests
     runs-on: ubuntu-latest
+    # Ohne Obergrenze kann ein haengender Test den Lauf stundenlang blockieren,
+    # ohne je fehlzuschlagen - genau das ist passiert. Lieber ein klarer Abbruch.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -35,7 +49,11 @@ jobs:
         run: ./gradlew ktlintCheck --stacktrace
 
       - name: Unit-Tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        # Enger als das Job-Limit: So bleibt Zeit, den Fehlerbericht zu schreiben.
+        timeout-minutes: 12
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --console=plain 2>&1 | tee /tmp/build.log
 
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
@@ -108,7 +126,19 @@ jobs:
           retention-days: 14
 
       - name: UI-Tests kompilieren
-        run: ./gradlew assembleDebugAndroidTest --console=plain
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebugAndroidTest --console=plain 2>&1 | tee -a /tmp/build.log
+
+      # Steht bewusst am Schluss: So sind Kompilierfehler am Ende des Logs zu finden
+      # und nicht zwischen Artefakt-Uploads.
+      - name: Fehler zusammenfassen
+        if: failure()
+        run: |
+          echo "=== Kompilier- und Testfehler ==="
+          grep -E "^e: |^w: .*error|FAILED$" /tmp/build.log | head -40 || echo "keine gefunden"
+          echo "=== Fehlgeschlagene Tests ==="
+          grep -E "FAILED" /tmp/build.log | head -20 || true
 
   instrumented:
     name: UI-Tests auf dem Emulator
@@ -147,7 +177,13 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew connectedDebugAndroidTest --console=plain
+          script: ./gradlew connectedDebugAndroidTest --console=plain 2>&1 | tee /tmp/ui.log
+
+      - name: Fehler zusammenfassen
+        if: failure()
+        run: |
+          echo "=== Kompilier- und Testfehler ==="
+          grep -E "^e: |FAILED|Exception" /tmp/ui.log | head -30 || echo "keine gefunden"
 
       - name: Testberichte hochladen
         if: always()
@@ -157,3 +193,114 @@ jobs:
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
           retention-days: 7
+
+  publish-apk:
+    name: Debug-APK veröffentlichen
+    runs-on: ubuntu-latest
+    # Laeuft bewusst nur auf Zuruf: bei jedem Push waere ein Release blosses Rauschen.
+    if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'apk'
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Debug-APK bauen
+        run: ./gradlew assembleDebug --console=plain
+
+      - name: APK benennen
+        id: apk
+        run: |
+          version="$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)"
+          target="rezeptli-${version}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$target"
+          echo "name=$target" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          sha256sum "$target"
+
+      - name: Release veröffentlichen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: apk-debug
+          APK: ${{ steps.apk.outputs.name }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          COMMIT: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          notes=$(cat <<NOTES
+          **Debug-Build zum Ausprobieren - kein fertiges Release.**
+
+          Diese APK ist mit dem Android-Debug-Schlüssel signiert und nicht optimiert.
+          Sie ist zum Testen gedacht, nicht zur Weitergabe.
+
+          - Version: \`$VERSION\`
+          - Paketname: \`ch.rezeptli.app.debug\` (läuft parallel zu einem späteren Release-Build)
+          - Stand: \`$COMMIT\`
+
+          **Installation:** APK auf dem Handy herunterladen und öffnen. Android fragt einmalig,
+          ob Browser bzw. Datei-Manager Apps installieren dürfen - das muss erlaubt werden.
+
+          Die App hat keine Internet-Berechtigung: alle Rezepte bleiben auf dem Gerät.
+          NOTES
+          )
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+            gh release edit "$TAG" --notes "$notes" --prerelease
+          else
+            gh release create "$TAG" "$APK" \
+              --title "Rezeptli $VERSION (Debug-Build)" \
+              --notes "$notes" \
+              --prerelease
+          fi
+
+          {
+            echo "### APK bereit"
+            echo "https://github.com/$REPO/releases/download/$TAG/$APK"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  quellen-pruefen:
+    name: Rezeptquellen analysieren
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'quellen-pruefen'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Quellen analysieren
+        run: |
+          set -o pipefail
+          python3 tools/quellen-recon.py 2>&1 | tee /tmp/quellen.txt
+        continue-on-error: true
+
+      - name: Bericht anhaengen
+        if: always()
+        run: |
+          {
+            echo '## Quellen-Analyse'
+            echo
+            echo '```'
+            cat /tmp/quellen.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Bericht hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quellen-analyse
+          path: /tmp/quellen.txt
+          retention-days: 14

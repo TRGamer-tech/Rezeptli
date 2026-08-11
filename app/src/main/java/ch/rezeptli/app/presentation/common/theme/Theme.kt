@@ -9,94 +9,133 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
-
-private val LightColors = lightColorScheme(
-    primary = HerbGreen40,
-    onPrimary = Color.White,
-    primaryContainer = HerbGreen90,
-    onPrimaryContainer = HerbGreen10,
-    secondary = Sage40,
-    onSecondary = Color.White,
-    secondaryContainer = Sage90,
-    onSecondaryContainer = Sage10,
-    tertiary = Carrot40,
-    onTertiary = Color.White,
-    tertiaryContainer = Carrot90,
-    onTertiaryContainer = Carrot10,
-    error = Tomato40,
-    onError = Color.White,
-    errorContainer = Tomato90,
-    onErrorContainer = Tomato10,
-    background = Cream99,
-    onBackground = Charcoal10,
-    surface = Cream99,
-    onSurface = Charcoal10,
-    surfaceVariant = Cream90,
-    onSurfaceVariant = Stone30,
-    outline = Stone50,
-    outlineVariant = Stone80,
-    surfaceContainer = Cream95,
-    surfaceContainerHigh = Cream90,
-)
+import androidx.compose.ui.text.TextStyle
 
 private val DarkColors = darkColorScheme(
-    primary = HerbGreen80,
-    onPrimary = HerbGreen20,
-    primaryContainer = HerbGreen30,
-    onPrimaryContainer = HerbGreen90,
-    secondary = Sage80,
-    onSecondary = Sage20,
-    secondaryContainer = Sage30,
-    onSecondaryContainer = Sage90,
-    tertiary = Carrot80,
-    onTertiary = Carrot20,
-    tertiaryContainer = Carrot30,
-    onTertiaryContainer = Carrot90,
-    error = Tomato80,
-    onError = Tomato20,
-    errorContainer = Tomato30,
-    onErrorContainer = Tomato90,
-    background = Charcoal10,
-    onBackground = Charcoal90,
-    surface = Charcoal10,
-    onSurface = Charcoal90,
-    surfaceVariant = Charcoal30,
-    onSurfaceVariant = Stone80,
-    outline = Stone50,
-    outlineVariant = Charcoal30,
-    surfaceContainer = Charcoal20,
-    surfaceContainerHigh = Charcoal30,
+    primary = DarkAccent,
+    onPrimary = DarkOnAccent,
+    primaryContainer = DarkAccentPressed,
+    onPrimaryContainer = DarkAccentLight,
+    secondary = DarkAccentSoft,
+    onSecondary = DarkOnAccent,
+    secondaryContainer = DarkSurfaceElevated,
+    onSecondaryContainer = DarkAccentLight,
+    tertiary = Tokens.Mesh.Teal,
+    onTertiary = Tokens.Neutral.Charcoal900,
+    tertiaryContainer = DarkSurfaceElevated,
+    onTertiaryContainer = DarkTextPrimary,
+    error = DarkError,
+    onError = DarkOnError,
+    errorContainer = DarkErrorSurface,
+    onErrorContainer = Color(0xFFFFDAD6),
+    background = DarkBackground,
+    onBackground = DarkTextPrimary,
+    surface = DarkBackground,
+    onSurface = DarkTextPrimary,
+    surfaceVariant = DarkSurfaceCard,
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkOutline,
+    outlineVariant = Tokens.Border.Hairline,
+    surfaceContainerLow = DarkSurfaceRaised,
+    surfaceContainer = DarkSurfaceCard,
+    surfaceContainerHigh = DarkSurfaceElevated,
+    surfaceContainerHighest = DarkSurfaceElevated,
+    scrim = Tokens.Neutral.Black,
 )
 
-/** Farben, die es im Material-Schema nicht gibt, die Rezeptli aber braucht. */
+private val LightColors = lightColorScheme(
+    primary = LightAccent,
+    onPrimary = LightOnAccent,
+    primaryContainer = LightAccentContainer,
+    onPrimaryContainer = LightOnAccentContainer,
+    secondary = LightAccentPressed,
+    onSecondary = LightOnAccent,
+    secondaryContainer = LightSurfaceElevated,
+    onSecondaryContainer = LightOnAccentContainer,
+    tertiary = Color(0xFF00696E),
+    onTertiary = LightOnAccent,
+    tertiaryContainer = Color(0xFFCFF7F9),
+    onTertiaryContainer = Color(0xFF002022),
+    error = LightError,
+    onError = LightOnError,
+    errorContainer = LightErrorSurface,
+    onErrorContainer = Color(0xFF410E0B),
+    background = LightBackground,
+    onBackground = LightTextPrimary,
+    surface = LightBackground,
+    onSurface = LightTextPrimary,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightTextSecondary,
+    outline = LightOutline,
+    outlineVariant = Color(0xFFE6DAEB),
+    surfaceContainerLow = Color(0xFFF7F1F9),
+    surfaceContainer = LightSurfaceCard,
+    surfaceContainerHigh = LightSurfaceElevated,
+    surfaceContainerHighest = LightSurfaceElevated,
+    scrim = Tokens.Neutral.Black,
+)
+
+/**
+ * Werte, die Material nicht kennt, die aber im ganzen Design gebraucht werden.
+ *
+ * Sie liegen bewusst neben dem Material-Farbschema statt darin: Material haette keinen
+ * passenden Platz fuer sie, und ein eigener Zugriffspunkt macht im Bildschirmcode
+ * sichtbar, dass hier eine App-eigene Entscheidung sichtbar wird.
+ */
 data class RezeptliAccentColors(
     val swipeYes: Color,
     val swipeNo: Color,
+    val glow: Color,
+    val glassFill: Color,
+    val hairline: Color,
+    val accentBorder: Color,
 )
 
-private val LightAccents = RezeptliAccentColors(swipeYes = SwipeYes, swipeNo = SwipeNo)
-
-/** Im Dunkelmodus etwas heller, damit die Rueckmeldung auf dunklem Grund lesbar bleibt. */
 private val DarkAccents = RezeptliAccentColors(
-    swipeYes = Color(0xFF6BD69B),
-    swipeNo = Color(0xFFFF8A7A),
+    swipeYes = SwipeYesDark,
+    swipeNo = SwipeNoDark,
+    glow = Tokens.Purple.Vivid,
+    // Glas ist eine Flaeche, durch die der Hintergrund schimmert - deshalb halbtransparent.
+    glassFill = Tokens.Neutral.Charcoal850.copy(alpha = 0.72f),
+    hairline = Tokens.Border.Hairline,
+    accentBorder = Tokens.Border.Accent,
 )
 
-private val LocalAccentColors = staticCompositionLocalOf { LightAccents }
+/**
+ * Im Hellen traegt nicht Weiss die Raender, sondern Schwarz - sonst verschwinden sie.
+ * Auch das Leuchten ist zurueckhaltender: Auf hellem Grund wirkt ein starker Schein
+ * schnell schmutzig statt leuchtend.
+ */
+private val LightAccents = RezeptliAccentColors(
+    swipeYes = SwipeYesLight,
+    swipeNo = SwipeNoLight,
+    glow = LightAccent,
+    glassFill = Color.White.copy(alpha = 0.78f),
+    hairline = Color.Black.copy(alpha = 0.12f),
+    accentBorder = LightAccent.copy(alpha = 0.35f),
+)
+
+private val LocalAccentColors = staticCompositionLocalOf { DarkAccents }
 
 object RezeptliTheme {
     val accents: RezeptliAccentColors
         @Composable
         @ReadOnlyComposable
         get() = LocalAccentColors.current
+
+    /** Mengenangaben in Ziffern gleicher Breite. */
+    val amountStyle: TextStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = AmountTextStyle
 }
 
 /**
  * Das Theme der App.
  *
- * Dynamic Color (Material You) wird bewusst nicht verwendet: Die Farbwelt aus Gruen und
- * Orange ist Teil der Identitaet der App, und die Wisch-Rueckmeldung braucht verlaessliche
- * Gruen- und Rottoene, die sich nicht mit dem Hintergrundbild des Geraets aendern.
+ * Dynamic Color (Material You) bleibt bewusst aus: Die Wisch-Rueckmeldung braucht
+ * verlaessliche Gruen- und Rottoene, die sich nicht mit dem Hintergrundbild des
+ * Geraets aendern.
  */
 @Composable
 fun RezeptliTheme(

@@ -6,6 +6,8 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.repository.UserProfileRepository
+import ch.rezeptli.app.domain.usecase.ObserveOpenShoppingCountUseCase
 import ch.rezeptli.app.domain.usecase.ObservePagedRecipesUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRecipeCountUseCase
 import ch.rezeptli.app.domain.usecase.ObserveTagsUseCase
@@ -32,6 +34,8 @@ data class RecipeListUiState(
     val maxPrepTimeMinutes: Int? = null,
     val availableTags: List<String> = emptyList(),
     val totalRecipeCount: Int = 0,
+    val openShoppingItems: Int = 0,
+    val firstName: String = "",
     val isFilterVisible: Boolean = false,
 ) {
     val filter: RecipeFilter
@@ -53,6 +57,8 @@ class RecipeListViewModel @Inject constructor(
     observePagedRecipes: ObservePagedRecipesUseCase,
     observeRecipeCount: ObserveRecipeCountUseCase,
     observeTags: ObserveTagsUseCase,
+    observeOpenShoppingCount: ObserveOpenShoppingCountUseCase,
+    profileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RecipeListUiState())
     val uiState: StateFlow<RecipeListUiState> = _uiState.asStateFlow()
@@ -78,6 +84,16 @@ class RecipeListViewModel @Inject constructor(
 
         observeTags()
             .onEach { tags -> _uiState.update { it.copy(availableTags = tags) } }
+            .launchIn(viewModelScope)
+
+        observeOpenShoppingCount()
+            .onEach { count -> _uiState.update { it.copy(openShoppingItems = count) } }
+            .launchIn(viewModelScope)
+
+        profileRepository.profile
+            .map { it.firstName }
+            .distinctUntilChanged()
+            .onEach { name -> _uiState.update { it.copy(firstName = name) } }
             .launchIn(viewModelScope)
     }
 

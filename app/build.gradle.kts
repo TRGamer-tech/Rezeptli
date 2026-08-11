@@ -19,6 +19,22 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
+        // Adresse des Pairing-Dienstes. Nur der Mehrspieler-Modus nutzt sie;
+        // alles andere in der App kommt ohne Server aus.
+        buildConfigField(
+            "String",
+            "PAIRING_URL",
+            "\"https://rezeptli-pairing.rezeptli.workers.dev\"",
+        )
+
+        // Das taeglich gebaute Rezeptverzeichnis. Ist es nicht erreichbar,
+        // holt die App die Sitemaps wie bisher selbst.
+        buildConfigField(
+            "String",
+            "INDEX_URL",
+            "\"https://trgamer-tech.github.io/Rezeptli\"",
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -48,6 +64,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -57,6 +74,10 @@ android {
             excludes += "/META-INF/LICENSE-notice.md"
         }
     }
+
+    // Die exportierten Schemas liegen als Assets im androidTest-Quellsatz, damit der
+    // Migrationstest gegen die tatsaechliche Vorgaengerversion laufen kann.
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 
     testOptions {
         unitTests {
@@ -96,6 +117,10 @@ dependencies {
 
     implementation(libs.androidx.navigation.compose)
 
+    // Einstellungen und Onboarding-Antworten - schlanker als eine Tabelle,
+    // und die Werte werden als Flow beobachtbar.
+    implementation(libs.androidx.datastore.preferences)
+
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
@@ -110,12 +135,19 @@ dependencies {
 
     implementation(libs.coil.compose)
 
+    // Web-Import: HTML lesen (jsoup) und die eingebetteten strukturierten Daten
+    // auswerten (kotlinx-serialization, nur die Laufzeit ohne Codegen).
+    implementation(libs.jsoup)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
