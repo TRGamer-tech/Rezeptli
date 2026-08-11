@@ -46,7 +46,9 @@ jobs:
         run: ./gradlew ktlintCheck --stacktrace
 
       - name: Unit-Tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --console=plain 2>&1 | tee /tmp/build.log
 
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
@@ -119,7 +121,19 @@ jobs:
           retention-days: 14
 
       - name: UI-Tests kompilieren
-        run: ./gradlew assembleDebugAndroidTest --console=plain
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebugAndroidTest --console=plain 2>&1 | tee -a /tmp/build.log
+
+      # Steht bewusst am Schluss: So sind Kompilierfehler am Ende des Logs zu finden
+      # und nicht zwischen Artefakt-Uploads.
+      - name: Fehler zusammenfassen
+        if: failure()
+        run: |
+          echo "=== Kompilier- und Testfehler ==="
+          grep -E "^e: |^w: .*error|FAILED$" /tmp/build.log | head -40 || echo "keine gefunden"
+          echo "=== Fehlgeschlagene Tests ==="
+          grep -E "FAILED" /tmp/build.log | head -20 || true
 
   instrumented:
     name: UI-Tests auf dem Emulator
