@@ -5,6 +5,14 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      aufgabe:
+        description: 'Was soll laufen?'
+        type: choice
+        default: apk
+        options:
+          - apk
+          - quellen-pruefen
 
 permissions:
   contents: write
@@ -165,7 +173,7 @@ jobs:
     name: Debug-APK veröffentlichen
     runs-on: ubuntu-latest
     # Laeuft bewusst nur auf Zuruf: bei jedem Push waere ein Release blosses Rauschen.
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'apk'
     needs: build
 
     steps:
@@ -237,3 +245,78 @@ jobs:
             echo "### APK bereit"
             echo "https://github.com/$REPO/releases/download/$TAG/$APK"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  quellen-pruefen:
+    name: Rezeptquellen analysieren
+    runs-on: ubuntu-latest
+    # Einmalige Analyse: Bieten die Schweizer Rezeptseiten strukturierte Daten
+    # (schema.org/Recipe als JSON-LD) an? Davon haengt ab, wie der Import gebaut wird.
+    if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'quellen-pruefen'
+
+    steps:
+      - name: Seiten analysieren
+        run: |
+          set +e
+          UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+          fetch() { curl -sSL --max-time 40 -A "$UA" "$1"; }
+
+          for host in https://www.swissmilk.ch https://fooby.ch https://migusto.migros.ch; do
+            echo "=================== $host ==================="
+            echo "--- robots.txt (Auszug) ---"
+            fetch "$host/robots.txt" | head -30
+            echo "--- Startseite: Status und Rezept-Links ---"
+            fetch "$host" > /tmp/home.html
+            echo "Bytes: $(wc -c < /tmp/home.html)"
+            grep -oE 'href="[^"]{0,120}(rezept|recipe)[^"]{0,80}"' /tmp/home.html \
+              | sort -u | head -8
+            echo "--- JSON-LD auf der Startseite? ---"
+            grep -c 'application/ld+json' /tmp/home.html
+          done
+
+          echo "=================== Rezeptseite im Detail ==================="
+          # Erste Rezept-URL von Swissmilk aufloesen und auf strukturierte Daten pruefen.
+          fetch https://www.swissmilk.ch/de/rezepte-kochideen/ > /tmp/list.html
+          echo "Listenseite Bytes: $(wc -c < /tmp/list.html)"
+          url=$(grep -oE 'href="[^"]*/rezepte/[^"]*"' /tmp/list.html | head -1 \
+            | sed 's/href="//; s/"$//')
+          echo "Gefundene Rezept-URL: $url"
+          case "$url" in
+            /*) url="https://www.swissmilk.ch$url" ;;
+          esac
+          if [ -n "$url" ]; then
+            fetch "$url" > /tmp/recipe.html
+            echo "Rezeptseite Bytes: $(wc -c < /tmp/recipe.html)"
+            echo "--- Anzahl JSON-LD-Bloecke ---"
+            grep -c 'application/ld+json' /tmp/recipe.html
+            echo "--- JSON-LD Inhalt (gekuerzt) ---"
+            python3 - <<'PYEOF'
+          import json, re
+          html = open('/tmp/recipe.html', encoding='utf-8', errors='replace').read()
+          blocks = re.findall(
+              r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', html, re.S)
+          print("Bloecke:", len(blocks))
+          for raw in blocks:
+              try:
+                  data = json.loads(raw)
+              except Exception as exc:
+                  print("  nicht parsebar:", exc)
+                  continue
+              for node in (data if isinstance(data, list) else [data]):
+                  if isinstance(node, dict) and 'Recipe' in str(node.get('@type', '')):
+                      print("  RECIPE GEFUNDEN. Felder:", sorted(node.keys()))
+                      for key in ('name', 'recipeYield', 'totalTime', 'prepTime', 'cookTime'):
+                          print(f"   {key}: {json.dumps(node.get(key), ensure_ascii=False)[:120]}")
+                      ing = node.get('recipeIngredient') or node.get('ingredients')
+                      print("   recipeIngredient (erste 6):",
+                            json.dumps(ing[:6] if isinstance(ing, list) else ing,
+                                       ensure_ascii=False)[:400])
+                      instr = node.get('recipeInstructions')
+                      print("   recipeInstructions Typ:", type(instr).__name__)
+                      print("   recipeInstructions:",
+                            json.dumps(instr, ensure_ascii=False)[:400])
+                      print("   image:", json.dumps(node.get('image'), ensure_ascii=False)[:200])
+                  elif isinstance(node, dict):
+                      print("  anderer Typ:", node.get('@type'))
+          PYEOF
+          fi
+          exit 0
