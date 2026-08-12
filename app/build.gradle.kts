@@ -80,6 +80,14 @@ android {
     // Migrationstest gegen die tatsaechliche Vorgaengerversion laufen kann.
     sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 
+    // Room schreibt das Schema waehrend der Kompilierung nach schemas/, die Assets
+    // der Geraetetests werden davon unabhaengig zusammengestellt. Ohne diese
+    // Abhaengigkeit entscheidet der Zufall, was zuerst laeuft - und der
+    // Migrationstest fand die Datei zur naechsten Datenbankfassung nicht.
+    tasks.configureEach {
+        if (name == "mergeDebugAndroidTestAssets") dependsOn("kspDebugKotlin")
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

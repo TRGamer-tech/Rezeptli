@@ -9,7 +9,7 @@ import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -33,6 +33,10 @@ import java.util.concurrent.TimeUnit
  *
  * Die zweite Person wird direkt ueber die Schnittstelle nachgestellt. Sie braucht
  * eine eigene Kennung, und die legt die App pro Geraet nur einmal an.
+ *
+ * Bewusst runBlocking statt runTest: runTest rechnet mit virtueller Zeit und laesst
+ * jedes withTimeout sofort ablaufen, waehrend das Netz noch antwortet. Hier soll die
+ * echte Uhr zaehlen.
  */
 @RunWith(AndroidJUnit4::class)
 class PairingLiveTest {
@@ -51,7 +55,7 @@ class PairingLiveTest {
     )
 
     @Test
-    fun eineGanzeRundeVonEinladenBisTreffer() = runTest {
+    fun eineGanzeRundeVonEinladenBisTreffer(): Unit = runBlocking {
         withTimeout(TEST_TIMEOUT_MS) {
             // 1. Einladen - genau der Schritt, der auf dem Geraet fehlschlug.
             val erstellt = repository.createSession(rezepte)
@@ -98,7 +102,7 @@ class PairingLiveTest {
     }
 
     @Test
-    fun einUnbekannterCodeWirdSauberAbgelehnt() = runTest {
+    fun einUnbekannterCodeWirdSauberAbgelehnt(): Unit = runBlocking {
         withTimeout(TEST_TIMEOUT_MS) {
             val result = repository.joinSession("ZZZZZZ")
 
