@@ -63,10 +63,9 @@ class DeckViewModelTest {
     )
 
     private fun createViewModel(
-        webRepository: FakeWebRecipeRepository = FakeWebRecipeRepository(
-            pool = pool,
-            cardImagesByUrl = mapOf(ohneBildAberNachladbar.url to "https://a.example/nachgeladen.jpg"),
-        ),
+        webRepository: FakeWebRecipeRepository = FakeWebRecipeRepository(pool = pool).apply {
+            cardImagesByUrl = mapOf(ohneBildAberNachladbar.url to "https://a.example/nachgeladen.jpg")
+        },
         recipeRepository: FakeRecipeRepository = FakeRecipeRepository(),
     ) = DeckViewModel(
         buildDeck = BuildSwipeDeckUseCase(
