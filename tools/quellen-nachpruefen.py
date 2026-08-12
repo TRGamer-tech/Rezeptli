@@ -67,22 +67,22 @@ def robots_erlaubt(url: str) -> str:
     return f"robots.txt verbietet {treffer[0]}" if treffer else "robots.txt erlaubt es"
 
 
-def erste_adresse(sitemap: str, muster: str, tiefe: int = 0) -> str | None:
+def erste_adresse_in_kindern(kinder: list[str], muster: str, tiefe: int = 0) -> str | None:
     if tiefe > 2:
         return None
-    xml = hole(sitemap).decode("utf-8", "replace")
-    adressen = LOC.findall(xml)
+    for kind in kinder[:6]:
+        xml = hole(kind).decode("utf-8", "replace")
+        adressen = LOC.findall(xml)
 
-    if "<sitemapindex" in xml.lower():
-        for kind in adressen[:6]:
-            gefunden = erste_adresse(kind, muster, tiefe + 1)
+        if "<sitemapindex" in xml.lower():
+            gefunden = erste_adresse_in_kindern(adressen, muster, tiefe + 1)
             if gefunden:
                 return gefunden
-        return None
+            continue
 
-    for adresse in adressen:
-        if re.search(muster, adresse, re.I):
-            return adresse
+        for adresse in adressen:
+            if re.search(muster, adresse, re.I):
+                return adresse
     return None
 
 
@@ -114,19 +114,27 @@ def pruefe(kennung: str, sitemap: str, muster: str) -> None:
         print(f"  Sitemap nicht erreichbar: {str(fehler)[:70]}")
         return
 
-    print(f"  Sitemap: {len(roh) // 1024} KB, {len(LOC.findall(roh))} <loc> auf oberster Ebene")
-    if "<sitemapindex" in roh.lower():
-        print("  Ist ein Sitemap-Index, keine Rezeptliste")
+    adressen = LOC.findall(roh)
+    print(f"  Sitemap: {len(roh) // 1024} KB, {len(adressen)} <loc> auf oberster Ebene")
 
-    try:
-        adresse = erste_adresse(sitemap, muster)
-    except Exception as fehler:
-        print(f"  beim Verfolgen des Index: {str(fehler)[:70]}")
-        return
+    if "<sitemapindex" in roh.lower():
+        print("  Ist ein Sitemap-Index, keine Rezeptliste - verfolge Unterverzeichnisse")
+        try:
+            adresse = erste_adresse_in_kindern(adressen, muster)
+        except Exception as fehler:
+            print(f"  beim Verfolgen der Unterverzeichnisse: {str(fehler)[:70]}")
+            return
+    else:
+        # Schon geladen - kein zweiter Abruf noetig. Ein erneuter Abruf derselben
+        # Datei kurz hintereinander war genau das, woran diese Pruefung bei Migusto
+        # gescheitert ist: die zweite Anfrage lief in ein Zeitlimit.
+        adresse = next((a for a in adressen if re.search(muster, a, re.I)), None)
 
     if adresse is None:
-        print(f"  Keine Adresse passt auf das Muster - Anfang der Sitemap:")
-        print(f"    {roh[:300]!r}")
+        anzahl_treffer = sum(1 for a in adressen if "migros" in a.lower() or "migusto" in a.lower())
+        print("  Keine Adresse passt auf das Muster")
+        print(f"    Muster: {muster}")
+        print(f"    Erste 3 Adressen der Sitemap: {adressen[:3]}")
         return
 
     print(f"  Beispielrezept: {adresse}")
