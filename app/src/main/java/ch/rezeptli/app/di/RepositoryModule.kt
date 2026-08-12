@@ -6,12 +6,14 @@ import ch.rezeptli.app.data.repository.RecipeRepositoryImpl
 import ch.rezeptli.app.data.repository.ShoppingListRepositoryImpl
 import ch.rezeptli.app.data.repository.SwipeSessionRepositoryImpl
 import ch.rezeptli.app.data.repository.WebRecipeRepositoryImpl
+import ch.rezeptli.app.data.translate.MlKitRecipeTranslator
 import ch.rezeptli.app.domain.repository.PairingRepository
 import ch.rezeptli.app.domain.repository.RecipeRepository
 import ch.rezeptli.app.domain.repository.ShoppingListRepository
 import ch.rezeptli.app.domain.repository.SwipeSessionRepository
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
+import ch.rezeptli.app.domain.translate.RecipeTranslator
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -44,4 +46,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPairingRepository(impl: PairingRepositoryImpl): PairingRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecipeTranslator(impl: MlKitRecipeTranslator): RecipeTranslator
 }

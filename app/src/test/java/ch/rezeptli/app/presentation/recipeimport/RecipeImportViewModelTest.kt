@@ -6,6 +6,7 @@ import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.parser.RecipeTextParser
 import ch.rezeptli.app.domain.steps.InstructionSplitter
+import ch.rezeptli.app.domain.translate.NoTranslation
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ParseRecipeTextUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
@@ -39,6 +40,7 @@ class RecipeImportViewModelTest {
                 FakeWebRecipeRepository(),
                 IngredientTextParser(),
                 InstructionSplitter(),
+                NoTranslation,
             ),
             saveRecipe = SaveRecipeUseCase(repository, InstructionSplitter()),
         )

@@ -6,8 +6,10 @@ import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
+import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
 import ch.rezeptli.app.domain.steps.InstructionSplitter
+import ch.rezeptli.app.domain.translate.NoTranslation
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.JoinSharedSessionUseCase
@@ -78,7 +80,12 @@ class MultiplayerViewModelTest {
     private fun createViewModel() = MultiplayerViewModel(
         startSession = StartSharedSessionUseCase(pairing, recipeRepository),
         selectionHolder = selectionHolder,
-        loadWebRecipe = LoadWebRecipeUseCase(FakeWebRecipeRepository()),
+        loadWebRecipe = LoadWebRecipeUseCase(
+            FakeWebRecipeRepository(),
+            IngredientTextParser(),
+            InstructionSplitter(),
+            NoTranslation,
+        ),
         saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
         addToShoppingList = AddRecipesToShoppingListUseCase(
             recipeRepository,

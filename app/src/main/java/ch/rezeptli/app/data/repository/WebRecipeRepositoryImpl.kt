@@ -15,6 +15,7 @@ import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
 import ch.rezeptli.app.domain.repository.WebSearchUpdate
+import ch.rezeptli.app.domain.translate.SourceLanguage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -172,7 +173,11 @@ class WebRecipeRepositoryImpl @Inject constructor(
         val recipe = extractor.extract(html, url, sourceName)
             ?: return WebRecipeResult.Failed(WebImportError.NO_RECIPE_FOUND)
 
-        return WebRecipeResult.Loaded(recipe)
+        // Die Sprache steht am Land der Quelle, nicht im Text: Eine Erkennung liegt
+        // bei kurzen Zutatenzeilen oft daneben.
+        return WebRecipeResult.Loaded(
+            recipe.copy(sourceLanguage = SourceLanguage.forCountry(source?.country)),
+        )
     }
 
     private fun WebFetchError.toDomain(): WebImportError = when (this) {
