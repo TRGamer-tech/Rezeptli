@@ -12,9 +12,14 @@ on:
         default: apk
         options:
           - apk
+          - vorabversion
           - quellen-pruefen
           - fehler-pruefen
           - bilder-pruefen
+      marke:
+        description: 'Marke der Vorabversion, z. B. v1.0.0-beta.1 (leer = aus Versionsnummer und Laufnummer)'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -258,7 +263,9 @@ jobs:
           **Installation:** APK auf dem Handy herunterladen und öffnen. Android fragt einmalig,
           ob Browser bzw. Datei-Manager Apps installieren dürfen - das muss erlaubt werden.
 
-          Die App hat keine Internet-Berechtigung: alle Rezepte bleiben auf dem Gerät.
+          **Die App braucht Internet.** Rezepte kommen aus dem Verzeichnis auf rezeptli.app
+          und von den Seiten der Anbieter; das gemeinsame Wischen laeuft ueber einen eigenen
+          Dienst. Was du speicherst, liegt auf dem Geraet.
           NOTES
           )
 
@@ -275,6 +282,104 @@ jobs:
           {
             echo "### APK bereit"
             echo "https://github.com/$REPO/releases/download/$TAG/$APK"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  vorabversion:
+    name: Vorabversion veröffentlichen
+    runs-on: ubuntu-latest
+    # Anders als der rollende Debug-Build bekommt eine Vorabversion eine eigene
+    # Marke und bleibt stehen: Man kann spaeter sagen, was drin war.
+    if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'vorabversion'
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Debug-APK bauen
+        run: ./gradlew assembleDebug --console=plain
+
+      - name: Marke und Datei bestimmen
+        id: stand
+        env:
+          GEWUENSCHT: ${{ inputs.marke }}
+        run: |
+          version="$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)"
+          marke="${GEWUENSCHT:-v${version}-beta.${GITHUB_RUN_NUMBER}}"
+          datei="rezeptli-${marke}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$datei"
+
+          {
+            echo "marke=$marke"
+            echo "datei=$datei"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+          sha256sum "$datei"
+
+      - name: Vorabversion anlegen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MARKE: ${{ steps.stand.outputs.marke }}
+          DATEI: ${{ steps.stand.outputs.datei }}
+          VERSION: ${{ steps.stand.outputs.version }}
+          COMMIT: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          notes=$(cat <<NOTES
+          **Vorabversion zum Ausprobieren.** Mit dem Android-Debug-Schlüssel signiert und
+          nicht optimiert - zum Testen gedacht, nicht zur Weitergabe.
+
+          - Version: \`$VERSION\`
+          - Paketname: \`ch.rezeptli.app.debug\` (läuft parallel zu einem späteren Release-Build)
+          - Stand: \`$COMMIT\`
+
+          **Was drin ist**
+
+          - Die App beginnt beim Wischen statt bei der Suche, mit einer unteren Leiste für
+            Wischen, Suchen, Rezepte und Einkauf.
+          - Der Stapel kommt aus dem täglich gebauten Rezeptverzeichnis und richtet sich nach
+            Wohnland und angegebenen Küchen.
+          - Vor jeder Runde die Frage nach der Anzahl Gerichte; bei Erreichen endet sie selbst.
+          - Party-Modus direkt aus dem Ergebnis: geteilt wird, was gerade gefallen hat.
+          - Einladen zu zweit funktioniert wieder - die Antwort des Dienstes wurde falsch
+            gelesen.
+          - Gutekueche liefert wieder Rezepte; die gepackte Sitemap wurde nicht ausgepackt.
+          - Alle Bildschirme benutzen dieselbe Flächensprache.
+
+          **Installation:** APK auf dem Handy herunterladen und öffnen. Android fragt einmalig,
+          ob Browser bzw. Datei-Manager Apps installieren dürfen - das muss erlaubt werden.
+
+          **Die App braucht Internet.** Rezepte kommen aus dem Verzeichnis auf rezeptli.app
+          und von den Seiten der Anbieter; das gemeinsame Wischen läuft über einen eigenen
+          Dienst. Was du speicherst, liegt auf dem Gerät.
+          NOTES
+          )
+
+          if gh release view "$MARKE" >/dev/null 2>&1; then
+            echo "::error::Die Marke $MARKE gibt es schon - bitte eine andere waehlen."
+            exit 1
+          fi
+
+          gh release create "$MARKE" "$DATEI" \
+            --title "Rezeptli $MARKE" \
+            --notes "$notes" \
+            --prerelease
+
+          {
+            echo "### Vorabversion bereit"
+            echo "https://github.com/$REPO/releases/tag/$MARKE"
           } >> "$GITHUB_STEP_SUMMARY"
 
   quellen-pruefen:
