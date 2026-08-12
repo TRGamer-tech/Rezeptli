@@ -17,8 +17,14 @@ interface PairingRepository {
     /** Eroeffnet eine Runde mit den uebergebenen Rezepten und liefert den Code. */
     suspend fun createSession(recipes: List<SharedRecipe>): PairingResult<SharedSession>
 
-    /** Tritt einer Runde bei und holt die Rezepte, ueber die abgestimmt wird. */
-    suspend fun joinSession(code: String): PairingResult<SharedSession>
+    /**
+     * Tritt einer Runde bei und holt die Rezepte, ueber die abgestimmt wird.
+     *
+     * Eigene Vorschlaege ([recipes]) mischt der Dienst in den Topf der Runde - danach
+     * stimmen beide Seiten ueber dieselbe, gemeinsame Auswahl ab statt nur ueber die
+     * des Gastgebers.
+     */
+    suspend fun joinSession(code: String, recipes: List<SharedRecipe> = emptyList()): PairingResult<SharedSession>
 
     /**
      * Sendet Entscheidungen. Mehrfach dasselbe zu senden ist unschaedlich - bei

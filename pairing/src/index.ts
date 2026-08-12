@@ -97,23 +97,7 @@ async function sitzungAnlegen(request: Request, env: Env): Promise<Response> {
     if (!Array.isArray(rezepte) || rezepte.length === 0) return fehler("rezepte fehlen", 400);
     if (rezepte.length > MAX_REZEPTE) return fehler("zu viele rezepte", 413);
 
-    const gepruefte: RezeptEingabe[] = [];
-    for (const eintrag of rezepte) {
-        if (typeof eintrag !== "object" || eintrag === null) continue;
-        const roh = eintrag as Record<string, unknown>;
-        const titel = text(roh.titel, MAX_TITEL_LAENGE);
-        const rezeptId = typeof roh.rezeptId === "number" ? Math.trunc(roh.rezeptId) : null;
-        if (titel === null || rezeptId === null) continue;
-
-        gepruefte.push({
-            rezeptId,
-            titel,
-            quelleUrl: text(roh.quelleUrl, 500),
-            bildUrl: text(roh.bildUrl, 500),
-            zubereitungszeit:
-                typeof roh.zubereitungszeit === "number" ? Math.trunc(roh.zubereitungszeit) : null,
-        });
-    }
+    const gepruefte = rezeptEingabenLesen(rezepte);
     if (gepruefte.length === 0) return fehler("keine brauchbaren rezepte", 400);
 
     const code = code_erzeugen();
@@ -149,10 +133,44 @@ async function sitzungAnlegen(request: Request, env: Env): Promise<Response> {
     return antwort({ code, verfaelltAm: verfall, rezepte: gepruefte.length }, 201);
 }
 
-/** Tritt einer Sitzung bei und bekommt die Rezepte, ueber die abgestimmt wird. */
+function rezeptEingabenLesen(wert: unknown): RezeptEingabe[] {
+    if (!Array.isArray(wert)) return [];
+
+    const gepruefte: RezeptEingabe[] = [];
+    for (const eintrag of wert) {
+        if (typeof eintrag !== "object" || eintrag === null) continue;
+        const roh = eintrag as Record<string, unknown>;
+        const titel = text(roh.titel, MAX_TITEL_LAENGE);
+        const rezeptId = typeof roh.rezeptId === "number" ? Math.trunc(roh.rezeptId) : null;
+        if (titel === null || rezeptId === null) continue;
+
+        gepruefte.push({
+            rezeptId,
+            titel,
+            quelleUrl: text(roh.quelleUrl, 500),
+            bildUrl: text(roh.bildUrl, 500),
+            zubereitungszeit:
+                typeof roh.zubereitungszeit === "number" ? Math.trunc(roh.zubereitungszeit) : null,
+        });
+    }
+    return gepruefte;
+}
+
+/**
+ * Tritt einer Sitzung bei und bekommt die Rezepte, ueber die abgestimmt wird.
+ *
+ * Bringt die beitretende Person eigene Rezeptvorschlaege mit, werden sie in den Topf
+ * gemischt statt nur ueber die des Gastgebers abzustimmen - sonst waere "gemeinsam
+ * aussuchen" nur "der einen Person zustimmen oder nicht". Ein Rezept, das beide schon
+ * kennen, hat auf beiden Geraeten dieselbe Kennung (sie kommt von der Adresse) und
+ * taucht darum nur einmal auf.
+ */
 async function beitreten(code: string, request: Request, env: Env): Promise<Response> {
     const rumpf = await request.json().catch(() => null);
-    const kennung = teilnehmerId((rumpf as { teilnehmer?: unknown } | null)?.teilnehmer);
+    const { teilnehmer, rezepte: mitgebracht } = (rumpf as
+        | { teilnehmer?: unknown; rezepte?: unknown }
+        | null) ?? {};
+    const kennung = teilnehmerId(teilnehmer);
     if (kennung === null) return fehler("teilnehmer fehlt", 400);
 
     const sitzung = await sitzungLaden(env, code);
@@ -182,6 +200,40 @@ async function beitreten(code: string, request: Request, env: Env): Promise<Resp
         )
             .bind(code, kennung, jetzt())
             .run();
+    }
+
+    const gepruefte = rezeptEingabenLesen(mitgebracht);
+    if (gepruefte.length > 0) {
+        const vorhandenePosition = await env.DB.prepare(
+            "SELECT COALESCE(MAX(position), -1) AS maxPosition FROM rezepte WHERE code = ?1",
+        )
+            .bind(code)
+            .first<{ maxPosition: number }>();
+
+        // Nur so viel dazu, wie insgesamt noch unter das Limit passt - lieber eine
+        // gekuerzte Mischung als ein abgelehnter Beitritt.
+        const platz = MAX_REZEPTE - ((vorhandenePosition?.maxPosition ?? -1) + 1);
+        const passt = gepruefte.slice(0, Math.max(0, platz));
+
+        if (passt.length > 0) {
+            const start = (vorhandenePosition?.maxPosition ?? -1) + 1;
+            await env.DB.batch(
+                passt.map((rezept, index) =>
+                    env.DB.prepare(
+                        "INSERT OR IGNORE INTO rezepte (code, rezept_id, position, titel, quelle_url, " +
+                            "bild_url, zubereitungszeit) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    ).bind(
+                        code,
+                        rezept.rezeptId,
+                        start + index,
+                        rezept.titel,
+                        rezept.quelleUrl,
+                        rezept.bildUrl,
+                        rezept.zubereitungszeit,
+                    ),
+                ),
+            );
+        }
     }
 
     const rezepte = await env.DB.prepare(
@@ -269,8 +321,13 @@ async function stimmenSenden(code: string, request: Request, env: Env): Promise<
 }
 
 /**
- * Stand der Sitzung: wer ist da, wer ist fertig, und - wenn alle fertig sind -
- * die gemeinsamen Treffer.
+ * Stand der Sitzung: wer ist da, wer ist fertig, der aktuelle Rezept-Topf, und -
+ * wenn alle fertig sind - die gemeinsamen Treffer.
+ *
+ * Der Topf gehoert mit hinein, weil er sich aendern kann, nachdem der Gastgeber
+ * eroeffnet hat: Bringt die beitretende Person eigene Rezepte mit, sieht der
+ * Gastgeber sie erst durch diese Abfrage - er wartet ja schon auf eine Antwort,
+ * seit bevor die andere Person ueberhaupt beigetreten ist.
  *
  * Die Treffer werden bewusst erst herausgegeben, wenn alle entschieden haben.
  * Sonst koennte man am Zwischenstand ablesen, was die andere Person gewischt
@@ -306,6 +363,19 @@ async function stand(code: string, env: Env): Promise<Response> {
         }));
     }
 
+    const rezepte = await env.DB.prepare(
+        "SELECT rezept_id, titel, quelle_url, bild_url, zubereitungszeit FROM rezepte " +
+            "WHERE code = ?1 ORDER BY position",
+    )
+        .bind(code)
+        .all<{
+            rezept_id: number;
+            titel: string;
+            quelle_url: string | null;
+            bild_url: string | null;
+            zubereitungszeit: number | null;
+        }>();
+
     return antwort({
         code,
         verfaelltAm: sitzung.verfaellt_am,
@@ -313,6 +383,13 @@ async function stand(code: string, env: Env): Promise<Response> {
         fertig: fertige,
         alleFertig,
         treffer,
+        rezepte: rezepte.results.map((zeile) => ({
+            rezeptId: zeile.rezept_id,
+            titel: zeile.titel,
+            quelleUrl: zeile.quelle_url,
+            bildUrl: zeile.bild_url,
+            zubereitungszeit: zeile.zubereitungszeit,
+        })),
     });
 }
 

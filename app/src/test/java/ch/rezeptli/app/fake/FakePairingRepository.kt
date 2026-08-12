@@ -20,6 +20,8 @@ class FakePairingRepository(
 ) : PairingRepository {
     var createdSession: SharedSession? = null
         private set
+    var joinedRecipes: List<SharedRecipe> = emptyList()
+        private set
     var sentVotes: List<SharedVote> = emptyList()
         private set
     var markedFinished = false
@@ -44,11 +46,15 @@ class FakePairingRepository(
         return PairingResult.Success(session)
     }
 
-    override suspend fun joinSession(code: String): PairingResult<SharedSession> {
+    /** Mischt mitgebrachte Rezepte in den Topf - so wie es der echte Dienst beim Beitreten tut. */
+    override suspend fun joinSession(code: String, recipes: List<SharedRecipe>): PairingResult<SharedSession> {
         failWith?.let { return PairingResult.Failure(it) }
         if (code != CODE) return PairingResult.Failure(PairingError.UNKNOWN_CODE)
 
-        return PairingResult.Success(SharedSession(code = CODE, expiresAt = EXPIRY, recipes = pool))
+        joinedRecipes = recipes
+        val bekannteIds = pool.map { it.recipeId }.toSet()
+        val gemischt = pool + recipes.filterNot { it.recipeId in bekannteIds }
+        return PairingResult.Success(SharedSession(code = CODE, expiresAt = EXPIRY, recipes = gemischt))
     }
 
     override suspend fun sendVotes(

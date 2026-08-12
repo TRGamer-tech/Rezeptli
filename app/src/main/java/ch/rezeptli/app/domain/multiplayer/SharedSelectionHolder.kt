@@ -28,4 +28,7 @@ class SharedSelectionHolder @Inject constructor() {
         auswahl = emptyList()
         return aktuell
     }
+
+    /** Schaut nach, ohne die Auswahl zu vergessen - etwa um zu wissen, ob nach der Anzahl zu fragen ist. */
+    fun peek(): List<SharedRecipe> = auswahl
 }

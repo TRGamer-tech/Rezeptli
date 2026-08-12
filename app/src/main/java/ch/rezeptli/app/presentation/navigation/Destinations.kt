@@ -36,8 +36,7 @@ object Destinations {
     const val ONBOARDING = "onboarding"
     const val SETTINGS = "einstellungen"
     const val COOKING = "kochen/{$ARG_RECIPE_ID}"
-    const val MULTIPLAYER =
-        "zuzweit?$ARG_QUERY={$ARG_QUERY}&$ARG_TAGS={$ARG_TAGS}&$ARG_MAX_PREP_TIME={$ARG_MAX_PREP_TIME}"
+    const val MULTIPLAYER = "zuzweit"
 
     fun recipeDetail(recipeId: Long): String = "recipes/$recipeId"
 
@@ -49,13 +48,6 @@ object Destinations {
 
     fun recipeImport(url: String? = null): String =
         if (url.isNullOrBlank()) "import?$ARG_URL=" else "import?$ARG_URL=" + Uri.encode(url)
-
-    fun multiplayer(filter: RecipeFilter): String = buildString {
-        append("zuzweit")
-        append("?$ARG_QUERY=" + Uri.encode(filter.query))
-        append("&$ARG_TAGS=" + Uri.encode(filter.tags.joinToString(TAG_SEPARATOR)))
-        append("&$ARG_MAX_PREP_TIME=" + (filter.maxPrepTimeMinutes ?: 0))
-    }
 
     fun swipe(filter: RecipeFilter): String = buildString {
         append("swipe/session")

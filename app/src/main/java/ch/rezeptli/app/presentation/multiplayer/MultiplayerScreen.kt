@@ -3,6 +3,8 @@ package ch.rezeptli.app.presentation.multiplayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -39,27 +42,26 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
-import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.shareText
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 import ch.rezeptli.app.presentation.common.theme.glassPanel
+import ch.rezeptli.app.presentation.deck.TARGET_OPTIONS
 import ch.rezeptli.app.presentation.swipe.SwipeCardStack
 
 /**
  * Gemeinsam entscheiden: eine Person eroeffnet, die andere tritt mit dem Code bei.
  *
- * Beide wischen unabhaengig durch dieselben Rezepte. Die Treffer erscheinen erst,
- * wenn beide fertig sind - sonst koennte man am Zwischenstand ablesen, was die andere
- * Person gewischt hat, und das ist beim gemeinsamen Aussuchen der halbe Reiz.
+ * Beide bringen einen eigenen Vorschlag aus dem Verzeichnis mit; der Dienst mischt
+ * beide zu einem gemeinsamen Topf. Die Treffer erscheinen erst, wenn beide fertig
+ * sind - sonst koennte man am Zwischenstand ablesen, was die andere Person gewischt
+ * hat, und das ist beim gemeinsamen Aussuchen der halbe Reiz.
  */
 @Composable
 fun MultiplayerRoute(
-    filter: RecipeFilter,
     onBack: () -> Unit,
-    onFindRecipes: () -> Unit,
     viewModel: MultiplayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -70,14 +72,15 @@ fun MultiplayerRoute(
             viewModel.onLeave()
             onBack()
         },
-        onHost = { viewModel.onHost(filter) },
+        onTargetChange = viewModel::onTargetChange,
+        onContinueFromTarget = viewModel::onContinueFromTarget,
+        onHost = viewModel::onHost,
         onCodeInputChange = viewModel::onCodeInputChange,
         onJoin = viewModel::onJoin,
         onStartSwiping = viewModel::onStartSwiping,
         onSwiped = viewModel::onSwiped,
         onDismissError = viewModel::onDismissError,
         onKeep = viewModel::onKeepMatches,
-        onFindRecipes = onFindRecipes,
     )
 }
 
@@ -86,6 +89,8 @@ fun MultiplayerRoute(
 fun MultiplayerScreen(
     uiState: MultiplayerUiState,
     onBack: () -> Unit,
+    onTargetChange: (Int) -> Unit,
+    onContinueFromTarget: () -> Unit,
     onHost: () -> Unit,
     onCodeInputChange: (String) -> Unit,
     onJoin: () -> Unit,
@@ -93,7 +98,6 @@ fun MultiplayerScreen(
     onSwiped: (Long, Boolean) -> Unit,
     onDismissError: () -> Unit,
     onKeep: () -> Unit = {},
-    onFindRecipes: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -111,14 +115,16 @@ fun MultiplayerScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             uiState.error?.let { error ->
-                if (error == PairingError.NO_RECIPES) {
-                    EmptyCollectionNote(onFindRecipes = onFindRecipes, onDismiss = onDismissError)
-                } else {
-                    ErrorNote(error = error, onDismiss = onDismissError)
-                }
+                ErrorNote(error = error, onDismiss = onDismissError)
             }
 
             when (uiState.step) {
+                MultiplayerStep.ANZAHL -> TargetStep(
+                    uiState = uiState,
+                    onTargetChange = onTargetChange,
+                    onContinue = onContinueFromTarget,
+                )
+
                 MultiplayerStep.START -> StartStep(
                     uiState = uiState,
                     onHost = onHost,
@@ -140,6 +146,48 @@ fun MultiplayerScreen(
 
                 MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, onKeep = onKeep)
             }
+        }
+    }
+}
+
+/** Wie viele Gerichte soll der eigene Vorschlag zur gemeinsamen Runde beitragen? */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TargetStep(
+    uiState: MultiplayerUiState,
+    onTargetChange: (Int) -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            stringResource(R.string.stapel_anzahl_frage),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            stringResource(R.string.mehrspieler_anzahl_hinweis),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TARGET_OPTIONS.forEach { anzahl ->
+                FilterChip(
+                    selected = uiState.target == anzahl,
+                    onClick = { onTargetChange(anzahl) },
+                    label = {
+                        Text(pluralStringResource(R.plurals.stapel_gerichte, anzahl, anzahl))
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
+            }
+        }
+
+        Button(
+            onClick = onContinue,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+        ) {
+            Text(stringResource(R.string.mehrspieler_weiter))
         }
     }
 }
@@ -384,37 +432,6 @@ private fun ErrorNote(error: PairingError, onDismiss: () -> Unit) {
         )
         TextButton(onClick = onDismiss) {
             Text(stringResource(R.string.action_ok))
-        }
-    }
-}
-
-/**
- * Eine leere Sammlung ist kein Fehler, sondern ein fehlender Schritt.
- *
- * Zum gemeinsamen Wischen braucht es Rezepte, und die kommen aus der Suche. Frueher
- * stand hier nur eine rote Zeile - wer die App neu hatte, sah beim Einladen also
- * bloss eine Fehlermeldung und keinen Weg weiter.
- */
-@Composable
-private fun EmptyCollectionNote(onFindRecipes: () -> Unit, onDismiss: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .cardSurface(Tokens.Radius.MdShape)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.mehrspieler_fehler_keine_rezepte),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onFindRecipes, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.mehrspieler_rezepte_suchen))
-            }
-            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.action_ok))
-            }
         }
     }
 }

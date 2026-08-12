@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
@@ -148,12 +147,6 @@ fun RecipeListScreen(
                                 )
                             }
                         }
-                    }
-                    IconButton(onClick = onSearchWeb) {
-                        Icon(
-                            imageVector = Icons.Filled.Language,
-                            contentDescription = stringResource(R.string.websearch_open),
-                        )
                     }
                     IconButton(onClick = onImportRecipe) {
                         Icon(

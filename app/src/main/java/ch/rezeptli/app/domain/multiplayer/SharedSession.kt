@@ -49,6 +49,13 @@ data class SharedSessionState(
     val allFinished: Boolean,
     val matches: List<SharedRecipe> = emptyList(),
     val expiresAt: Long = 0L,
+    /**
+     * Der aktuelle Rezept-Topf der Runde.
+     *
+     * Er kann nach dem Eroeffnen noch wachsen: Bringt die beitretende
+     * Person eigene Rezepte mit, stehen sie erst hier.
+     */
+    val pool: List<SharedRecipe> = emptyList(),
 ) {
     /** Es fehlt noch jemand - der Einladungscode sollte also noch sichtbar sein. */
     val isWaitingForPartner: Boolean get() = participants < 2

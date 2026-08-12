@@ -1,21 +1,18 @@
 package ch.rezeptli.app.domain.usecase
 
-import ch.rezeptli.app.domain.model.RecipeFilter
-import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSession
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.repository.PairingRepository
-import ch.rezeptli.app.domain.repository.RecipeRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
 /**
- * Eroeffnet eine gemeinsame Runde aus der eigenen Sammlung.
+ * Eroeffnet eine gemeinsame Runde.
  *
  * Geteilt wird nur, was zum Entscheiden noetig ist: Titel, Bild und Zeit. Zutaten und
  * Zubereitung bleiben auf dem Geraet - die zweite Person stimmt ueber Rezepte ab, sie
@@ -23,44 +20,9 @@ import javax.inject.Inject
  */
 class StartSharedSessionUseCase @Inject constructor(
     private val pairingRepository: PairingRepository,
-    private val recipeRepository: RecipeRepository,
 ) {
-    /**
-     * Eroeffnet eine Runde ueber bereits ausgewaehlte Rezepte.
-     *
-     * So laesst sich direkt aus einer Wischrunde weitermachen: Geteilt wird, was gerade
-     * auf den Karten lag. Die Rezepte muessen dafuer nicht erst gespeichert werden -
-     * zum Abstimmen genuegen Titel, Bild und Zeit.
-     */
     suspend operator fun invoke(recipes: List<SharedRecipe>): PairingResult<SharedSession> =
         pairingRepository.createSession(recipes.take(MAX_GETEILTE))
-
-    suspend operator fun invoke(filter: RecipeFilter): PairingResult<SharedSession> {
-        val ids = recipeRepository.getFilteredRecipeIds(filter)
-        val summaries = recipeRepository.getSummaries(ids)
-
-        // Der Dienst nimmt hoechstens MAX_GETEILTE Rezepte an und lehnt groessere
-        // Runden mit einem Fehler ab. Wer viel gesammelt hat, bekam deshalb beim
-        // Einladen nur eine Fehlermeldung. Lieber eine Runde mit den ersten
-        // Rezepten als gar keine - so viele wischt ohnehin niemand durch.
-        val geteilt = summaries.take(MAX_GETEILTE).map { it.toShared() }
-
-        return pairingRepository.createSession(geteilt)
-    }
-
-    /**
-     * Fuer die andere Person zaehlt nur, was sie sehen muss.
-     *
-     * Das Bild wird nur mitgeschickt, wenn es im Netz steht. Eigene Fotos liegen als
-     * Dateipfad auf diesem Geraet - der andere koennte damit nichts anfangen, und ein
-     * Pfad aus dem eigenen Speicher hat auf einem fremden Bildschirm nichts verloren.
-     */
-    private fun RecipeSummary.toShared(): SharedRecipe = SharedRecipe(
-        recipeId = id,
-        title = title,
-        imageUrl = photoUri?.takeIf { it.startsWith("http://") || it.startsWith("https://") },
-        prepTimeMinutes = prepTimeMinutes,
-    )
 
     companion object {
         /** Gleicher Wert wie MAX_REZEPTE im Pairing-Dienst. */
@@ -68,11 +30,23 @@ class StartSharedSessionUseCase @Inject constructor(
     }
 }
 
+/**
+ * Tritt einer Runde bei.
+ *
+ * Bringt [recipes] eigene Vorschlaege mit, mischt der Dienst sie in den Topf - danach
+ * stimmen beide Seiten ueber dieselbe, gemeinsame Auswahl ab statt nur ueber die des
+ * Gastgebers.
+ */
 class JoinSharedSessionUseCase @Inject constructor(
     private val pairingRepository: PairingRepository,
 ) {
-    suspend operator fun invoke(code: String): PairingResult<SharedSession> =
-        pairingRepository.joinSession(code)
+    suspend operator fun invoke(
+        code: String,
+        recipes: List<SharedRecipe> = emptyList(),
+    ): PairingResult<SharedSession> {
+        val begrenzt = recipes.take(StartSharedSessionUseCase.MAX_GETEILTE)
+        return pairingRepository.joinSession(code, begrenzt)
+    }
 }
 
 class SendSharedVotesUseCase @Inject constructor(

@@ -3,6 +3,8 @@ package ch.rezeptli.app.data.web
 import ch.rezeptli.app.BuildConfig
 import ch.rezeptli.app.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -59,7 +61,35 @@ class PrebuiltIndexClient @Inject constructor(
         }
     }
 
-    override suspend fun deckSample(): List<SampleEntry>? = withContext(ioDispatcher) {
+    /** Einmal geladen, gilt sie fuer den Rest des Prozesses - sie aendert sich nur einmal taeglich. */
+    private var stapelCache: List<SampleEntry>? = null
+    private val stapelMutex = Mutex()
+
+    /**
+     * Die Stapeldatei ist der einzige Weg, mit dem der Wischstapel nicht auf die
+     * Verzeichnisse aller Quellen zurueckfaellt (siehe [entriesFor]s Dokumentation). Ohne
+     * Zwischenspeicher hier hiesse "der Stapel legt nach" oder "die gemeinsame Runde
+     * zieht einen eigenen Vorschlag": dieselben paar hundert Kilobyte noch einmal vom
+     * Netz holen und neu einlesen - und das mehrmals in derselben Sitzung.
+     */
+    override suspend fun deckSample(): List<SampleEntry>? {
+        stapelCache?.let { return it }
+
+        return stapelMutex.withLock {
+            stapelCache?.let { return@withLock it }
+
+            val geladen = deckSampleVomNetz() ?: deckSampleVomNetz()
+            geladen?.also { stapelCache = it }
+        }
+    }
+
+    /**
+     * Ein einzelner Versuch, die Stapeldatei zu laden.
+     *
+     * [deckSample] ruft das bei einem Fehlschlag ein zweites Mal auf: Ein einzelner
+     * verlorener Abruf soll nicht gleich den langen Weg ueber alle Quellen ausloesen.
+     */
+    private suspend fun deckSampleVomNetz(): List<SampleEntry>? = withContext(ioDispatcher) {
         lade("stapel.tsv.gz") { spalten ->
             val quelle = spalten.getOrNull(3)?.takeIf { it.isNotBlank() } ?: return@lade null
             SampleEntry(
