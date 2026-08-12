@@ -5,8 +5,10 @@
 ## Kontext
 
 Rezeptli soll Rezepte bei Schweizer Anbietern finden und übernehmen können: Betty Bossi,
-Swissmilk, Gutekueche, Migusto, Bettys Küchenschätze, Le Menu, Fooby – dazu Chefkoch aus
-Deutschland. Das ändert die bisherige Haltung der App: Sie braucht damit erstmals eine
+Swissmilk, Gutekueche, Migusto, Bettys Küchenschätze, Fooby – dazu Chefkoch aus
+Deutschland. Le Menu war anfangs dabei, ist aber wieder draussen: Die Seite veröffentlicht
+keine maschinenlesbaren Rezeptdaten und kein Verzeichnis, taucht also weder in der Suche
+noch im Import je auf. Sollte sich das ändern, kommt sie zurück. Das ändert die bisherige Haltung der App: Sie braucht damit erstmals eine
 Internet-Verbindung.
 
 Vor dem Entwurf wurden alle acht Seiten analysiert (robots.txt, Sitemaps, strukturierte

@@ -9,19 +9,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -38,6 +33,8 @@ import ch.rezeptli.app.domain.profile.Cuisine
 import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.SectionCard
 import ch.rezeptli.app.presentation.common.label
 
 @Composable
@@ -79,16 +76,9 @@ fun SettingsScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.einstellungen_titel)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
-                    }
-                },
+            RezeptliTopBar(
+                title = stringResource(R.string.einstellungen_titel),
+                onBack = onBack,
             )
         },
     ) { padding ->
@@ -100,27 +90,24 @@ fun SettingsScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                stringResource(R.string.einstellungen_profil),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                stringResource(R.string.einstellungen_profil_text),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            OutlinedTextField(
-                value = uiState.profile.firstName,
-                onValueChange = onFirstNameChange,
-                label = { Text(stringResource(R.string.onboarding_vorname)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Done,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            SectionCard(title = stringResource(R.string.einstellungen_profil), spacing = 8) {
+                Text(
+                    stringResource(R.string.einstellungen_profil_text),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = uiState.profile.firstName,
+                    onValueChange = onFirstNameChange,
+                    label = { Text(stringResource(R.string.onboarding_vorname)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Done,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             SettingsSection(stringResource(R.string.onboarding_land_frage)) {
                 ChoiceChipGroup(
@@ -223,8 +210,5 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsSection(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        content()
-    }
+    SectionCard(title = title, spacing = 8) { content() }
 }

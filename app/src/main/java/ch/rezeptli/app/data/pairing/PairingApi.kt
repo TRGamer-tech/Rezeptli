@@ -5,6 +5,7 @@ import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSession
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -66,11 +67,23 @@ internal object PairingApi {
             )
         }
 
-    fun sessionFrom(body: JsonObject): SharedSession = SharedSession(
-        code = body["code"]?.jsonPrimitive?.content.orEmpty(),
-        expiresAt = body["verfaelltAm"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
-        recipes = body["rezepte"]?.jsonArray?.mapNotNull { it.jsonObject.toSharedRecipe() }.orEmpty(),
-    )
+    /**
+     * Liest die Antwort auf "Runde eroeffnen" oder "beitreten".
+     *
+     * Die beiden Antworten sehen im Feld `rezepte` verschieden aus: Beim Beitreten
+     * steht dort die Liste, beim Eroeffnen nur deren Anzahl - der Gastgeber hat die
+     * Rezepte ja gerade selbst geschickt. Wer das Feld blind als Liste liest, bekommt
+     * beim Eroeffnen eine Ausnahme, und die Einladung scheitert mit einer nichts
+     * sagenden Fehlermeldung. Deshalb [fallback]: was der Gastgeber gesendet hat.
+     */
+    fun sessionFrom(body: JsonObject, fallback: List<SharedRecipe> = emptyList()): SharedSession =
+        SharedSession(
+            code = body["code"]?.jsonPrimitive?.content.orEmpty(),
+            expiresAt = body["verfaelltAm"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+            recipes = (body["rezepte"] as? JsonArray)
+                ?.mapNotNull { (it as? JsonObject)?.toSharedRecipe() }
+                ?: fallback,
+        )
 
     fun stateFrom(body: JsonObject): SharedSessionState = SharedSessionState(
         code = body["code"]?.jsonPrimitive?.content.orEmpty(),

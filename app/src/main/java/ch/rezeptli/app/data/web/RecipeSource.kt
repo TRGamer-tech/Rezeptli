@@ -66,7 +66,9 @@ object RecipeSourceCatalog {
         name = "Gutekueche",
         homeUrl = "https://www.gutekueche.ch",
         urlPattern = Regex("gutekueche\\.ch/[^/]+-rezept-\\d+", RegexOption.IGNORE_CASE),
-        sitemapUrls = listOf("https://www.gutekueche.ch/sitemap.xml.gz"),
+        // Die robots.txt verweist auf das CDN; unter www liegt die Datei nicht.
+        // Mit der falschen Adresse lieferte die Quelle gar nichts.
+        sitemapUrls = listOf("https://cdn.gutekueche.ch/sitemaps/sitemap.xml.gz"),
     )
 
     val MIGUSTO = RecipeSource(
@@ -85,21 +87,6 @@ object RecipeSourceCatalog {
         homeUrl = "https://bettyskuechenschaetze.ch",
         urlPattern = Regex("bettyskuechenschaetze\\.ch/[^/]+/?$", RegexOption.IGNORE_CASE),
         sitemapUrls = listOf("https://bettyskuechenschaetze.ch/sitemap_index.xml"),
-    )
-
-    /**
-     * Le Menu veroeffentlicht auf seinen Seiten keine Rezeptdaten - die Analyse fand
-     * dort nur `ItemList`, kein `Recipe`. Ein Import wuerde also immer scheitern,
-     * deshalb steht die Quelle nicht mehr zur Suche bereit. Der Eintrag bleibt, damit
-     * ein geteilter Link wenigstens der richtigen Quelle zugeordnet wird.
-     */
-    val LE_MENU = RecipeSource(
-        id = "lemenu",
-        country = Country.SCHWEIZ,
-        name = "Le Menu",
-        homeUrl = "https://lemenu.ch",
-        urlPattern = Regex("lemenu\\.ch/de/", RegexOption.IGNORE_CASE),
-        note = "keine Rezeptdaten auf der Seite",
     )
 
     /**
@@ -202,7 +189,6 @@ object RecipeSourceCatalog {
         GUTEKUECHE,
         MIGUSTO,
         BETTYS_KUECHENSCHAETZE,
-        LE_MENU,
         FOOBY,
         CHEFKOCH,
         EINFACH_KOCHEN,

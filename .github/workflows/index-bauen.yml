@@ -5,6 +5,11 @@ on:
     # Nachts um vier, wenn bei den Anbietern wenig los ist.
     - cron: '0 4 * * *'
   workflow_dispatch:
+    inputs:
+      nur_pruefen:
+        description: 'Nur bauen und die Quellen pruefen, nichts veroeffentlichen'
+        type: boolean
+        default: false
 
 # Nur zum Veröffentlichen auf GitHub Pages - kein Schreibzugriff auf das Repository.
 permissions:
@@ -20,6 +25,7 @@ jobs:
   bauen:
     name: Index bauen und veröffentlichen
     runs-on: ubuntu-latest
+    if: inputs.nur_pruefen != true
 
     environment:
       name: github-pages
@@ -95,6 +101,22 @@ jobs:
         id: veroeffentlichen
         uses: actions/deploy-pages@v4
 
+      - name: Jede Quelle auf Inhalt prüfen
+        run: |
+          set -o pipefail
+          python3 tools/index-pruefen.py 2>&1 | tee /tmp/quellenpruefung.txt
+
+      - name: Quellenpruefung anhängen
+        if: always()
+        run: |
+          {
+            echo '### Quellen im Index'
+            echo
+            echo '```'
+            cat /tmp/quellenpruefung.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Prüfen, ob die Seite wirklich etwas anzeigt
         run: |
           # Ein erfolgreicher Deploy ist kein Beweis, dass die Seite laedt. Die
@@ -133,3 +155,39 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           exit $fehler
+
+  pruefen:
+    name: Quellen prüfen, ohne zu veröffentlichen
+    runs-on: ubuntu-latest
+    # Die Pages-Umgebung laesst nur den Hauptzweig veroeffentlichen. Dieser Job
+    # braucht sie nicht: Er baut den Index und schaut nach, ob jede Quelle etwas
+    # geliefert hat. So laesst sich eine Quelle auf einem Zweig nachweisen, ohne
+    # die Website anzufassen.
+    if: inputs.nur_pruefen == true
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Index bauen
+        run: |
+          set -o pipefail
+          python3 tools/index-bauen.py 2>&1 | tee /tmp/index.log
+
+      - name: Jede Quelle auf Inhalt prüfen
+        run: |
+          set -o pipefail
+          python3 tools/index-pruefen.py 2>&1 | tee /tmp/quellenpruefung.txt
+
+      - name: Bericht anhängen
+        if: always()
+        run: |
+          {
+            echo '## Quellen im Index'
+            echo
+            echo '```'
+            cat /tmp/quellenpruefung.txt 2>/dev/null || echo 'keine Pruefung gelaufen'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

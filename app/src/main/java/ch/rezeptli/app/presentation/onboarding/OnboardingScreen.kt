@@ -20,7 +20,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -40,6 +39,7 @@ import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.label
 
 /**
@@ -92,17 +92,13 @@ fun OnboardingScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(
-                            R.string.onboarding_schritt,
-                            uiState.stepNumber,
-                            uiState.stepCount,
-                        ),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                },
+            RezeptliTopBar(
+                title = stringResource(
+                    R.string.onboarding_schritt,
+                    uiState.stepNumber,
+                    uiState.stepCount,
+                ),
+                titleStyle = MaterialTheme.typography.labelLarge,
                 actions = {
                     TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.onboarding_ueberspringen))

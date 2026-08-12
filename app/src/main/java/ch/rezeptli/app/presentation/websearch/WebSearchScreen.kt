@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
@@ -34,12 +33,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -53,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 
@@ -89,16 +87,9 @@ fun WebSearchScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.websearch_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
-                        )
-                    }
-                },
+            RezeptliTopBar(
+                title = stringResource(R.string.websearch_title),
+                onBack = onBack,
             )
         },
     ) { innerPadding ->

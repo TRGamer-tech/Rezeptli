@@ -20,6 +20,9 @@ object Destinations {
     /** Trennzeichen der Tag-Liste in der Route. */
     const val TAG_SEPARATOR = "|"
 
+    /** Der Startbildschirm: der Wischstapel aus dem Rezeptverzeichnis. */
+    const val DECK = "wischen"
+
     const val RECIPE_LIST = "recipes"
     const val RECIPE_DETAIL = "recipes/{$ARG_RECIPE_ID}"
     const val RECIPE_EDIT = "recipes/edit?$ARG_RECIPE_ID={$ARG_RECIPE_ID}"

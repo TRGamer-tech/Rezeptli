@@ -37,7 +37,16 @@ class WebIndexCache @Inject constructor(
             runCatching {
                 file.readLines().mapNotNull { line ->
                     val parts = line.split('\t')
-                    if (parts.size == 2) SitemapEntry(url = parts[0], title = parts[1]) else null
+                    // Zwei Spalten sind das alte Format ohne Bild - es bleibt lesbar.
+                    if (parts.size >= 2) {
+                        SitemapEntry(
+                            url = parts[0],
+                            title = parts[1],
+                            imageUrl = parts.getOrNull(2)?.takeIf { it.isNotBlank() },
+                        )
+                    } else {
+                        null
+                    }
                 }
             }.getOrNull()
         }
@@ -45,7 +54,7 @@ class WebIndexCache @Inject constructor(
     override suspend fun write(sourceId: String, entries: List<SitemapEntry>) = withContext(ioDispatcher) {
         runCatching {
             fileFor(sourceId).writeText(
-                entries.joinToString("\n") { "${it.url}\t${it.title}" },
+                entries.joinToString("\n") { "${it.url}\t${it.title}\t${it.imageUrl.orEmpty()}" },
             )
         }
         Unit

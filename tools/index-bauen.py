@@ -34,6 +34,10 @@ MAX_UNTERVERZEICHNISSE = 12
 MAX_TIEFE = 2
 
 LOC = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.I)
+# Viele Sitemaps nennen zu jedem Eintrag ein Bild. Wo das so ist, kostet ein Foto
+# auf der Wischkarte nichts extra - sonst muesste die App jede Seite einzeln laden.
+URL_BLOCK = re.compile(r"<url>(.*?)</url>", re.I | re.S)
+IMAGE_LOC = re.compile(r"<image:loc>\s*([^<\s]+)\s*</image:loc>", re.I)
 PAGE_SUFFIX = re.compile(r"\.(html?|aspx)$", re.I)
 TRAILING_ID = re.compile(r"-\d+$")
 TRAILING_NOISE = re.compile(r"-(rezept|recipe|recette|ricetta|fid)$", re.I)
@@ -87,9 +91,9 @@ def titel_aus_adresse(url: str) -> str:
     return " ".join(w[:1].upper() + w[1:] for w in woerter) or url
 
 
-def eintraege(quelle: dict) -> list[tuple[str, str]]:
-    """Alle Rezeptadressen einer Quelle, samt aus der Adresse gewonnenem Titel."""
-    gesammelt: dict[str, str] = {}
+def eintraege(quelle: dict) -> list[tuple[str, str, str]]:
+    """Alle Rezeptadressen einer Quelle, mit Titel und - falls vorhanden - Bild."""
+    gesammelt: dict[str, tuple[str, str]] = {}
 
     def verarbeite(url: str, tiefe: int) -> None:
         if tiefe > MAX_TIEFE:
@@ -109,14 +113,29 @@ def eintraege(quelle: dict) -> list[tuple[str, str]]:
                 verarbeite(kind, tiefe + 1)
             return
 
-        for adresse in adressen:
-            if quelle["muster"].search(adresse):
-                gesammelt.setdefault(adresse, titel_aus_adresse(adresse))
+        # Erst blockweise lesen, damit Bild und Adresse zusammenbleiben.
+        for block in URL_BLOCK.findall(xml):
+            treffer = LOC.search(block)
+            if treffer is None:
+                continue
+            adresse = treffer.group(1)
+            if not quelle["muster"].search(adresse):
+                continue
+            bild = IMAGE_LOC.search(block)
+            gesammelt.setdefault(
+                adresse, (titel_aus_adresse(adresse), bild.group(1) if bild else ""),
+            )
+
+        # Sitemaps ohne <url>-Bloecke (selten, aber es gibt sie).
+        if not gesammelt:
+            for adresse in adressen:
+                if quelle["muster"].search(adresse):
+                    gesammelt.setdefault(adresse, (titel_aus_adresse(adresse), ""))
 
     for sitemap in quelle["sitemaps"]:
         verarbeite(sitemap, 0)
 
-    return sorted(gesammelt.items())
+    return sorted((adresse, titel, bild) for adresse, (titel, bild) in gesammelt.items())
 
 
 def main() -> int:
@@ -137,14 +156,19 @@ def main() -> int:
         ziel = AUSGABE / f"{kennung}.tsv.gz"
         # mtime auf 0, damit dieselbe Eingabe dieselbe Datei ergibt.
         with gzip.GzipFile(ziel, "wb", mtime=0) as datei:
-            inhalt = "\n".join(f"{adresse}\t{titel}" for adresse, titel in gefunden)
+            # Adresse, Titel, Bild - durch Tabulatoren getrennt. Fehlt das Bild,
+            # bleibt die dritte Spalte leer; aeltere Dateien ohne sie bleiben lesbar.
+            inhalt = "\n".join(f"{adresse}\t{titel}\t{bild}" for adresse, titel, bild in gefunden)
             datei.write(inhalt.encode("utf-8"))
 
+        mit_bild = sum(1 for _, _, bild in gefunden if bild)
         manifest["quellen"][kennung] = {
             "eintraege": len(gefunden),
+            "mitBild": mit_bild,
             "groesseBytes": ziel.stat().st_size,
         }
-        print(f"  {len(gefunden)} Eintraege, {ziel.stat().st_size // 1024} KB")
+        print(f"  {len(gefunden)} Eintraege ({mit_bild} mit Bild), "
+              f"{ziel.stat().st_size // 1024} KB")
 
     (AUSGABE / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False),

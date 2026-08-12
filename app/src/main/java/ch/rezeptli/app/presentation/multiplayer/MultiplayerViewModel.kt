@@ -7,6 +7,7 @@ import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
+import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSession
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
@@ -82,6 +83,7 @@ data class MultiplayerUiState(
 @HiltViewModel
 class MultiplayerViewModel @Inject constructor(
     private val startSession: StartSharedSessionUseCase,
+    private val selectionHolder: SharedSelectionHolder,
     private val joinSession: JoinSharedSessionUseCase,
     private val sendVotes: SendSharedVotesUseCase,
     private val closeSession: CloseSharedSessionUseCase,
@@ -103,7 +105,12 @@ class MultiplayerViewModel @Inject constructor(
         _uiState.update { it.copy(isBusy = true, error = null) }
 
         viewModelScope.launch {
-            when (val result = startSession(filter)) {
+            // Kommt die Runde aus einem Wischstapel, steht die Auswahl schon fest.
+            // Sonst wird aus der eigenen Sammlung geteilt.
+            val auswahl = selectionHolder.take()
+            val result = if (auswahl.isNotEmpty()) startSession(auswahl) else startSession(filter)
+
+            when (result) {
                 is PairingResult.Success -> {
                     applySession(result.value, isHost = true)
                     _uiState.update { it.copy(step = MultiplayerStep.WARTET_AUF_PERSON) }

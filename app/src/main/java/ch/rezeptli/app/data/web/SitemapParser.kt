@@ -6,6 +6,13 @@ import javax.inject.Inject
 data class SitemapEntry(
     val url: String,
     val title: String,
+    /**
+     * Bild aus dem Verzeichnis, falls die Quelle eines nennt.
+     *
+     * Viele Sitemaps fuehren zu jedem Eintrag ein `<image:loc>`. Wo das so ist, hat die
+     * Wischkarte sofort ein Foto, ohne dass die App die Rezeptseite laden muss.
+     */
+    val imageUrl: String? = null,
 )
 
 /**
@@ -33,11 +40,37 @@ class SitemapParser @Inject constructor() {
      * Adresse gewonnen ("aprikosen-blechkuchen" wird zu "Aprikosen Blechkuchen").
      * Das reicht fuer eine Suche und spart es, hunderte Seiten zu laden.
      */
-    fun recipeEntries(xml: String, source: RecipeSource): List<SitemapEntry> =
-        locations(xml)
+    fun recipeEntries(xml: String, source: RecipeSource): List<SitemapEntry> {
+        // Blockweise lesen, damit Adresse und Bild zusammenbleiben. Ohne <url>-Bloecke
+        // - die gibt es - faellt es auf die reine Adressliste zurueck.
+        val ausBloecken = URL_BLOCK
+            .findAll(xml)
+            .mapNotNull { block ->
+                val inhalt = block.groupValues[1]
+                val adresse = ersterTreffer(LOC, inhalt) ?: return@mapNotNull null
+                if (!source.matches(adresse)) return@mapNotNull null
+
+                SitemapEntry(
+                    url = adresse,
+                    title = titleFromUrl(adresse),
+                    imageUrl = ersterTreffer(IMAGE_LOC, inhalt)?.let { WebUrl.absolute(it, adresse) },
+                )
+            }.distinctBy { it.url }
+            .toList()
+
+        if (ausBloecken.isNotEmpty()) return ausBloecken
+
+        return locations(xml)
             .filter { source.matches(it) }
             .map { SitemapEntry(url = it, title = titleFromUrl(it)) }
             .distinctBy { it.url }
+    }
+
+    /** Der getrimmte erste Klammerausdruck des ersten Treffers, sonst null. */
+    private fun ersterTreffer(regex: Regex, text: String): String? {
+        val treffer = regex.find(text) ?: return null
+        return treffer.groupValues[1].trim().takeIf { it.isNotEmpty() }
+    }
 
     fun titleFromUrl(url: String): String {
         val slug = url
@@ -58,6 +91,8 @@ class SitemapParser @Inject constructor() {
 
     private companion object {
         val LOC = Regex("<loc>\\s*([^<\\s]+)\\s*</loc>", RegexOption.IGNORE_CASE)
+        val URL_BLOCK = Regex("<url>(.*?)</url>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        val IMAGE_LOC = Regex("<image:loc>\\s*([^<\\s]+)\\s*</image:loc>", RegexOption.IGNORE_CASE)
 
         /** Cookaround endet auf .html, CuisineAZ auf .aspx. */
         val PAGE_SUFFIX = Regex("\\.(html?|aspx)$", RegexOption.IGNORE_CASE)

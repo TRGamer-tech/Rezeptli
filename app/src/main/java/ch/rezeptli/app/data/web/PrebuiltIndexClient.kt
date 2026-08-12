@@ -38,13 +38,14 @@ class PrebuiltIndexClient @Inject constructor(
                 GZIPInputStream(body.byteStream()).bufferedReader().useLines { lines ->
                     lines
                         .mapNotNull { line ->
-                            val separator = line.indexOf('\t')
-                            if (separator <= 0) {
+                            val spalten = line.split('\t')
+                            if (spalten.size < 2 || spalten[0].isBlank()) {
                                 null
                             } else {
                                 SitemapEntry(
-                                    url = line.substring(0, separator),
-                                    title = line.substring(separator + 1),
+                                    url = spalten[0],
+                                    title = spalten[1],
+                                    imageUrl = spalten.getOrNull(2)?.takeIf { it.isNotBlank() },
                                 )
                             }
                         }.toList()
