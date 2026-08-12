@@ -219,7 +219,7 @@ class MultiplayerViewModelTest {
             viewModel.onJoin()
 
             assertEquals(PairingError.UNKNOWN_CODE, viewModel.uiState.value.error)
-            assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+            assertEquals(MultiplayerStep.ANZAHL, viewModel.uiState.value.step)
         }
     }
 
@@ -329,7 +329,7 @@ class MultiplayerViewModelTest {
             viewModel.onLeave()
 
             assertEquals(FakePairingRepository.CODE, pairing.closedCode)
-            assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+            assertEquals(MultiplayerStep.ANZAHL, viewModel.uiState.value.step)
             assertEquals("", viewModel.uiState.value.code)
         }
     }
@@ -353,7 +353,7 @@ class MultiplayerViewModelTest {
             viewModel.onHost()
 
             assertEquals(PairingError.NO_CONNECTION, viewModel.uiState.value.error)
-            assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)
+            assertEquals(MultiplayerStep.ANZAHL, viewModel.uiState.value.step)
             assertFalse(viewModel.uiState.value.isBusy)
         }
     }
