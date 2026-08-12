@@ -1,5 +1,13 @@
 package ch.rezeptli.app.data.web
 
+/** Ein Eintrag der Stapeldatei - wie ein Verzeichniseintrag, aber mit Quelle. */
+data class SampleEntry(
+    val url: String,
+    val title: String,
+    val imageUrl: String?,
+    val sourceId: String,
+)
+
 /**
  * Das fertig gebaute Rezeptverzeichnis.
  *
@@ -12,7 +20,20 @@ package ch.rezeptli.app.data.web
  * Faellt der Index aus, geht die Suche den alten Weg ueber die Sitemaps. Die App
  * bleibt also unabhaengig von ihm.
  */
+
 interface PrebuiltIndex {
+    /**
+     * Die kleine Auswahl fuer den Wischstapel, quer ueber alle Quellen.
+     *
+     * Der Stapel zeigt ein paar Dutzend Karten; die Verzeichnisse aller Quellen
+     * zusammen haben ueber 300'000 Eintraege. Die vorher zu laden hiess: zweistellige
+     * Megabytes und minutenlanges Warten vor der ersten Karte. Diese Datei ist ein
+     * Bruchteil davon und wird taeglich mitgebaut.
+     *
+     * `null`, wenn sie nicht erreichbar ist - dann bleibt der lange Weg.
+     */
+    suspend fun deckSample(): List<SampleEntry>?
+
     /**
      * Das Verzeichnis einer Quelle, oder `null`, wenn es nicht erreichbar ist.
      *

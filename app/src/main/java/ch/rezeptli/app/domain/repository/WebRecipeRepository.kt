@@ -88,4 +88,14 @@ interface WebRecipeRepository {
      * schon nach einem Abruf bereit - der Stapel wartet nicht auf die Rezeptseiten.
      */
     suspend fun deckPool(): DeckPool
+
+    /**
+     * Das Vorschaubild einer Rezeptseite, oder `null`.
+     *
+     * Nicht jede Quelle nennt in ihrem Verzeichnis ein Bild - Cookaround, Swissmilk und
+     * ein paar andere tun es nicht. Fuer diese Karten wird das Bild nachgeholt, und
+     * zwar nur fuer die naechsten paar: Der Stapel soll nicht auf Bilder warten, die
+     * niemand zu Gesicht bekommt.
+     */
+    suspend fun cardImage(url: String): String?
 }

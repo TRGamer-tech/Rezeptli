@@ -90,10 +90,16 @@ fun SwipeCardStack(
     modifier: Modifier = Modifier,
     state: SwipeCardStackState = rememberSwipeCardStackState(),
 ) {
+    // Nur die obersten Karten zeichnen. Wer den ganzen Stapel hereingibt, bekam
+    // sonst jede Karte gezeichnet - bei dreissig Karten ein Faecher aus dreissig
+    // halbdurchsichtigen Flaechen quer ueber den Bildschirm. Das gehoert hierher
+    // und nicht in jeden Aufrufer: Die Karte weiss selbst, wie tief ihr Stapel ist.
+    val sichtbar = cards.take(VISIBLE_CARDS)
+
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         // Von hinten nach vorne zeichnen, damit die oberste Karte oben liegt.
-        cards.asReversed().forEachIndexed { reversedIndex, card ->
-            val indexFromTop = cards.size - 1 - reversedIndex
+        sichtbar.asReversed().forEachIndexed { reversedIndex, card ->
+            val indexFromTop = sichtbar.size - 1 - reversedIndex
             if (indexFromTop == 0) {
                 TopSwipeCard(
                     card = card,
@@ -342,3 +348,6 @@ private const val IDLE_GLOW = 0.25f
 
 /** Anteil der Karte, ueber den der dunkle Verlauf laeuft. */
 private const val SCRIM_FRACTION = 0.45f
+
+/** Mehr gleichzeitig zu zeichnen bringt nichts - man sieht nur die obersten. */
+private const val VISIBLE_CARDS = 3

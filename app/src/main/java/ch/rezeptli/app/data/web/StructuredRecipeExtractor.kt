@@ -133,6 +133,15 @@ class StructuredRecipeExtractor @Inject constructor() {
             .filter { it.isNotBlank() }
             .distinct()
 
+    /**
+     * Nur die Bildadresse einer Seite - fuer Karten, deren Quelle im Verzeichnis
+     * keins nennt. Ein ganzes Rezept auszulesen waere dafuer zu viel Arbeit.
+     */
+    fun imageOf(html: String, sourceUrl: String): String? {
+        val document = Jsoup.parse(html, sourceUrl)
+        return WebUrl.absolute(document.metaImage(), sourceUrl)
+    }
+
     private fun Document.metaImage(): String? =
         selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }
 

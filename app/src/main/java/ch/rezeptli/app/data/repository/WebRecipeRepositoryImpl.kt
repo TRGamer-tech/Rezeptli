@@ -1,6 +1,7 @@
 package ch.rezeptli.app.data.repository
 
 import ch.rezeptli.app.data.web.PageFetcher
+import ch.rezeptli.app.data.web.PrebuiltIndex
 import ch.rezeptli.app.data.web.RecipeSourceCatalog
 import ch.rezeptli.app.data.web.StructuredRecipeExtractor
 import ch.rezeptli.app.data.web.WebFetchError
@@ -22,12 +23,14 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class WebRecipeRepositoryImpl @Inject constructor(
     private val searcher: WebRecipeSearcher,
+    private val prebuiltIndex: PrebuiltIndex,
     private val fetcher: PageFetcher,
     private val extractor: StructuredRecipeExtractor,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -96,6 +99,33 @@ class WebRecipeRepositoryImpl @Inject constructor(
      */
     override suspend fun deckPool(): DeckPool = coroutineScope {
         val sources = RecipeSourceCatalog.SEARCHABLE
+        val herkunft = sources.associate { it.id to it.origin }
+
+        // Erst die kleine Stapeldatei: ein Abruf von ein paar hundert Kilobyte statt
+        // der Verzeichnisse aller Quellen. Vorher lud der Stapel ueber 300'000
+        // Adressen, bevor die erste Karte erschien - das dauerte am Handy Minuten.
+        prebuiltIndex.deckSample()?.let { auswahl ->
+            val namen = sources.associate { it.id to it.name }
+            val gruppiert = auswahl
+                .filter { it.sourceId in namen }
+                .groupBy { it.sourceId }
+                .mapValues { (quelle, eintraege) ->
+                    eintraege.map { eintrag ->
+                        DeckEntry(
+                            url = eintrag.url,
+                            title = eintrag.title,
+                            imageUrl = eintrag.imageUrl,
+                            sourceId = quelle,
+                            sourceName = namen.getValue(quelle),
+                        )
+                    }
+                }
+
+            if (gruppiert.isNotEmpty()) {
+                return@coroutineScope DeckPool(entriesBySource = gruppiert, origins = herkunft)
+            }
+        }
+
         val mutex = Mutex()
         val eintraege = mutableMapOf<String, List<DeckEntry>>()
 
@@ -120,10 +150,13 @@ class WebRecipeRepositoryImpl @Inject constructor(
 
         auftraege.joinAll()
 
-        DeckPool(
-            entriesBySource = eintraege.toMap(),
-            origins = sources.associate { it.id to it.origin },
-        )
+        DeckPool(entriesBySource = eintraege.toMap(), origins = herkunft)
+    }
+
+    override suspend fun cardImage(url: String): String? = withContext(ioDispatcher) {
+        val source = RecipeSourceCatalog.forUrl(url)
+        val html = runCatching { fetcher.fetch(url, source) }.getOrNull() ?: return@withContext null
+        extractor.imageOf(html, url)
     }
 
     override suspend fun loadRecipe(url: String): WebRecipeResult {

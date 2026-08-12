@@ -272,7 +272,7 @@ private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -
         )
         Box(modifier = Modifier.weight(1f)) {
             SwipeCardStack(
-                cards = uiState.remainingCards.take(VISIBLE_CARDS),
+                cards = uiState.remainingCards,
                 onSwiped = { card, liked -> onSwiped(card.id, liked) },
             )
         }
@@ -390,6 +390,3 @@ private fun PairingError.messageRes(): Int = when (this) {
     PairingError.NO_RECIPES -> R.string.mehrspieler_fehler_keine_rezepte
     PairingError.UNKNOWN -> R.string.mehrspieler_fehler_unbekannt
 }
-
-/** Mehr Karten gleichzeitig zu zeichnen bringt nichts - man sieht nur die obersten. */
-private const val VISIBLE_CARDS = 3

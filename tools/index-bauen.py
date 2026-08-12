@@ -17,6 +17,7 @@ gepflegt werden muss.
 import gzip
 import io
 import json
+import random
 import re
 import sys
 import time
@@ -32,6 +33,12 @@ UA = "Rezeptli-Index/1.0 (+https://github.com/TRGamer-tech/Rezeptli)"
 
 MAX_UNTERVERZEICHNISSE = 12
 MAX_TIEFE = 2
+
+# So viele Rezepte je Quelle kommen in die Stapeldatei. Der Wischstapel braucht
+# keine 320'000 Adressen - er zeigt ein paar Dutzend Karten. Frueher lud die App
+# das ganze Verzeichnis aller Quellen, bevor die erste Karte erschien; das waren
+# zweistellige Megabytes und Minuten am Handy.
+STAPEL_JE_QUELLE = 400
 
 LOC = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.I)
 # Viele Sitemaps nennen zu jedem Eintrag ein Bild. Wo das so ist, kostet ein Foto
@@ -138,6 +145,52 @@ def eintraege(quelle: dict) -> list[tuple[str, str, str]]:
     return sorted((adresse, titel, bild) for adresse, (titel, bild) in gesammelt.items())
 
 
+def stapel_bauen(manifest: dict) -> None:
+    """Schreibt eine kleine Auswahl fuer den Wischstapel.
+
+    Bevorzugt werden Eintraege mit Bild: Eine Karte ohne Foto muss die App sonst
+    selbst nachladen, und das dauert pro Karte rund eine Sekunde. Wo eine Quelle
+    keine Bilder nennt, kommen Eintraege ohne Bild dazu - lieber eine Karte, die
+    ihr Foto nachlaedt, als eine Quelle, die im Stapel gar nicht vorkommt.
+
+    Gezogen wird mit festem Startwert, damit derselbe Index dieselbe Datei ergibt.
+    """
+    zufall = random.Random(1)
+    zeilen: list[str] = []
+
+    for kennung in sorted(manifest["quellen"]):
+        quelldatei = AUSGABE / f"{kennung}.tsv.gz"
+        if not quelldatei.exists():
+            continue
+
+        with gzip.GzipFile(quelldatei, "rb") as datei:
+            alle = [z.split("\t") for z in datei.read().decode("utf-8").split("\n") if z]
+
+        mit_bild = [t for t in alle if len(t) >= 3 and t[2]]
+        ohne_bild = [t for t in alle if not (len(t) >= 3 and t[2])]
+
+        gewaehlt = zufall.sample(mit_bild, min(STAPEL_JE_QUELLE, len(mit_bild)))
+        fehlend = STAPEL_JE_QUELLE - len(gewaehlt)
+        if fehlend > 0 and ohne_bild:
+            gewaehlt += zufall.sample(ohne_bild, min(fehlend, len(ohne_bild)))
+
+        for teile in gewaehlt:
+            adresse = teile[0]
+            titel = teile[1] if len(teile) > 1 else ""
+            bild = teile[2] if len(teile) > 2 else ""
+            zeilen.append(f"{adresse}\t{titel}\t{bild}\t{kennung}")
+
+        manifest["quellen"][kennung]["imStapel"] = len(gewaehlt)
+
+    zufall.shuffle(zeilen)
+    ziel = AUSGABE / "stapel.tsv.gz"
+    with gzip.GzipFile(ziel, "wb", mtime=0) as datei:
+        datei.write("\n".join(zeilen).encode("utf-8"))
+
+    manifest["stapel"] = {"eintraege": len(zeilen), "groesseBytes": ziel.stat().st_size}
+    print(f"\nStapel: {len(zeilen)} Rezepte, {ziel.stat().st_size // 1024} KB")
+
+
 def main() -> int:
     AUSGABE.mkdir(parents=True, exist_ok=True)
     manifest = {"gebautAm": int(time.time() * 1000), "quellen": {}}
@@ -169,6 +222,8 @@ def main() -> int:
         }
         print(f"  {len(gefunden)} Eintraege ({mit_bild} mit Bild), "
               f"{ziel.stat().st_size // 1024} KB")
+
+    stapel_bauen(manifest)
 
     (AUSGABE / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False),
