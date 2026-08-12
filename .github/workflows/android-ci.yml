@@ -179,12 +179,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          # set -o pipefail ist hier keine Formsache: Ohne ihn ist der Rueckgabewert
-          # der von tee, also immer 0. Fehlgeschlagene Geraetetests haben den Job so
-          # gruen gemeldet, obwohl Tests rot waren.
-          script: |
-            set -o pipefail
-            ./gradlew connectedDebugAndroidTest --console=plain 2>&1 | tee /tmp/ui.log
+          # pipefail ist hier keine Formsache: Ohne ihn ist der Rueckgabewert der von
+          # tee, also immer 0 - fehlgeschlagene Geraetetests haben den Job so gruen
+          # gemeldet. Die Action fuehrt jede Zeile mit /usr/bin/sh aus, und dash kennt
+          # kein "set -o pipefail". Deshalb ausdruecklich eine Bash, in einer Zeile.
+          script: bash -c 'set -o pipefail; ./gradlew connectedDebugAndroidTest --console=plain 2>&1 | tee /tmp/ui.log'
 
       - name: Fehler zusammenfassen
         if: failure()
