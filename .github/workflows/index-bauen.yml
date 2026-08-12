@@ -95,6 +95,22 @@ jobs:
         id: veroeffentlichen
         uses: actions/deploy-pages@v4
 
+      - name: Jede Quelle auf Inhalt prüfen
+        run: |
+          set -o pipefail
+          python3 tools/index-pruefen.py 2>&1 | tee /tmp/quellenpruefung.txt
+
+      - name: Quellenpruefung anhängen
+        if: always()
+        run: |
+          {
+            echo '### Quellen im Index'
+            echo
+            echo '```'
+            cat /tmp/quellenpruefung.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Prüfen, ob die Seite wirklich etwas anzeigt
         run: |
           # Ein erfolgreicher Deploy ist kein Beweis, dass die Seite laedt. Die

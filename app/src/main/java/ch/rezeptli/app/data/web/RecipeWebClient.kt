@@ -61,7 +61,10 @@ class RecipeWebClient @Inject constructor(
                 }
                 throw WebFetchException(error, "HTTP ${it.code} für $url")
             }
-            it.body?.string().orEmpty()
+            // Nicht .string(): Manche Sitemaps kommen als .xml.gz, also als gepackter
+            // Inhalt ohne Content-Encoding. Die packt der Client nicht selbst aus.
+            val rohe = it.body?.bytes() ?: ByteArray(0)
+            GzipText.decode(rohe)
         }
     }
 
