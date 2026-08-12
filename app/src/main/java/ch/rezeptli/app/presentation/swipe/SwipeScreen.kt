@@ -27,7 +27,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -42,6 +41,7 @@ import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import kotlinx.coroutines.launch
 
@@ -96,8 +96,8 @@ fun SwipeScreen(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.swipe_title)) },
+            RezeptliTopBar(
+                title = stringResource(R.string.swipe_title),
                 navigationIcon = {
                     IconButton(onClick = onExitRequest) {
                         Icon(

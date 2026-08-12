@@ -39,7 +39,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -58,6 +57,7 @@ import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.RecipeListCard
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import kotlinx.coroutines.launch
 
 /** Einstiegspunkt der App: alle Rezepte, Suche, Filter und der Weg in den Swipe-Modus. */
@@ -127,15 +127,11 @@ fun RecipeListScreen(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        if (uiState.firstName.isBlank()) {
-                            stringResource(R.string.recipes_title)
-                        } else {
-                            stringResource(R.string.begruessung_mit_name, uiState.firstName)
-                        },
-                    )
+            RezeptliTopBar(
+                title = if (uiState.firstName.isBlank()) {
+                    stringResource(R.string.recipes_title)
+                } else {
+                    stringResource(R.string.begruessung_mit_name, uiState.firstName)
                 },
                 actions = {
                     if (uiState.openShoppingItems > 0) {

@@ -35,7 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -54,6 +53,7 @@ import ch.rezeptli.app.domain.model.AmountFormatter
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.presentation.common.KeepScreenOn
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
@@ -110,13 +110,9 @@ fun CookingScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        uiState.recipe?.title.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                },
+            RezeptliTopBar(
+                title = uiState.recipe?.title.orEmpty(),
+                titleStyle = MaterialTheme.typography.titleMedium,
                 navigationIcon = {
                     IconButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) {
                         Icon(

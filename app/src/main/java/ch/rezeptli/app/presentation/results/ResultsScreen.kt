@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SentimentDissatisfied
@@ -24,7 +23,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -40,6 +38,7 @@ import ch.rezeptli.app.R
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.RecipeListCard
+import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import kotlinx.coroutines.launch
 
 /** Ergebnis einer Swipe-Session: alles, was es durch die Runde geschafft hat. */
@@ -95,16 +94,9 @@ fun ResultsScreen(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.results_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBackToRecipes) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.results_back_to_recipes),
-                        )
-                    }
-                },
+            RezeptliTopBar(
+                title = stringResource(R.string.results_title),
+                onBack = onBackToRecipes,
                 actions = {
                     IconButton(onClick = onOpenShoppingList) {
                         Icon(
