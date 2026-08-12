@@ -127,10 +127,23 @@ class CuratedDeckBuilder @Inject constructor() {
         /** So viele Karten, dass man eine Weile wischen kann, ohne endlos zu laden. */
         const val DEFAULT_SIZE = 30
 
+        /** Pro gesuchtem Gericht ein paar Karten - abgelehnt wird oefter als behalten. */
+        private const val CARDS_PER_TARGET = 6
+        private const val MIN_DECK = 12
+
         /** Anteil fremdsprachiger Quellen ohne besonderes Interesse. */
         private const val BASE_SHARE = 0.15
 
         /** Anteil, wenn im Onboarding eine solche Kueche angegeben wurde. */
         private const val INTERESTED_SHARE = 0.4
+
+        /**
+         * Wie gross ein Stapel fuer ein gegebenes Ziel sein sollte.
+         *
+         * Gemeinsam fuer den Alleingang und die gemeinsame Runde - beide ziehen aus
+         * demselben Verzeichnis, und "wie viele Karten fuer wie viele Gerichte" ist
+         * dieselbe Frage in beiden Faellen.
+         */
+        fun deckSizeFor(target: Int): Int = (target * CARDS_PER_TARGET).coerceAtLeast(MIN_DECK)
     }
 }

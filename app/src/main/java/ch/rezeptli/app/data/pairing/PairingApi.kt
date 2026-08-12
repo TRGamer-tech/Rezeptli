@@ -26,26 +26,30 @@ import kotlinx.serialization.json.put
 internal object PairingApi {
     fun createBody(participantId: String, recipes: List<SharedRecipe>): JsonObject = buildJsonObject {
         put("gastgeber", participantId)
-        put(
-            "rezepte",
-            buildJsonArray {
-                recipes.forEach { recipe ->
-                    add(
-                        buildJsonObject {
-                            put("rezeptId", recipe.recipeId)
-                            put("titel", recipe.title)
-                            recipe.sourceUrl?.let { put("quelleUrl", it) }
-                            recipe.imageUrl?.let { put("bildUrl", it) }
-                            recipe.prepTimeMinutes?.let { put("zubereitungszeit", it) }
-                        },
-                    )
-                }
-            },
-        )
+        put("rezepte", recipesJsonArray(recipes))
     }
 
-    fun joinBody(participantId: String): JsonObject = buildJsonObject {
+    /**
+     * [recipes] sind eigene Vorschlaege, die der Dienst in den Topf der Runde mischt -
+     * leer, wenn nur ueber die des Gastgebers abgestimmt werden soll.
+     */
+    fun joinBody(participantId: String, recipes: List<SharedRecipe> = emptyList()): JsonObject = buildJsonObject {
         put("teilnehmer", participantId)
+        if (recipes.isNotEmpty()) put("rezepte", recipesJsonArray(recipes))
+    }
+
+    private fun recipesJsonArray(recipes: List<SharedRecipe>): JsonArray = buildJsonArray {
+        recipes.forEach { recipe ->
+            add(
+                buildJsonObject {
+                    put("rezeptId", recipe.recipeId)
+                    put("titel", recipe.title)
+                    recipe.sourceUrl?.let { put("quelleUrl", it) }
+                    recipe.imageUrl?.let { put("bildUrl", it) }
+                    recipe.prepTimeMinutes?.let { put("zubereitungszeit", it) }
+                },
+            )
+        }
     }
 
     fun votesBody(participantId: String, votes: List<SharedVote>, finished: Boolean): JsonObject =
@@ -92,6 +96,7 @@ internal object PairingApi {
         allFinished = body["alleFertig"]?.jsonPrimitive?.content == "true",
         matches = body["treffer"]?.jsonArray?.mapNotNull { it.jsonObject.toSharedRecipe() }.orEmpty(),
         expiresAt = body["verfaelltAm"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+        pool = body["rezepte"]?.jsonArray?.mapNotNull { it.jsonObject.toSharedRecipe() }.orEmpty(),
     )
 
     /** Die Antwortcodes des Dienstes, uebersetzt in etwas, das die App erklaeren kann. */

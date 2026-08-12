@@ -56,7 +56,6 @@ import ch.rezeptli.app.presentation.swipe.SwipeCardStack
 @Composable
 fun DeckRoute(
     onOpenTogether: () -> Unit,
-    onSaved: (Int) -> Unit,
     viewModel: DeckViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -68,7 +67,10 @@ fun DeckRoute(
         onSwiped = viewModel::onSwiped,
         onFinishEarly = viewModel::onFinishEarly,
         onRestart = viewModel::onRestart,
-        onKeep = { viewModel.onKeepLiked(onSaved) },
+        // Zurueck auf den Anfang der naechsten Runde statt weg von der Karte -
+        // sonst landet man nach dem Speichern bei den Rezepten und muesste den
+        // Umweg ueber die Leiste nehmen, um weiterzuwischen.
+        onKeep = { viewModel.onKeepLiked { viewModel.onRestart() } },
         onTogether = {
             viewModel.prepareTogether()
             onOpenTogether()

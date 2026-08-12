@@ -58,11 +58,14 @@ class PairingRepositoryImpl @Inject constructor(
         return post("$BASE_URL/sitzung", body) { PairingApi.sessionFrom(it, fallback = recipes) }
     }
 
-    override suspend fun joinSession(code: String): PairingResult<SharedSession> {
+    override suspend fun joinSession(
+        code: String,
+        recipes: List<SharedRecipe>,
+    ): PairingResult<SharedSession> {
         val cleaned = code.normalizeCode()
         if (cleaned.isEmpty()) return PairingResult.Failure(PairingError.UNKNOWN_CODE)
 
-        val body = PairingApi.joinBody(participantId())
+        val body = PairingApi.joinBody(participantId(), recipes)
         return post("$BASE_URL/sitzung/$cleaned/beitreten", body) { PairingApi.sessionFrom(it) }
     }
 

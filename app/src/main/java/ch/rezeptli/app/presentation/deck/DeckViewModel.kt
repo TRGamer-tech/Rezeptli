@@ -2,6 +2,7 @@ package ch.rezeptli.app.presentation.deck
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
@@ -118,7 +119,7 @@ class DeckViewModel @Inject constructor(
         viewModelScope.launch {
             // Etwas mehr Karten als Ziele: Es wird ja auch abgelehnt. Ohne Ziel gibt es
             // keine Zahl, von der sich das ableiten liesse - dann ein fester Vorrat.
-            val groesse = target?.let { deckSizeFor(it) } ?: ENDLESS_INITIAL_SIZE
+            val groesse = target?.let { CuratedDeckBuilder.deckSizeFor(it) } ?: ENDLESS_INITIAL_SIZE
             val deck = buildDeck(size = groesse, exclude = gesehen)
             gesehen += deck.map { it.url }
 
@@ -278,9 +279,6 @@ class DeckViewModel @Inject constructor(
     }
 
     private companion object {
-        /** Pro gesuchtem Gericht ein paar Karten - abgelehnt wird oefter als behalten. */
-        const val CARDS_PER_TARGET = 6
-        const val MIN_DECK = 12
         const val REFILL_SIZE = 15
         const val REFILL_THRESHOLD = 4
 
@@ -289,7 +287,5 @@ class DeckViewModel @Inject constructor(
 
         /** Fuer so viele Karten im Voraus wird ein fehlendes Bild geholt. */
         const val VORAUSLADEN = 5
-
-        fun deckSizeFor(target: Int): Int = (target * CARDS_PER_TARGET).coerceAtLeast(MIN_DECK)
     }
 }

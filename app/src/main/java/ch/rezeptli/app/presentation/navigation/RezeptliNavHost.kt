@@ -13,7 +13,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.presentation.cooking.CookingRoute
 import ch.rezeptli.app.presentation.deck.DeckRoute
 import ch.rezeptli.app.presentation.multiplayer.MultiplayerRoute
@@ -72,10 +71,7 @@ fun RezeptliNavHost(
 
             composable(Destinations.DECK) {
                 DeckRoute(
-                    onOpenTogether = {
-                        navController.navigate(Destinations.multiplayer(RecipeFilter()))
-                    },
-                    onSaved = { navController.navigate(Destinations.RECIPE_LIST) },
+                    onOpenTogether = { navController.navigate(Destinations.MULTIPLAYER) },
                 )
             }
 
@@ -151,9 +147,9 @@ fun RezeptliNavHost(
             ) {
                 RecipeImportRoute(
                     onBack = { navController.popBackStack() },
-                    onSaved = { recipeId ->
-                        navController.navigate(Destinations.recipeDetail(recipeId)) {
-                            popUpTo(Destinations.RECIPE_LIST)
+                    onSaved = {
+                        navController.navigate(Destinations.RECIPE_LIST) {
+                            popUpTo(Destinations.RECIPE_LIST) { inclusive = true }
                         }
                     },
                 )
@@ -174,39 +170,15 @@ fun RezeptliNavHost(
                             popUpTo(Destinations.SWIPE_SETUP) { inclusive = true }
                         }
                     },
-                    onStartTogether = { filter ->
-                        navController.navigate(Destinations.multiplayer(filter))
-                    },
+                    // Der gemeinsame Modus zieht seinen eigenen Vorschlag aus dem
+                    // Verzeichnis - der hier gewaehlte Filter fuer die eigene Sammlung
+                    // gilt dafuer nicht.
+                    onStartTogether = { navController.navigate(Destinations.MULTIPLAYER) },
                 )
             }
 
-            composable(
-                route = Destinations.MULTIPLAYER,
-                arguments = listOf(
-                    navArgument(Destinations.ARG_QUERY) {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                    navArgument(Destinations.ARG_TAGS) {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                    navArgument(Destinations.ARG_MAX_PREP_TIME) {
-                        type = NavType.IntType
-                        defaultValue = 0
-                    },
-                ),
-            ) { entry ->
-                val filter = Destinations.filterFrom(
-                    query = entry.arguments?.getString(Destinations.ARG_QUERY),
-                    tags = entry.arguments?.getString(Destinations.ARG_TAGS),
-                    maxPrepTime = entry.arguments?.getInt(Destinations.ARG_MAX_PREP_TIME),
-                )
-                MultiplayerRoute(
-                    filter = filter,
-                    onBack = { navController.popBackStack() },
-                    onFindRecipes = { navController.navigate(Destinations.WEB_SEARCH) },
-                )
+            composable(Destinations.MULTIPLAYER) {
+                MultiplayerRoute(onBack = { navController.popBackStack() })
             }
 
             composable(

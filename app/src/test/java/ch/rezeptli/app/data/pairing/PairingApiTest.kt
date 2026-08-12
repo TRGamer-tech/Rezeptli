@@ -91,6 +91,22 @@ class PairingApiTest {
     }
 
     @Test
+    fun `Stand bringt den aktuellen Topf mit - auch mitgebrachte Rezepte der beitretenden Person`() {
+        val zustand = PairingApi.stateFrom(
+            body(
+                """
+                {"code":"LUH64E","teilnehmer":2,"fertig":0,"alleFertig":false,"rezepte":[
+                  {"rezeptId":1,"titel":"Rösti","quelleUrl":null,"bildUrl":null,"zubereitungszeit":null},
+                  {"rezeptId":2,"titel":"Risotto","quelleUrl":null,"bildUrl":null,"zubereitungszeit":null}
+                ]}
+                """.trimIndent(),
+            ),
+        )
+
+        assertEquals(listOf("Rösti", "Risotto"), zustand.pool.map { it.title })
+    }
+
+    @Test
     fun `Antwortcodes werden erklaerbar uebersetzt`() {
         assertEquals(PairingError.UNKNOWN_CODE, PairingApi.errorFor(404))
         assertEquals(PairingError.FULL, PairingApi.errorFor(409))

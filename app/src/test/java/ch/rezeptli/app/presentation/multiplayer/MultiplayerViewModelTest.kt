@@ -1,16 +1,21 @@
 package ch.rezeptli.app.presentation.multiplayer
 
-import ch.rezeptli.app.domain.model.Recipe
-import ch.rezeptli.app.domain.model.RecipeFilter
+import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
+import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.parser.IngredientTextParser
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.domain.ranking.SourceOrigin
+import ch.rezeptli.app.domain.repository.DeckPool
 import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
 import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.domain.translate.NoTranslation
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
+import ch.rezeptli.app.domain.usecase.BuildSwipeDeckUseCase
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.JoinSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
@@ -21,6 +26,7 @@ import ch.rezeptli.app.domain.usecase.StartSharedSessionUseCase
 import ch.rezeptli.app.fake.FakePairingRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
 import ch.rezeptli.app.fake.FakeShoppingListRepository
+import ch.rezeptli.app.fake.FakeUserProfileRepository
 import ch.rezeptli.app.fake.FakeWebRecipeRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,15 +47,43 @@ class MultiplayerViewModelTest {
     @RegisterExtension
     val mainDispatcher = MainDispatcherExtension()
 
-    private val rezepte = listOf(
-        Recipe(id = 1L, title = "Rösti"),
-        Recipe(id = 2L, title = "Risotto"),
-        Recipe(id = 3L, title = "Älplermagronen"),
+    /** Was ein frisch gezogener eigener Vorschlag enthaelt - alle mit Bild, wie gefordert. */
+    private val eigeneEintraege = listOf(
+        DeckEntry(
+            url = "https://a.example/roesti",
+            title = "Rösti",
+            imageUrl = "https://a.example/roesti.jpg",
+            sourceId = "a",
+            sourceName = "A",
+        ),
+        DeckEntry(
+            url = "https://a.example/risotto",
+            title = "Risotto",
+            imageUrl = "https://a.example/risotto.jpg",
+            sourceId = "a",
+            sourceName = "A",
+        ),
+        DeckEntry(
+            url = "https://a.example/alplermagronen",
+            title = "Älplermagronen",
+            imageUrl = "https://a.example/alpler.jpg",
+            sourceId = "a",
+            sourceName = "A",
+        ),
     )
 
-    private val pool = rezepte.map { SharedRecipe(recipeId = it.id, title = it.title) }
-    private val recipeRepository = FakeRecipeRepository(rezepte)
-    private val pairing = FakePairingRepository(pool = pool)
+    private val gefuellterPool = DeckPool(
+        entriesBySource = mapOf("a" to eigeneEintraege),
+        origins = mapOf("a" to SourceOrigin("a", Country.SCHWEIZ)),
+    )
+
+    /** Das, worueber schon abgestimmt wird, wenn ein Test einer Runde beitritt. */
+    private val bestehenderTopf = listOf(
+        SharedRecipe(recipeId = 1L, title = "Rösti"),
+        SharedRecipe(recipeId = 2L, title = "Risotto"),
+        SharedRecipe(recipeId = 3L, title = "Älplermagronen"),
+    )
+    private val pairing = FakePairingRepository(pool = bestehenderTopf)
 
     /**
      * Stellt ein ViewModel bereit und beendet danach seine Abfrageschleife.
@@ -62,8 +96,10 @@ class MultiplayerViewModelTest {
      * Wichtig ist, dass das Aufraeumen *innerhalb* des Rumpfs geschieht. Ein
      * `@AfterEach` kommt zu spaet - da wartet `runTest` bereits.
      */
-    private fun TestScope.mitViewModel(block: (MultiplayerViewModel) -> Unit) {
-        val viewModel = createViewModel()
+    private fun TestScope.mitViewModel(
+        viewModel: MultiplayerViewModel = createViewModel(),
+        block: (MultiplayerViewModel) -> Unit,
+    ) {
         try {
             block(viewModel)
         } finally {
@@ -72,23 +108,32 @@ class MultiplayerViewModelTest {
         }
     }
 
-    /** Ohne vorbereitete Auswahl - die Runde kommt hier aus der eigenen Sammlung. */
     private val selectionHolder = SharedSelectionHolder()
-
     private val shoppingRepository = FakeShoppingListRepository()
 
-    private fun createViewModel() = MultiplayerViewModel(
-        startSession = StartSharedSessionUseCase(pairing, recipeRepository),
+    /**
+     * [webRepository] liefert per Voreinstellung einen gefuellten Vorrat, mit dem
+     * onHost()/onJoin() ohne Weiteres klappen.
+     */
+    private fun createViewModel(
+        webRepository: FakeWebRecipeRepository = FakeWebRecipeRepository(pool = gefuellterPool),
+    ) = MultiplayerViewModel(
+        startSession = StartSharedSessionUseCase(pairing),
         selectionHolder = selectionHolder,
+        buildDeck = BuildSwipeDeckUseCase(
+            webRepository = webRepository,
+            profileRepository = FakeUserProfileRepository(UserProfile(country = Country.SCHWEIZ)),
+            builder = CuratedDeckBuilder(),
+        ),
         loadWebRecipe = LoadWebRecipeUseCase(
             FakeWebRecipeRepository(),
             IngredientTextParser(),
             InstructionSplitter(),
             NoTranslation,
         ),
-        saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
+        saveRecipe = SaveRecipeUseCase(FakeRecipeRepository(), InstructionSplitter()),
         addToShoppingList = AddRecipesToShoppingListUseCase(
-            recipeRepository,
+            FakeRecipeRepository(),
             shoppingRepository,
             ShoppingListAggregator(),
         ),
@@ -99,7 +144,7 @@ class MultiplayerViewModelTest {
     )
 
     @Test
-    fun `eine vorbereitete Auswahl geht vor der eigenen Sammlung`() = runTest {
+    fun `eine vorbereitete Auswahl geht vor einem frisch gezogenen Vorschlag`() = runTest {
         // So kommt der Party-Modus aus einer Wischrunde: geteilt wird, was dort gefiel.
         val ausDerRunde = listOf(
             SharedRecipe(recipeId = 99L, title = "Wähe aus dem Stapel"),
@@ -108,7 +153,7 @@ class MultiplayerViewModelTest {
         selectionHolder.set(ausDerRunde)
 
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
 
             assertEquals(
                 ausDerRunde.map { it.title },
@@ -121,40 +166,49 @@ class MultiplayerViewModelTest {
     fun `die Auswahl gilt nur fuer eine Runde`() = runTest {
         selectionHolder.set(listOf(SharedRecipe(recipeId = 99L, title = "Einmalig")))
 
-        mitViewModel { viewModel -> viewModel.onHost(RecipeFilter.NONE) }
+        mitViewModel { viewModel -> viewModel.onHost() }
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
 
-            // Zweite Runde ohne neue Auswahl: wieder aus der eigenen Sammlung.
-            assertEquals(rezepte.size, pairing.createdSession?.recipes?.size)
+            // Zweite Runde ohne neue Auswahl: wieder frisch aus dem Verzeichnis gezogen.
+            assertEquals(eigeneEintraege.size, pairing.createdSession?.recipes?.size)
         }
     }
 
     @Test
     fun `eroeffnen liefert einen Code und wartet auf die andere Person`() = runTest {
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
 
             val state = viewModel.uiState.value
             assertEquals(FakePairingRepository.CODE, state.code)
             assertEquals(MultiplayerStep.WARTET_AUF_PERSON, state.step)
             assertTrue(state.isHost)
-            assertEquals(rezepte.size, pairing.createdSession?.recipes?.size)
+            assertEquals(eigeneEintraege.size, pairing.createdSession?.recipes?.size)
         }
     }
 
     @Test
-    fun `geteilt werden nur Titel und Bild, keine Zutaten`() = runTest {
+    fun `der eigene Vorschlag zieht nur Rezepte mit Bild`() = runTest {
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
 
             val geteilt = pairing.createdSession?.recipes.orEmpty()
             assertEquals(
                 setOf("Rösti", "Risotto", "Älplermagronen"),
                 geteilt.map { it.title }.toSet(),
             )
-            // SharedRecipe hat schlicht kein Feld fuer Zutaten oder Zubereitung.
-            assertTrue(geteilt.all { it.sourceUrl == null })
+            assertTrue(geteilt.all { it.imageUrl != null }, "Ohne Bild darf kein Vorschlag mitgehen")
+        }
+    }
+
+    @Test
+    fun `ohne erreichbaren Vorrat meldet das Eroeffnen einen Fehler statt einer leeren Runde`() = runTest {
+        mitViewModel(createViewModel(webRepository = FakeWebRecipeRepository())) { viewModel ->
+            viewModel.onHost()
+
+            assertEquals(PairingError.NO_RECIPES, viewModel.uiState.value.error)
+            assertNull(pairing.createdSession)
         }
     }
 
@@ -170,14 +224,15 @@ class MultiplayerViewModelTest {
     }
 
     @Test
-    fun `beitreten holt den Rezeptstapel und beginnt sofort`() = runTest {
+    fun `beitreten mischt den eigenen Vorschlag in den bestehenden Topf`() = runTest {
         mitViewModel { viewModel ->
             viewModel.onCodeInputChange(FakePairingRepository.CODE)
             viewModel.onJoin()
 
             val state = viewModel.uiState.value
             assertEquals(MultiplayerStep.WISCHEN, state.step)
-            assertEquals(pool.size, state.pool.size)
+            assertEquals(bestehenderTopf.size + eigeneEintraege.size, state.pool.size)
+            assertTrue(bestehenderTopf.map { it.title }.all { titel -> state.pool.any { it.title == titel } })
             assertFalse(state.isHost)
         }
     }
@@ -193,7 +248,9 @@ class MultiplayerViewModelTest {
 
     @Test
     fun `nach dem letzten Rezept gehen alle Stimmen auf einmal raus`() = runTest {
-        mitViewModel { viewModel ->
+        // Ohne eigenen Vorrat bleibt der Topf beim Beitreten genau die drei
+        // vorgegebenen Rezepte - die Stimmenzahl bleibt damit vorhersagbar.
+        mitViewModel(createViewModel(webRepository = FakeWebRecipeRepository())) { viewModel ->
             viewModel.onCodeInputChange(FakePairingRepository.CODE)
             viewModel.onJoin()
 
@@ -257,7 +314,7 @@ class MultiplayerViewModelTest {
             allFinished = false,
         )
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
             advanceTimeBy(FIVE_SECONDS)
 
             assertEquals(MultiplayerStep.WISCHEN, viewModel.uiState.value.step)
@@ -267,7 +324,7 @@ class MultiplayerViewModelTest {
     @Test
     fun `verlassen schliesst die Runde des Gastgebers beim Dienst`() = runTest {
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
 
             viewModel.onLeave()
 
@@ -293,7 +350,7 @@ class MultiplayerViewModelTest {
     fun `ohne Verbindung bleibt die Runde beim Start stehen`() = runTest {
         pairing.failWith = PairingError.NO_CONNECTION
         mitViewModel { viewModel ->
-            viewModel.onHost(RecipeFilter.NONE)
+            viewModel.onHost()
 
             assertEquals(PairingError.NO_CONNECTION, viewModel.uiState.value.error)
             assertEquals(MultiplayerStep.START, viewModel.uiState.value.step)

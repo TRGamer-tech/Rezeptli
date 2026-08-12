@@ -110,12 +110,50 @@ class PairingLiveTest {
         }
     }
 
+    /**
+     * Bringt die beitretende Person eigene Rezepte mit, landen sie im gemeinsamen Topf -
+     * beide Seiten stimmen danach ueber dieselbe, gemischte Auswahl ab statt nur ueber
+     * die des Gastgebers.
+     */
+    @Test
+    fun eigeneRezepteBeimBeitretenLandenImGemeinsamenTopf(): Unit = runBlocking {
+        withTimeout(TEST_TIMEOUT_MS) {
+            val erstellt = repository.createSession(rezepte)
+            assertTrue("Einladen fehlgeschlagen: $erstellt", erstellt is PairingResult.Success)
+            val sitzung = (erstellt as PairingResult.Success).value
+
+            try {
+                val gast = "test-gast-" + System.nanoTime()
+                val mitgebracht = listOf(SharedRecipe(recipeId = 4L, title = "Zopf"))
+
+                val topf = beitreten(sitzung.code, gast, mitgebracht)
+
+                assertEquals(
+                    (rezepte + mitgebracht).map { it.title }.toSet(),
+                    topf.map { it.title }.toSet(),
+                )
+            } finally {
+                repository.closeSession(sitzung.code)
+            }
+        }
+    }
+
     /** Der Beitritt der zweiten Person - ohne die App, mit eigener Kennung. */
-    private fun beitreten(code: String, kennung: String): List<SharedRecipe> {
-        val antwort = sende(
-            "$basis/sitzung/$code/beitreten",
-            JSONObject().put("teilnehmer", kennung),
-        )
+    private fun beitreten(
+        code: String,
+        kennung: String,
+        mitgebracht: List<SharedRecipe> = emptyList(),
+    ): List<SharedRecipe> {
+        val rumpf = JSONObject().put("teilnehmer", kennung)
+        if (mitgebracht.isNotEmpty()) {
+            val liste = JSONArray()
+            mitgebracht.forEach { rezept ->
+                liste.put(JSONObject().put("rezeptId", rezept.recipeId).put("titel", rezept.title))
+            }
+            rumpf.put("rezepte", liste)
+        }
+
+        val antwort = sende("$basis/sitzung/$code/beitreten", rumpf)
         val rohe = antwort.optJSONArray("rezepte") ?: JSONArray()
         return (0 until rohe.length()).map { index ->
             val eintrag = rohe.getJSONObject(index)

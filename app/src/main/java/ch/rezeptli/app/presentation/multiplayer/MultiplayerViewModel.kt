@@ -2,7 +2,7 @@ package ch.rezeptli.app.presentation.multiplayer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import ch.rezeptli.app.domain.model.RecipeFilter
+import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.PairingResult
@@ -12,6 +12,7 @@ import ch.rezeptli.app.domain.multiplayer.SharedSession
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
+import ch.rezeptli.app.domain.usecase.BuildSwipeDeckUseCase
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.JoinSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
@@ -21,6 +22,7 @@ import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SendSharedVotesUseCase
 import ch.rezeptli.app.domain.usecase.StartSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.WebImportOutcome
+import ch.rezeptli.app.presentation.deck.DEFAULT_TARGET
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,8 +34,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Wo in der gemeinsamen Runde man gerade steht. */
+/** Wo in einer gemeinsamen Runde man gerade steht. */
 enum class MultiplayerStep {
+    /** Wie viele Gerichte sollen es werden? Bestimmt, wie gross der eigene Vorschlag ist. */
+    ANZAHL,
+
     /** Eroeffnen oder beitreten? */
     START,
 
@@ -51,7 +56,8 @@ enum class MultiplayerStep {
 }
 
 data class MultiplayerUiState(
-    val step: MultiplayerStep = MultiplayerStep.START,
+    val step: MultiplayerStep = MultiplayerStep.ANZAHL,
+    val target: Int = DEFAULT_TARGET,
     val code: String = "",
     val codeInput: String = "",
     val isHost: Boolean = false,
@@ -87,6 +93,14 @@ data class MultiplayerUiState(
 /**
  * Fuehrt durch eine gemeinsame Runde.
  *
+ * Beide Seiten bringen einen eigenen, frisch aus dem Verzeichnis gezogenen Vorschlag
+ * mit - denselben Weg wie der Alleingang, nur zu zweit. Der Dienst mischt beide Listen
+ * zu einem gemeinsamen Topf, ueber den dann beide abstimmen. Das war vorher anders: Nur
+ * der Gastgeber brachte Rezepte mit, die andere Person stimmte bloss darueber ab. Eine
+ * Ausnahme bleibt: Kommt die Runde aus einer eigenen Wischrunde (siehe [SharedSelectionHolder]),
+ * steht die Auswahl der gastgebenden Person schon fest, und die Frage nach der Anzahl
+ * entfaellt fuer sie - sie wurde ja gerade erst beantwortet.
+ *
  * Die Entscheidungen werden gesammelt und am Ende in einem Rutsch gesendet, nicht
  * einzeln: Das spart Funkverkehr, und wer zwischendurch das Netz verliert, verliert
  * nicht die halbe Runde. Erneutes Senden ist beim Dienst unschaedlich.
@@ -95,6 +109,7 @@ data class MultiplayerUiState(
 class MultiplayerViewModel @Inject constructor(
     private val startSession: StartSharedSessionUseCase,
     private val selectionHolder: SharedSelectionHolder,
+    private val buildDeck: BuildSwipeDeckUseCase,
     private val loadWebRecipe: LoadWebRecipeUseCase,
     private val saveRecipe: SaveRecipeUseCase,
     private val addToShoppingList: AddRecipesToShoppingListUseCase,
@@ -103,28 +118,48 @@ class MultiplayerViewModel @Inject constructor(
     private val closeSession: CloseSharedSessionUseCase,
     private val observeSession: ObserveSharedSessionUseCase,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(MultiplayerUiState())
+    private val _uiState = MutableStateFlow(initialState())
     val uiState: StateFlow<MultiplayerUiState> = _uiState.asStateFlow()
 
     private val votes = mutableListOf<SharedVote>()
     private var pollJob: Job? = null
 
+    /** Kommt die Runde schon aus einer Wischrunde, steht die Anzahl schon fest. */
+    private fun initialState(): MultiplayerUiState = if (selectionHolder.peek().isNotEmpty()) {
+        MultiplayerUiState(step = MultiplayerStep.START)
+    } else {
+        MultiplayerUiState()
+    }
+
+    fun onTargetChange(value: Int) {
+        _uiState.update { it.copy(target = value.coerceAtLeast(1)) }
+    }
+
+    fun onContinueFromTarget() {
+        _uiState.update { it.copy(step = MultiplayerStep.START) }
+    }
+
     fun onCodeInputChange(value: String) {
         _uiState.update { it.copy(codeInput = value.uppercase().take(MAX_CODE_LENGTH), error = null) }
     }
 
-    /** Eroeffnet eine Runde aus der eigenen Sammlung. */
-    fun onHost(filter: RecipeFilter) {
+    /** Eroeffnet eine Runde. */
+    fun onHost() {
         if (_uiState.value.isBusy) return
         _uiState.update { it.copy(isBusy = true, error = null) }
 
         viewModelScope.launch {
             // Kommt die Runde aus einem Wischstapel, steht die Auswahl schon fest.
-            // Sonst wird aus der eigenen Sammlung geteilt.
+            // Sonst wird frisch aus dem Verzeichnis gezogen - derselbe Weg wie beim
+            // Alleingang.
             val auswahl = selectionHolder.take()
-            val result = if (auswahl.isNotEmpty()) startSession(auswahl) else startSession(filter)
+            val eigene = auswahl.ifEmpty { eigenenVorschlagZiehen() }
+            if (eigene.isEmpty()) {
+                fail(PairingError.NO_RECIPES)
+                return@launch
+            }
 
-            when (result) {
+            when (val result = startSession(eigene)) {
                 is PairingResult.Success -> {
                     applySession(result.value, isHost = true)
                     _uiState.update { it.copy(step = MultiplayerStep.WARTET_AUF_PERSON) }
@@ -142,7 +177,8 @@ class MultiplayerViewModel @Inject constructor(
         _uiState.update { it.copy(isBusy = true, error = null) }
 
         viewModelScope.launch {
-            when (val result = joinSession(code)) {
+            val eigene = eigenenVorschlagZiehen()
+            when (val result = joinSession(code, eigene)) {
                 is PairingResult.Success -> {
                     applySession(result.value, isHost = false)
                     _uiState.update { it.copy(step = MultiplayerStep.WISCHEN) }
@@ -151,6 +187,27 @@ class MultiplayerViewModel @Inject constructor(
 
                 is PairingResult.Failure -> fail(result.error)
             }
+        }
+    }
+
+    /**
+     * Zieht einen eigenen Vorschlag aus dem Verzeichnis - genau wie der Wischstapel im
+     * Alleingang, nur ohne Karten ohne Bild: Fuer die gemeinsame Runde gibt es kein
+     * Nachladen im Hintergrund, also muss das Bild schon da sein.
+     */
+    private suspend fun eigenenVorschlagZiehen(): List<SharedRecipe> {
+        val ziel = CuratedDeckBuilder.deckSizeFor(_uiState.value.target)
+        val gezogen = buildDeck(size = ziel * ZIEHUNGS_PUFFER)
+            .filter { it.imageUrl != null }
+            .take(ziel)
+
+        return gezogen.map { eintrag ->
+            SharedRecipe(
+                recipeId = eintrag.url.hashCode().toLong(),
+                title = eintrag.title,
+                sourceUrl = eintrag.url,
+                imageUrl = eintrag.imageUrl,
+            )
         }
     }
 
@@ -186,7 +243,7 @@ class MultiplayerViewModel @Inject constructor(
             viewModelScope.launch { closeSession(state.code) }
         }
         votes.clear()
-        _uiState.value = MultiplayerUiState()
+        _uiState.value = initialState()
     }
 
     /**
@@ -257,9 +314,19 @@ class MultiplayerViewModel @Inject constructor(
 
     private fun applyState(state: SharedSessionState) {
         _uiState.update { current ->
+            // Der Topf darf nur wachsen, waehrend noch niemand wischt - sonst
+            // verschoebe sich, welche Karte hinter welcher Zahl an entschiedenen
+            // Karten steckt, mitten in der Runde.
+            val topf = if (current.step == MultiplayerStep.WARTET_AUF_PERSON && state.pool.isNotEmpty()) {
+                state.pool
+            } else {
+                current.pool
+            }
+
             current.copy(
                 participants = state.participants,
                 matches = state.matches,
+                pool = topf,
                 step = when {
                     state.allFinished -> MultiplayerStep.TREFFER
                     // Sobald jemand beigetreten ist, darf der Gastgeber loswischen.
@@ -283,5 +350,12 @@ class MultiplayerViewModel @Inject constructor(
 
     private companion object {
         const val MAX_CODE_LENGTH = 8
+
+        /**
+         * Es wird mehr gezogen als gebraucht, weil Karten ohne Bild aussortiert
+         * werden - anders als im Alleingang gibt es hier kein Nachladen im
+         * Hintergrund, das eine fehlende Karte spaeter ersetzen wuerde.
+         */
+        const val ZIEHUNGS_PUFFER = 2
     }
 }
