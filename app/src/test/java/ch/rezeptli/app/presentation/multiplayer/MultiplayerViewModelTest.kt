@@ -4,6 +4,7 @@ import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
+import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.JoinSharedSessionUseCase
@@ -62,13 +63,49 @@ class MultiplayerViewModelTest {
         }
     }
 
+    /** Ohne vorbereitete Auswahl - die Runde kommt hier aus der eigenen Sammlung. */
+    private val selectionHolder = SharedSelectionHolder()
+
     private fun createViewModel() = MultiplayerViewModel(
         startSession = StartSharedSessionUseCase(pairing, recipeRepository),
+        selectionHolder = selectionHolder,
         joinSession = JoinSharedSessionUseCase(pairing),
         sendVotes = SendSharedVotesUseCase(pairing),
         closeSession = CloseSharedSessionUseCase(pairing),
         observeSession = ObserveSharedSessionUseCase(pairing),
     )
+
+    @Test
+    fun `eine vorbereitete Auswahl geht vor der eigenen Sammlung`() = runTest {
+        // So kommt der Party-Modus aus einer Wischrunde: geteilt wird, was dort gefiel.
+        val ausDerRunde = listOf(
+            SharedRecipe(recipeId = 99L, title = "Wähe aus dem Stapel"),
+            SharedRecipe(recipeId = 98L, title = "Polenta aus dem Stapel"),
+        )
+        selectionHolder.set(ausDerRunde)
+
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
+
+            assertEquals(
+                ausDerRunde.map { it.title },
+                pairing.createdSession?.recipes?.map { it.title },
+            )
+        }
+    }
+
+    @Test
+    fun `die Auswahl gilt nur fuer eine Runde`() = runTest {
+        selectionHolder.set(listOf(SharedRecipe(recipeId = 99L, title = "Einmalig")))
+
+        mitViewModel { viewModel -> viewModel.onHost(RecipeFilter.NONE) }
+        mitViewModel { viewModel ->
+            viewModel.onHost(RecipeFilter.NONE)
+
+            // Zweite Runde ohne neue Auswahl: wieder aus der eigenen Sammlung.
+            assertEquals(rezepte.size, pairing.createdSession?.recipes?.size)
+        }
+    }
 
     @Test
     fun `eroeffnen liefert einen Code und wartet auf die andere Person`() = runTest {
