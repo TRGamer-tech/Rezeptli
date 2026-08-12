@@ -53,7 +53,9 @@ class PairingRepositoryImpl @Inject constructor(
         if (recipes.isEmpty()) return PairingResult.Failure(PairingError.NO_RECIPES)
 
         val body = PairingApi.createBody(participantId(), recipes)
-        return post("$BASE_URL/sitzung", body) { PairingApi.sessionFrom(it) }
+        // Der Dienst bestaetigt beim Eroeffnen nur die Anzahl. Die Rezepte selbst
+        // stehen schon hier - sie muessen nicht zurueckkommen.
+        return post("$BASE_URL/sitzung", body) { PairingApi.sessionFrom(it, fallback = recipes) }
     }
 
     override suspend fun joinSession(code: String): PairingResult<SharedSession> {

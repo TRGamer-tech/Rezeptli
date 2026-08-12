@@ -60,6 +60,7 @@ import ch.rezeptli.app.presentation.swipe.SwipeCardStack
 fun MultiplayerRoute(
     filter: RecipeFilter,
     onBack: () -> Unit,
+    onFindRecipes: () -> Unit,
     viewModel: MultiplayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -76,6 +77,7 @@ fun MultiplayerRoute(
         onStartSwiping = viewModel::onStartSwiping,
         onSwiped = viewModel::onSwiped,
         onDismissError = viewModel::onDismissError,
+        onFindRecipes = onFindRecipes,
     )
 }
 
@@ -90,6 +92,7 @@ fun MultiplayerScreen(
     onStartSwiping: () -> Unit,
     onSwiped: (Long, Boolean) -> Unit,
     onDismissError: () -> Unit,
+    onFindRecipes: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -114,7 +117,11 @@ fun MultiplayerScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             uiState.error?.let { error ->
-                ErrorNote(error = error, onDismiss = onDismissError)
+                if (error == PairingError.NO_RECIPES) {
+                    EmptyCollectionNote(onFindRecipes = onFindRecipes, onDismiss = onDismissError)
+                } else {
+                    ErrorNote(error = error, onDismiss = onDismissError)
+                }
             }
 
             when (uiState.step) {
@@ -349,6 +356,37 @@ private fun ErrorNote(error: PairingError, onDismiss: () -> Unit) {
         )
         TextButton(onClick = onDismiss) {
             Text(stringResource(R.string.action_ok))
+        }
+    }
+}
+
+/**
+ * Eine leere Sammlung ist kein Fehler, sondern ein fehlender Schritt.
+ *
+ * Zum gemeinsamen Wischen braucht es Rezepte, und die kommen aus der Suche. Frueher
+ * stand hier nur eine rote Zeile - wer die App neu hatte, sah beim Einladen also
+ * bloss eine Fehlermeldung und keinen Weg weiter.
+ */
+@Composable
+private fun EmptyCollectionNote(onFindRecipes: () -> Unit, onDismiss: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(Tokens.Radius.MdShape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.mehrspieler_fehler_keine_rezepte),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onFindRecipes, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.mehrspieler_rezepte_suchen))
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.action_ok))
+            }
         }
     }
 }

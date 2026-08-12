@@ -177,6 +177,7 @@ fun RezeptliNavHost(
             MultiplayerRoute(
                 filter = filter,
                 onBack = { navController.popBackStack() },
+                onFindRecipes = { navController.navigate(Destinations.WEB_SEARCH) },
             )
         }
 
