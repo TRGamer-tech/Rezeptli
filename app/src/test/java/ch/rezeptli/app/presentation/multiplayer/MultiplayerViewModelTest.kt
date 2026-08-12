@@ -6,13 +6,20 @@ import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
+import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
+import ch.rezeptli.app.domain.steps.InstructionSplitter
+import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.JoinSharedSessionUseCase
+import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ObserveSharedSessionUseCase
+import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SendSharedVotesUseCase
 import ch.rezeptli.app.domain.usecase.StartSharedSessionUseCase
 import ch.rezeptli.app.fake.FakePairingRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
+import ch.rezeptli.app.fake.FakeShoppingListRepository
+import ch.rezeptli.app.fake.FakeWebRecipeRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -66,9 +73,18 @@ class MultiplayerViewModelTest {
     /** Ohne vorbereitete Auswahl - die Runde kommt hier aus der eigenen Sammlung. */
     private val selectionHolder = SharedSelectionHolder()
 
+    private val shoppingRepository = FakeShoppingListRepository()
+
     private fun createViewModel() = MultiplayerViewModel(
         startSession = StartSharedSessionUseCase(pairing, recipeRepository),
         selectionHolder = selectionHolder,
+        loadWebRecipe = LoadWebRecipeUseCase(FakeWebRecipeRepository()),
+        saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
+        addToShoppingList = AddRecipesToShoppingListUseCase(
+            recipeRepository,
+            shoppingRepository,
+            ShoppingListAggregator(),
+        ),
         joinSession = JoinSharedSessionUseCase(pairing),
         sendVotes = SendSharedVotesUseCase(pairing),
         closeSession = CloseSharedSessionUseCase(pairing),

@@ -11,11 +11,16 @@ import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSession
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
+import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.JoinSharedSessionUseCase
+import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ObserveSharedSessionUseCase
+import ch.rezeptli.app.domain.usecase.SaveRecipeResult
+import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SendSharedVotesUseCase
 import ch.rezeptli.app.domain.usecase.StartSharedSessionUseCase
+import ch.rezeptli.app.domain.usecase.WebImportOutcome
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +61,12 @@ data class MultiplayerUiState(
     val decidedCount: Int = 0,
     val participants: Int = 0,
     val matches: List<SharedRecipe> = emptyList(),
+    /** Laeuft gerade das Uebernehmen der Treffer? */
+    val isKeeping: Boolean = false,
+    /** Wie viele Treffer schon in der Sammlung sind. */
+    val keptRecipes: Int = 0,
+    /** Wie viele Zutaten dabei auf der Einkaufsliste gelandet sind, sobald fertig. */
+    val addedItems: Int? = null,
 ) {
     /** Die noch nicht bewerteten Rezepte, als Karten fuer den bestehenden Stapel. */
     val remainingCards: List<RecipeSummary>
@@ -84,6 +95,9 @@ data class MultiplayerUiState(
 class MultiplayerViewModel @Inject constructor(
     private val startSession: StartSharedSessionUseCase,
     private val selectionHolder: SharedSelectionHolder,
+    private val loadWebRecipe: LoadWebRecipeUseCase,
+    private val saveRecipe: SaveRecipeUseCase,
+    private val addToShoppingList: AddRecipesToShoppingListUseCase,
     private val joinSession: JoinSharedSessionUseCase,
     private val sendVotes: SendSharedVotesUseCase,
     private val closeSession: CloseSharedSessionUseCase,
@@ -173,6 +187,47 @@ class MultiplayerViewModel @Inject constructor(
         }
         votes.clear()
         _uiState.value = MultiplayerUiState()
+    }
+
+    /**
+     * Uebernimmt die gemeinsamen Treffer: in die Sammlung und auf die Einkaufsliste.
+     *
+     * Bis hierhin waren die Treffer nur Titel auf einem Bildschirm - wer danach
+     * einkaufen wollte, musste jedes Rezept von Hand suchen. Rezepte aus einem
+     * Wischstapel werden dafuer jetzt geholt und gespeichert; Rezepte aus der eigenen
+     * Sammlung sind schon da und wandern direkt auf die Liste.
+     */
+    fun onKeepMatches() {
+        val treffer = _uiState.value.matches
+        if (treffer.isEmpty() || _uiState.value.isKeeping) return
+
+        _uiState.update { it.copy(isKeeping = true, keptRecipes = 0, addedItems = null) }
+
+        viewModelScope.launch {
+            val kennungen = mutableListOf<Long>()
+
+            treffer.forEach { rezept ->
+                val quelle = rezept.sourceUrl
+                if (quelle.isNullOrBlank()) {
+                    // Stammt aus der eigenen Sammlung - schon gespeichert.
+                    kennungen += rezept.recipeId
+                } else {
+                    when (val geladen = loadWebRecipe(quelle)) {
+                        is WebImportOutcome.Loaded ->
+                            when (val gespeichert = saveRecipe(geladen.recipe)) {
+                                is SaveRecipeResult.Saved -> kennungen += gespeichert.recipeId
+                                else -> Unit
+                            }
+
+                        is WebImportOutcome.Failed -> Unit
+                    }
+                }
+                _uiState.update { it.copy(keptRecipes = kennungen.size) }
+            }
+
+            val zutaten = if (kennungen.isEmpty()) 0 else addToShoppingList(kennungen)
+            _uiState.update { it.copy(isKeeping = false, addedItems = zutaten) }
+        }
     }
 
     fun onDismissError() {
