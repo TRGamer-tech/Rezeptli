@@ -16,6 +16,7 @@ on:
           - quellen-pruefen
           - fehler-pruefen
           - bilder-pruefen
+          - quellen-nachpruefen
       marke:
         description: 'Marke der Vorabversion, z. B. v1.0.0-beta.1 (leer = aus Versionsnummer und Laufnummer)'
         type: string
@@ -282,6 +283,33 @@ jobs:
           {
             echo "### APK bereit"
             echo "https://github.com/$REPO/releases/download/$TAG/$APK"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  quellen-nachpruefen:
+    name: Quellen bis zum Rezept prüfen
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'quellen-nachpruefen'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prüfen
+        run: |
+          set -o pipefail
+          python3 tools/quellen-nachpruefen.py 2>&1 | tee /tmp/nachpruefung.txt
+        continue-on-error: true
+
+      - name: Bericht anhängen
+        if: always()
+        run: |
+          {
+            echo '## Quellen bis zum Rezept'
+            echo
+            echo '```'
+            cat /tmp/nachpruefung.txt
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
   vorabversion:
