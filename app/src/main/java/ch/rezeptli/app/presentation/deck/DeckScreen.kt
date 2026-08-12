@@ -79,7 +79,7 @@ fun DeckRoute(
 @Composable
 fun DeckScreen(
     uiState: DeckUiState,
-    onTargetChange: (Int) -> Unit,
+    onTargetChange: (Int?) -> Unit,
     onStart: () -> Unit,
     onSwiped: (DeckEntry, Boolean) -> Unit,
     onFinishEarly: () -> Unit,
@@ -94,7 +94,7 @@ fun DeckScreen(
             RezeptliTopBar(
                 title = stringResource(R.string.stapel_titel),
                 actions = {
-                    if (uiState.step == DeckStep.WISCHEN) {
+                    if (uiState.step == DeckStep.WISCHEN && uiState.target != null) {
                         TextButton(onClick = onFinishEarly) {
                             Text(stringResource(R.string.stapel_genug))
                         }
@@ -122,7 +122,11 @@ fun DeckScreen(
                     CircularProgressIndicator()
                 }
 
-                DeckStep.WISCHEN -> SwipingStep(uiState = uiState, onSwiped = onSwiped)
+                DeckStep.WISCHEN -> SwipingStep(
+                    uiState = uiState,
+                    onSwiped = onSwiped,
+                    onFinishEarly = onFinishEarly,
+                )
 
                 DeckStep.FERTIG -> ResultStep(
                     uiState = uiState,
@@ -140,7 +144,7 @@ fun DeckScreen(
 @Composable
 private fun TargetStep(
     uiState: DeckUiState,
-    onTargetChange: (Int) -> Unit,
+    onTargetChange: (Int?) -> Unit,
     onStart: () -> Unit,
 ) {
     Column(
@@ -167,6 +171,12 @@ private fun TargetStep(
                         modifier = Modifier.heightIn(min = 48.dp),
                     )
                 }
+                FilterChip(
+                    selected = uiState.target == null,
+                    onClick = { onTargetChange(null) },
+                    label = { Text(stringResource(R.string.stapel_endlos)) },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                )
             }
         }
 
@@ -190,7 +200,11 @@ private fun TargetStep(
 }
 
 @Composable
-private fun SwipingStep(uiState: DeckUiState, onSwiped: (DeckEntry, Boolean) -> Unit) {
+private fun SwipingStep(
+    uiState: DeckUiState,
+    onSwiped: (DeckEntry, Boolean) -> Unit,
+    onFinishEarly: () -> Unit,
+) {
     Column(modifier = Modifier.fillMaxSize()) {
         DeckProgress(uiState = uiState)
 
@@ -211,6 +225,20 @@ private fun SwipingStep(uiState: DeckUiState, onSwiped: (DeckEntry, Boolean) -> 
                     .weight(1f),
             )
         }
+
+        // Ohne Ziel gibt es keine Zahl, bei der die Runde von selbst endet - dafuer
+        // dieser eigene, gut sichtbare Knopf statt der kleinen Textschaltflaeche oben.
+        if (uiState.target == null) {
+            Button(
+                onClick = onFinishEarly,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.stapel_fertig))
+            }
+        }
     }
 }
 
@@ -223,15 +251,24 @@ private fun DeckProgress(uiState: DeckUiState) {
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            text = stringResource(R.string.stapel_fortschritt, uiState.foundCount, uiState.target),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        LinearProgressIndicator(
-            progress = { uiState.progress },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        val ziel = uiState.target
+        if (ziel != null) {
+            Text(
+                text = stringResource(R.string.stapel_fortschritt, uiState.foundCount, ziel),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LinearProgressIndicator(
+                progress = { uiState.progress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.stapel_fortschritt_endlos, uiState.foundCount),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

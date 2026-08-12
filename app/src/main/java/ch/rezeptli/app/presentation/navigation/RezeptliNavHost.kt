@@ -62,7 +62,7 @@ fun RezeptliNavHost(
             composable(Destinations.ONBOARDING) {
                 OnboardingRoute(
                     onFinished = {
-                        navController.navigate(Destinations.RECIPE_LIST) {
+                        navController.navigate(Destinations.DECK) {
                             // Das Onboarding soll nicht ueber "Zurueck" wiederkehren.
                             popUpTo(Destinations.ONBOARDING) { inclusive = true }
                         }

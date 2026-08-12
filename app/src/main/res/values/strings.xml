@@ -321,6 +321,9 @@
     <string name="stapel_losgehts">Losgehts</string>
     <string name="stapel_genug">Reicht mir</string>
     <string name="stapel_fortschritt">%1$d von %2$d gefunden</string>
+    <string name="stapel_fortschritt_endlos">%1$d gefunden</string>
+    <string name="stapel_endlos">Ohne Ziel</string>
+    <string name="stapel_fertig">Fertig</string>
     <string name="stapel_kein_vorrat">Das Rezeptverzeichnis ist gerade nicht erreichbar. Ohne Internet geht das Wischen leider nicht.</string>
     <string name="stapel_nichts_titel">Nichts dabei</string>
     <string name="stapel_nichts_text">Diesmal hat dich nichts angelacht. Eine neue Runde bringt andere Rezepte.</string>
