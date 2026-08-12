@@ -65,4 +65,14 @@ class FakeWebRecipeRepository(
         val recipe = recipeByUrl[url] ?: return WebRecipeResult.Failed(WebImportError.NO_RECIPE_FOUND)
         return WebRecipeResult.Loaded(recipe)
     }
+
+    /** Was cardImage() liefert - je Adresse, oder ueberhaupt, oder gar nichts. */
+    var cardImagesByUrl: Map<String, String> = emptyMap()
+    var cardImageCalls: MutableList<String> = mutableListOf()
+        private set
+
+    override suspend fun cardImage(url: String): String? {
+        cardImageCalls += url
+        return cardImagesByUrl[url]
+    }
 }
