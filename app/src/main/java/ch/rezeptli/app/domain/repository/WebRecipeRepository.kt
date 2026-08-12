@@ -1,7 +1,9 @@
 package ch.rezeptli.app.domain.repository
 
+import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.model.WebSearchResult
+import ch.rezeptli.app.domain.ranking.SourceOrigin
 import kotlinx.coroutines.flow.Flow
 
 /** Warum ein Import nicht geklappt hat - in Kategorien, die die UI erklaeren kann. */
@@ -46,6 +48,19 @@ data class WebSearchUpdate(
     val hasResults: Boolean get() = results.isNotEmpty()
 }
 
+/**
+ * Der Vorrat, aus dem ein Wischstapel gezogen wird.
+ *
+ * Herkunft und Eintraege kommen zusammen heraus, weil der Stapel beides braucht: die
+ * Eintraege zum Ziehen, die Herkunft zum Mischen nach Land und Sprachraum.
+ */
+data class DeckPool(
+    val entriesBySource: Map<String, List<DeckEntry>> = emptyMap(),
+    val origins: Map<String, SourceOrigin> = emptyMap(),
+) {
+    val isEmpty: Boolean get() = entriesBySource.values.all { it.isEmpty() }
+}
+
 /** Zugriff auf Rezepte im Web. */
 interface WebRecipeRepository {
     /**
@@ -65,4 +80,12 @@ interface WebRecipeRepository {
      * beim ersten Treffer geholt - mitten in der Anfrage der Nutzerin.
      */
     suspend fun warmUp(sourceIds: Set<String>)
+
+    /**
+     * Die Verzeichnisse aller durchsuchbaren Quellen, als Vorrat fuer den Wischstapel.
+     *
+     * Kommt aus demselben taeglich gebauten Verzeichnis wie die Suche. Es steht damit
+     * schon nach einem Abruf bereit - der Stapel wartet nicht auf die Rezeptseiten.
+     */
+    suspend fun deckPool(): DeckPool
 }

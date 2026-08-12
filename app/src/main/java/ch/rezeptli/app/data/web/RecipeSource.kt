@@ -90,21 +90,6 @@ object RecipeSourceCatalog {
     )
 
     /**
-     * Le Menu veroeffentlicht auf seinen Seiten keine Rezeptdaten - die Analyse fand
-     * dort nur `ItemList`, kein `Recipe`. Ein Import wuerde also immer scheitern,
-     * deshalb steht die Quelle nicht mehr zur Suche bereit. Der Eintrag bleibt, damit
-     * ein geteilter Link wenigstens der richtigen Quelle zugeordnet wird.
-     */
-    val LE_MENU = RecipeSource(
-        id = "lemenu",
-        country = Country.SCHWEIZ,
-        name = "Le Menu",
-        homeUrl = "https://lemenu.ch",
-        urlPattern = Regex("lemenu\\.ch/de/", RegexOption.IGNORE_CASE),
-        note = "keine Rezeptdaten auf der Seite",
-    )
-
-    /**
      * Fooby untersagt in der robots.txt das Abfragen der eigenen Suche und verlangt
      * 10 Sekunden Abstand zwischen Anfragen. Ein Verzeichnis mit Rezeptlinks liess sich
      * nicht finden, deshalb hier nur Import ueber einen konkreten Link.
@@ -204,7 +189,6 @@ object RecipeSourceCatalog {
         GUTEKUECHE,
         MIGUSTO,
         BETTYS_KUECHENSCHAETZE,
-        LE_MENU,
         FOOBY,
         CHEFKOCH,
         EINFACH_KOCHEN,

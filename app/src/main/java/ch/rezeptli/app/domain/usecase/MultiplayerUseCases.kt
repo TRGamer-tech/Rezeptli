@@ -25,6 +25,16 @@ class StartSharedSessionUseCase @Inject constructor(
     private val pairingRepository: PairingRepository,
     private val recipeRepository: RecipeRepository,
 ) {
+    /**
+     * Eroeffnet eine Runde ueber bereits ausgewaehlte Rezepte.
+     *
+     * So laesst sich direkt aus einer Wischrunde weitermachen: Geteilt wird, was gerade
+     * auf den Karten lag. Die Rezepte muessen dafuer nicht erst gespeichert werden -
+     * zum Abstimmen genuegen Titel, Bild und Zeit.
+     */
+    suspend operator fun invoke(recipes: List<SharedRecipe>): PairingResult<SharedSession> =
+        pairingRepository.createSession(recipes.take(MAX_GETEILTE))
+
     suspend operator fun invoke(filter: RecipeFilter): PairingResult<SharedSession> {
         val ids = recipeRepository.getFilteredRecipeIds(filter)
         val summaries = recipeRepository.getSummaries(ids)

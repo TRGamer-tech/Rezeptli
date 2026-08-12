@@ -7,7 +7,9 @@ import ch.rezeptli.app.data.web.WebFetchError
 import ch.rezeptli.app.data.web.WebFetchException
 import ch.rezeptli.app.data.web.WebRecipeSearcher
 import ch.rezeptli.app.di.IoDispatcher
+import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.model.WebSearchResult
+import ch.rezeptli.app.domain.repository.DeckPool
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
@@ -16,6 +18,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -82,6 +85,45 @@ class WebRecipeRepositoryImpl @Inject constructor(
                     }
                 }
         }
+    }
+
+    /**
+     * Holt die Verzeichnisse aller durchsuchbaren Quellen fuer den Wischstapel.
+     *
+     * Die Quellen werden gleichzeitig gefragt, und eine ausgefallene Quelle laesst die
+     * anderen stehen: Ein Stapel aus zehn Quellen statt elf faellt niemandem auf, ein
+     * leerer Bildschirm schon.
+     */
+    override suspend fun deckPool(): DeckPool = coroutineScope {
+        val sources = RecipeSourceCatalog.SEARCHABLE
+        val mutex = Mutex()
+        val eintraege = mutableMapOf<String, List<DeckEntry>>()
+
+        val auftraege = sources.map { source ->
+            launch(ioDispatcher) {
+                val gefunden = runCatching { searcher.index(source) }
+                    .getOrDefault(emptyList())
+                if (gefunden.isEmpty()) return@launch
+
+                val umgewandelt = gefunden.map { eintrag ->
+                    DeckEntry(
+                        url = eintrag.url,
+                        title = eintrag.title,
+                        imageUrl = eintrag.imageUrl,
+                        sourceId = source.id,
+                        sourceName = source.name,
+                    )
+                }
+                mutex.withLock { eintraege[source.id] = umgewandelt }
+            }
+        }
+
+        auftraege.joinAll()
+
+        DeckPool(
+            entriesBySource = eintraege.toMap(),
+            origins = sources.associate { it.id to it.origin },
+        )
     }
 
     override suspend fun loadRecipe(url: String): WebRecipeResult {

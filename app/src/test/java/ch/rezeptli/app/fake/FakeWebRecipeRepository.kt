@@ -2,6 +2,7 @@ package ch.rezeptli.app.fake
 
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.model.WebSearchResult
+import ch.rezeptli.app.domain.repository.DeckPool
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
@@ -15,7 +16,17 @@ class FakeWebRecipeRepository(
     private val results: List<WebSearchResult> = emptyList(),
     private var recipeByUrl: Map<String, WebRecipe> = emptyMap(),
     private var error: WebImportError? = null,
+    private val pool: DeckPool = DeckPool(),
 ) : WebRecipeRepository {
+    /** Wie oft der Vorrat geholt wurde - der Stapel soll ihn nicht doppelt anfragen. */
+    var deckPoolCalls: Int = 0
+        private set
+
+    override suspend fun deckPool(): DeckPool {
+        deckPoolCalls += 1
+        return pool
+    }
+
     var lastQuery: String? = null
         private set
     var lastSourceIds: Set<String> = emptySet()
