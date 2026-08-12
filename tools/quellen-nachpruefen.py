@@ -33,6 +33,7 @@ QUELLEN = [
     ("cookaround", "https://www.cookaround.com/sitemap/ricette.xml", r"cookaround\.com/ricetta/"),
     ("swissmilk", "https://www.swissmilk.ch/de/sitemap.xml", r"swissmilk\.ch/de/rezepte-kochideen/rezepte/"),
     ("bettybossi", "https://www.bettybossi.ch/sitemap.xml", r"bettybossi\.ch/de/Rezept/"),
+    ("migusto", "https://migusto.migros.ch/.rest/sitemap/migusto/de.xml", r"migusto\.migros\.ch/de/rezepte/"),
 ]
 
 
@@ -108,13 +109,24 @@ def rezept_aus(html: str) -> dict | None:
 def pruefe(kennung: str, sitemap: str, muster: str) -> None:
     print(f"\n{'=' * 62}\n{kennung}\n{'=' * 62}")
     try:
-        adresse = erste_adresse(sitemap, muster)
+        roh = hole(sitemap).decode("utf-8", "replace")
     except Exception as fehler:
         print(f"  Sitemap nicht erreichbar: {str(fehler)[:70]}")
         return
 
+    print(f"  Sitemap: {len(roh) // 1024} KB, {len(LOC.findall(roh))} <loc> auf oberster Ebene")
+    if "<sitemapindex" in roh.lower():
+        print("  Ist ein Sitemap-Index, keine Rezeptliste")
+
+    try:
+        adresse = erste_adresse(sitemap, muster)
+    except Exception as fehler:
+        print(f"  beim Verfolgen des Index: {str(fehler)[:70]}")
+        return
+
     if adresse is None:
-        print("  Keine passende Rezeptadresse im Verzeichnis gefunden")
+        print(f"  Keine Adresse passt auf das Muster - Anfang der Sitemap:")
+        print(f"    {roh[:300]!r}")
         return
 
     print(f"  Beispielrezept: {adresse}")
