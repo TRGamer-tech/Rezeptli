@@ -32,7 +32,7 @@ weggetragen. Für die Frage "was koche ich heute" ist das zu viel Apparat.
 
 Der statische Index bringt den entscheidenden Teil des Nutzens zum Preis von null Betrieb:
 Die Anbieter werden einmal täglich für alle zusammen abgefragt statt einmal pro
-Installation, und die erste Suche ist sofort da.
+Installation, und die erste Karte ist sofort da.
 
 ## Warum der Pairing-Dienst trotzdem echt sein muss
 
@@ -55,3 +55,25 @@ Netz.
 Beim gemeinsamen Wischen verlassen Rezepttitel das Gerät. Das ist die einzige Stelle,
 an der eigene Inhalte weggehen, und sie steht im README, im Pairing-README und vor dem
 Start im Bildschirm selbst.
+
+## Nachtrag: Wischen zuerst, und warum der Index eine zweite Datei bekam
+
+Die App begann zunächst in der eigenen Sammlung - bei einer neuen Installation also im
+Leeren, mit der Suche als einzigem Ausweg. Das stand quer zum eigentlichen Zweck der
+App: Sie beantwortet "was koche ich heute", und darauf ist Wischen die Antwort, nicht
+Suchen. Die App startet deshalb auf dem Wischstapel; eine untere Leiste hält Suche,
+eigene Rezepte und Einkaufsliste einen Griff entfernt.
+
+Der Stapel zieht aus dem Verzeichnis der Web-Quellen. Das brachte die App an genau die
+Stelle zurück, die dieses ADR eigentlich löste: Vor der ersten Karte lud sie die
+Verzeichnisse aller Quellen - über 300'000 Adressen, zweistellige Megabytes -, weil der
+Index als Ganzes für die Suche gedacht war, nicht für einen Stapel von ein paar Dutzend
+Karten. Der tägliche Auftrag schreibt seither zusätzlich eine kleine Stapeldatei
+(`stapel.tsv.gz`): einige hundert Rezepte je Quelle, mit Vorrang für Einträge, die schon
+ein Bild nennen. Die App lädt diese eine kleine Datei statt der vollständigen
+Verzeichnisse, und der Rückfall auf den langen Weg bleibt bestehen, falls sie fehlt.
+
+Eine Wischkarte ohne Foto ist nur eine leere Fläche mit Titel. Karten, deren Quelle im
+Verzeichnis kein Bild nennt, holen es deshalb im Hintergrund von der Rezeptseite nach
+und bleiben bis dahin unsichtbar; lässt sich gar keins finden, fällt die Karte aus dem
+Stapel, statt für immer als Lücke liegen zu bleiben.

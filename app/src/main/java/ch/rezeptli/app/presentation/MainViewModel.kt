@@ -22,7 +22,8 @@ sealed interface StartState {
 
     data object Onboarding : StartState
 
-    data object Rezepte : StartState
+    /** Onboarding ist erledigt - es geht auf den Wischstapel, den Startbildschirm. */
+    data object Bereit : StartState
 }
 
 @HiltViewModel
@@ -30,7 +31,7 @@ class MainViewModel @Inject constructor(
     profileRepository: UserProfileRepository,
 ) : ViewModel() {
     val startState: StateFlow<StartState> = profileRepository.profile
-        .map { if (it.onboardingCompleted) StartState.Rezepte else StartState.Onboarding }
+        .map { if (it.onboardingCompleted) StartState.Bereit else StartState.Onboarding }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
