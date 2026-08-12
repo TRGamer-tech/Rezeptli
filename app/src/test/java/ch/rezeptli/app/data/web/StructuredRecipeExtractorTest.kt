@@ -239,6 +239,39 @@ class StructuredRecipeExtractorTest {
         }
     }
 
+    @Test
+    fun `nimmt bei Microdata den Rezeptnamen und nicht den erstbesten Namen`() {
+        // So sieht ichkoche.at aus: kein JSON-LD, dafuer Microdata - und vor dem
+        // Rezept stehen Brotkrumen und der Seitenbetreiber, beide mit itemprop=name.
+        val seite = page(
+            body = """
+            <div itemscope itemtype="https://schema.org/Organization">
+              <span itemprop="name">ichkoche.at</span>
+            </div>
+            <div itemscope itemtype="https://schema.org/Recipe">
+              <h1 itemprop="name">Fleischbällchen mit Tomatensauce</h1>
+              <span itemprop="recipeIngredient">500 g Faschiertes</span>
+              <span itemprop="recipeIngredient">1 Dose Tomaten</span>
+              <div itemprop="recipeInstructions">
+                <ol>
+                  <li>Faschiertes anbraten.</li>
+                  <li>Tomaten dazugeben und köcheln lassen.</li>
+                </ol>
+              </div>
+            </div>
+            """.trimIndent(),
+        )
+
+        val recipe = extractor.extract(seite, "https://www.ichkoche.at/x-rezept-1", "Ichkoche")
+
+        assertNotNull(recipe)
+        assertEquals("Fleischbällchen mit Tomatensauce", recipe?.title)
+        assertEquals(2, recipe?.ingredientLines?.size)
+        // Die Anleitung ist eine Liste - also zwei Schritte, nicht ein langer Block.
+        assertEquals(2, recipe?.instructionSteps?.size)
+        assertEquals("Faschiertes anbraten.", recipe?.instructionSteps?.first())
+    }
+
     @Nested
     @DisplayName("Bildadressen")
     inner class Bildadressen {

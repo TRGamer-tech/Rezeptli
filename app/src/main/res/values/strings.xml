@@ -343,4 +343,10 @@
     <string name="tab_suchen">Suchen</string>
     <string name="tab_rezepte">Rezepte</string>
     <string name="tab_einkauf">Einkauf</string>
+    <string name="mehrspieler_uebernehmen">Übernehmen und einkaufen</string>
+    <string name="mehrspieler_uebernehmen_laeuft">Wird geholt … %1$d von %2$d</string>
+    <plurals name="mehrspieler_uebernommen">
+        <item quantity="one">Gespeichert, eine Zutat steht auf der Einkaufsliste.</item>
+        <item quantity="other">Gespeichert, %d Zutaten stehen auf der Einkaufsliste.</item>
+    </plurals>
 </resources>

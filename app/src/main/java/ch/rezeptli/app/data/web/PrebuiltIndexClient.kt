@@ -59,6 +59,45 @@ class PrebuiltIndexClient @Inject constructor(
         }
     }
 
+    override suspend fun deckSample(): List<SampleEntry>? = withContext(ioDispatcher) {
+        lade("stapel.tsv.gz") { spalten ->
+            val quelle = spalten.getOrNull(3)?.takeIf { it.isNotBlank() } ?: return@lade null
+            SampleEntry(
+                url = spalten[0],
+                title = spalten[1],
+                imageUrl = spalten.getOrNull(2)?.takeIf { it.isNotBlank() },
+                sourceId = quelle,
+            )
+        }
+    }
+
+    /** Holt eine Datei des Verzeichnisses und liest sie Zeile fuer Zeile. */
+    private fun <T> lade(datei: String, zeileLesen: (List<String>) -> T?): List<T>? {
+        val request = Request
+            .Builder()
+            .url("$BASE_URL/$datei")
+            .header("Accept-Encoding", "identity")
+            .build()
+
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body ?: return null
+
+                GZIPInputStream(body.byteStream()).bufferedReader().useLines { lines ->
+                    lines
+                        .mapNotNull { line ->
+                            val spalten = line.split('\t')
+                            if (spalten.size < 2 || spalten[0].isBlank()) null else zeileLesen(spalten)
+                        }.toList()
+                        .takeIf { it.isNotEmpty() }
+                }
+            }
+        } catch (exception: IOException) {
+            null
+        }
+    }
+
     private companion object {
         val BASE_URL = BuildConfig.INDEX_URL.trimEnd('/')
     }

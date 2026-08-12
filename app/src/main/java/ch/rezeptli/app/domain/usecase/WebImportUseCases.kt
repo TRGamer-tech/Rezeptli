@@ -11,11 +11,15 @@ import ch.rezeptli.app.domain.repository.WebRecipeResult
 import ch.rezeptli.app.domain.repository.WebSearchUpdate
 import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.domain.steps.RecipeStep
+import ch.rezeptli.app.domain.translate.RecipeTranslator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 import javax.inject.Inject
+
+private const val DEUTSCH = "de"
 
 class SearchWebRecipesUseCase @Inject constructor(
     private val repository: WebRecipeRepository,
@@ -60,12 +64,49 @@ class LoadWebRecipeUseCase @Inject constructor(
     private val repository: WebRecipeRepository,
     private val ingredientParser: IngredientTextParser,
     private val splitter: InstructionSplitter,
+    private val translator: RecipeTranslator,
 ) {
     suspend operator fun invoke(url: String): WebImportOutcome =
         when (val result = repository.loadRecipe(url.trim())) {
             is WebRecipeResult.Failed -> WebImportOutcome.Failed(result.error)
-            is WebRecipeResult.Loaded -> WebImportOutcome.Loaded(result.recipe.toRecipe())
+            is WebRecipeResult.Loaded -> WebImportOutcome.Loaded(
+                uebersetzeWennNoetig(result.recipe).toRecipe(),
+            )
         }
+
+    /**
+     * Uebersetzt ein fremdsprachiges Rezept, wenn das Geraet auf Deutsch steht.
+     *
+     * Titel, Zutaten und Schritte gehen in einem Rutsch durch die Uebersetzung und
+     * kommen in derselben Reihenfolge zurueck - so bleibt zusammen, was zusammengehoert,
+     * und das Modell sieht genug Zusammenhang, um "Blanc d oeuf" nicht als
+     * "Weiss von Ei" auszugeben.
+     *
+     * Klappt es nicht, bleibt das Original stehen. Ein franzoesisches Rezept ist
+     * besser als gar keins.
+     */
+    private suspend fun uebersetzeWennNoetig(recipe: WebRecipe): WebRecipe {
+        val sprache = recipe.sourceLanguage ?: return recipe
+        if (Locale.getDefault().language != DEUTSCH) return recipe
+
+        val schritte = recipe.instructionSteps.ifEmpty {
+            recipe.instructions.split('\n').filter { it.isNotBlank() }
+        }
+        val stapel = listOf(recipe.title) + recipe.ingredientLines + schritte
+
+        val uebersetzt = translator.toGerman(stapel, sprache) ?: return recipe
+        if (uebersetzt.size != stapel.size) return recipe
+
+        val zutatenEnde = 1 + recipe.ingredientLines.size
+        val neueSchritte = uebersetzt.drop(zutatenEnde)
+
+        return recipe.copy(
+            title = uebersetzt.first(),
+            ingredientLines = uebersetzt.subList(1, zutatenEnde),
+            instructionSteps = neueSchritte,
+            instructions = neueSchritte.joinToString("\n"),
+        )
+    }
 
     private fun WebRecipe.toRecipe(): Recipe = Recipe(
         title = title,

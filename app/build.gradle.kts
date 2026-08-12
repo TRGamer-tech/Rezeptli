@@ -147,6 +147,11 @@ dependencies {
     // Web-Import: HTML lesen (jsoup) und die eingebetteten strukturierten Daten
     // auswerten (kotlinx-serialization, nur die Laufzeit ohne Codegen).
     implementation(libs.jsoup)
+
+    // Uebersetzt auf dem Geraet. Das Sprachmodell (rund 30 MB je Paar) holt die
+    // App beim ersten Bedarf ueber WLAN nach - im APK steckt es nicht.
+    implementation(libs.mlkit.translate)
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
 

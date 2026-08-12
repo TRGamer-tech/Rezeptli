@@ -35,9 +35,14 @@ private class FakeFetcher(private val responses: Map<String, String>) : PageFetc
  * Damit laufen die bestehenden Tests wie bisher ueber die Sitemaps - und ein Test
  * kann gezielt Eintraege setzen, um den schnellen Weg zu pruefen.
  */
-private class FakePrebuiltIndex(var entries: List<SitemapEntry>? = null) : PrebuiltIndex {
+private class FakePrebuiltIndex(
+    var entries: List<SitemapEntry>? = null,
+    private var sample: List<SampleEntry>? = null,
+) : PrebuiltIndex {
     var abgefragt = 0
         private set
+
+    override suspend fun deckSample(): List<SampleEntry>? = sample
 
     override suspend fun entriesFor(sourceId: String): List<SitemapEntry>? {
         abgefragt += 1

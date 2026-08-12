@@ -2,6 +2,7 @@ package ch.rezeptli.app.domain.model
 
 import ch.rezeptli.app.domain.profile.Country
 import ch.rezeptli.app.domain.ranking.SourceOrigin
+import ch.rezeptli.app.domain.translate.SourceLanguage
 
 /**
  * Ein Rezept, wie es von einer Website gelesen wurde - noch unverarbeitet.
@@ -27,6 +28,12 @@ data class WebRecipe(
     val keywords: List<String> = emptyList(),
     val sourceUrl: String,
     val sourceName: String,
+    /**
+     * Die Sprache der Quelle, sofern sie nicht Deutsch ist.
+     *
+     * Steht hier etwas, kann die App das Rezept beim Import uebersetzen.
+     */
+    val sourceLanguage: SourceLanguage? = null,
 ) {
     val isUsable: Boolean
         get() = title.isNotBlank() && (ingredientLines.isNotEmpty() || instructions.isNotBlank())

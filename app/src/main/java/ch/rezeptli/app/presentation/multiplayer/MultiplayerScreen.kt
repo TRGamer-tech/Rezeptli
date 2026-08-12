@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -75,6 +76,7 @@ fun MultiplayerRoute(
         onStartSwiping = viewModel::onStartSwiping,
         onSwiped = viewModel::onSwiped,
         onDismissError = viewModel::onDismissError,
+        onKeep = viewModel::onKeepMatches,
         onFindRecipes = onFindRecipes,
     )
 }
@@ -90,6 +92,7 @@ fun MultiplayerScreen(
     onStartSwiping: () -> Unit,
     onSwiped: (Long, Boolean) -> Unit,
     onDismissError: () -> Unit,
+    onKeep: () -> Unit = {},
     onFindRecipes: () -> Unit = {},
 ) {
     Scaffold(
@@ -135,7 +138,7 @@ fun MultiplayerScreen(
                     message = stringResource(R.string.mehrspieler_warten_text),
                 )
 
-                MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState)
+                MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, onKeep = onKeep)
             }
         }
     }
@@ -272,7 +275,7 @@ private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -
         )
         Box(modifier = Modifier.weight(1f)) {
             SwipeCardStack(
-                cards = uiState.remainingCards.take(VISIBLE_CARDS),
+                cards = uiState.remainingCards,
                 onSwiped = { card, liked -> onSwiped(card.id, liked) },
             )
         }
@@ -280,7 +283,7 @@ private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -
 }
 
 @Composable
-private fun MatchesStep(uiState: MultiplayerUiState) {
+private fun MatchesStep(uiState: MultiplayerUiState, onKeep: () -> Unit) {
     if (uiState.matches.isEmpty()) {
         WaitingNote(
             title = stringResource(R.string.mehrspieler_keine_treffer_titel),
@@ -294,7 +297,10 @@ private fun MatchesStep(uiState: MultiplayerUiState) {
             stringResource(R.string.mehrspieler_treffer_titel),
             style = MaterialTheme.typography.headlineSmall,
         )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f, fill = false),
+        ) {
             items(uiState.matches, key = { it.recipeId }) { match ->
                 Column(
                     modifier = Modifier
@@ -305,6 +311,37 @@ private fun MatchesStep(uiState: MultiplayerUiState) {
                     Text(match.title, style = MaterialTheme.typography.titleMedium)
                 }
             }
+        }
+
+        // Bis hierhin waren die Treffer nur Titel. Ein Griff bringt sie in die
+        // Sammlung und ihre Zutaten auf die Einkaufsliste.
+        val fertig = uiState.addedItems
+        if (fertig == null) {
+            Button(
+                onClick = onKeep,
+                enabled = !uiState.isKeeping,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(
+                    if (uiState.isKeeping) {
+                        stringResource(
+                            R.string.mehrspieler_uebernehmen_laeuft,
+                            uiState.keptRecipes,
+                            uiState.matches.size,
+                        )
+                    } else {
+                        stringResource(R.string.mehrspieler_uebernehmen)
+                    },
+                )
+            }
+        } else {
+            Text(
+                text = pluralStringResource(R.plurals.mehrspieler_uebernommen, fertig, fertig),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -390,6 +427,3 @@ private fun PairingError.messageRes(): Int = when (this) {
     PairingError.NO_RECIPES -> R.string.mehrspieler_fehler_keine_rezepte
     PairingError.UNKNOWN -> R.string.mehrspieler_fehler_unbekannt
 }
-
-/** Mehr Karten gleichzeitig zu zeichnen bringt nichts - man sieht nur die obersten. */
-private const val VISIBLE_CARDS = 3

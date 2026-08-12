@@ -8,6 +8,7 @@ import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.domain.usecase.SearchWebRecipesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,9 +58,31 @@ class WebSearchViewModel @Inject constructor(
     val uiState: StateFlow<WebSearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var tippJob: Job? = null
 
+    /**
+     * Sucht von selbst, sobald das Tippen kurz aussetzt.
+     *
+     * Nach jedem Zeichen zu suchen hiesse, bei "Risotto" siebenmal loszulaufen und
+     * sechs Ergebnisse gleich wieder wegzuwerfen. Eine kurze Pause reicht, um
+     * abzuwarten, ob noch etwas kommt - und ist kurz genug, dass es sich anfuehlt,
+     * als suche die App waehrend des Tippens.
+     */
     fun onQueryChange(query: String) {
         _uiState.update { it.copy(query = query) }
+
+        tippJob?.cancel()
+        if (query.isBlank()) {
+            // Ein geleertes Feld beendet auch eine laufende Suche.
+            searchJob?.cancel()
+            _uiState.update { it.copy(isSearching = false, results = emptyList(), hasSearched = false) }
+            return
+        }
+
+        tippJob = viewModelScope.launch {
+            delay(TIPP_PAUSE_MS)
+            onSearch()
+        }
     }
 
     fun onToggleSource(sourceId: String) {
@@ -87,7 +110,7 @@ class WebSearchViewModel @Inject constructor(
 
     fun onSearch() {
         val state = _uiState.value
-        if (!state.canSearch) return
+        if (state.query.isBlank() || state.selectedSourceIds.isEmpty()) return
 
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
@@ -113,5 +136,10 @@ class WebSearchViewModel @Inject constructor(
 
             _uiState.update { it.copy(isSearching = false) }
         }
+    }
+
+    private companion object {
+        /** So lange wartet die Suche auf das naechste Zeichen. */
+        const val TIPP_PAUSE_MS = 200L
     }
 }

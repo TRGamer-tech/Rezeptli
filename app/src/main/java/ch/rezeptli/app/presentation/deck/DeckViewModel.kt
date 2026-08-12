@@ -6,6 +6,7 @@ import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
+import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.usecase.BuildSwipeDeckUseCase
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
@@ -78,6 +79,7 @@ const val DEFAULT_TARGET = 3
 class DeckViewModel @Inject constructor(
     private val buildDeck: BuildSwipeDeckUseCase,
     private val selectionHolder: SharedSelectionHolder,
+    private val webRepository: WebRecipeRepository,
     private val loadWebRecipe: LoadWebRecipeUseCase,
     private val saveRecipe: SaveRecipeUseCase,
 ) : ViewModel() {
@@ -86,6 +88,9 @@ class DeckViewModel @Inject constructor(
 
     /** Schon gesehene Adressen - damit ein Nachschlag keine Wiederholung wird. */
     private val gesehen = mutableSetOf<String>()
+
+    /** Adressen, fuer die ein Bild schon versucht wurde - erfolgreich oder nicht. */
+    private val bildVersucht = mutableSetOf<String>()
 
     fun onTargetChange(value: Int) {
         _uiState.update { it.copy(target = value.coerceAtLeast(1)) }
@@ -107,6 +112,7 @@ class DeckViewModel @Inject constructor(
                     loadFailed = deck.isEmpty(),
                 )
             }
+            bilderNachladen()
         }
     }
 
@@ -126,6 +132,7 @@ class DeckViewModel @Inject constructor(
 
         // Geht der Stapel aus, bevor das Ziel steht, wird nachgelegt.
         if (!fertig && rest.size <= REFILL_THRESHOLD) nachlegen()
+        if (!fertig) bilderNachladen()
     }
 
     /** Auch ohne erreichtes Ziel darf man aufhoeren - mit dem, was man hat. */
@@ -184,6 +191,37 @@ class DeckViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Holt Bilder fuer die naechsten Karten nach, die keins mitbringen.
+     *
+     * Manche Quellen nennen in ihrem Verzeichnis kein Bild; deren Karten haetten
+     * sonst dauerhaft nur die Platzhalterflaeche. Geholt wird nur fuer die naechsten
+     * paar Karten und immer im Hintergrund - keine Karte wartet auf ihr Bild, und
+     * fuer abgelehnte Karten wird nichts geladen, was niemand sieht.
+     */
+    private fun bilderNachladen() {
+        val offen = _uiState.value.cards
+            .take(VORAUSLADEN)
+            .filter { it.imageUrl == null && it.url !in bildVersucht }
+        if (offen.isEmpty()) return
+
+        bildVersucht += offen.map { it.url }
+
+        offen.forEach { eintrag ->
+            viewModelScope.launch {
+                val bild = webRepository.cardImage(eintrag.url) ?: return@launch
+
+                _uiState.update { state ->
+                    state.copy(
+                        cards = state.cards.map { karte ->
+                            if (karte.url == eintrag.url) karte.copy(imageUrl = bild) else karte
+                        },
+                    )
+                }
+            }
+        }
+    }
+
     private fun nachlegen() {
         viewModelScope.launch {
             val nachschub = buildDeck(size = REFILL_SIZE, exclude = gesehen)
@@ -200,6 +238,9 @@ class DeckViewModel @Inject constructor(
         const val MIN_DECK = 12
         const val REFILL_SIZE = 15
         const val REFILL_THRESHOLD = 4
+
+        /** Fuer so viele Karten im Voraus wird ein fehlendes Bild geholt. */
+        const val VORAUSLADEN = 3
 
         fun deckSizeFor(target: Int): Int = (target * CARDS_PER_TARGET).coerceAtLeast(MIN_DECK)
     }

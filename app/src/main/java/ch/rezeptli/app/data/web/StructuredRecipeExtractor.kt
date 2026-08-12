@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import javax.inject.Inject
 
 /**
@@ -102,19 +103,31 @@ class StructuredRecipeExtractor @Inject constructor() {
     // ------------------------------------------------------------------ Microdata
 
     private fun fromMicrodata(document: Document, sourceUrl: String, sourceName: String): WebRecipe? {
-        val ingredients = document.microdataIngredients()
+        // Innerhalb des Rezeptbereichs suchen, wenn die Seite einen auszeichnet. Sonst
+        // greift jedes `itemprop` der ganzen Seite - und `name` steht auch am
+        // Seitenbetreiber, an Brotkrumen und an jeder einzelnen Zutat. Als Titel kam
+        // dann irgendein Fremdtext heraus statt des Rezeptnamens.
+        val bereich = document.selectFirst("[itemtype~=(?i)schema.org/Recipe]") ?: document
+
+        val ingredients = bereich.microdataIngredients().ifEmpty { document.microdataIngredients() }
         if (ingredients.isEmpty()) return null
 
-        val title = document.selectFirst("[itemprop=name]")?.text()?.cleanText()
+        val title = bereich.recipeName()
             ?: document.selectFirst("h1")?.text()?.cleanText()
             ?: document.title().cleanText()
 
         // Mehrere Elemente mit recipeInstructions sind bereits die Gliederung der
         // Seite - jedes davon ist ein Schritt.
-        val steps = document
+        val steps = bereich
             .select("[itemprop=recipeInstructions]")
-            .map { it.text().cleanText().trim() }
-            .filter { it.isNotBlank() }
+            .flatMap { block ->
+                // Steht die Anleitung als Liste im Block, ist jeder Punkt ein Schritt;
+                // sonst der Block selbst. Ohne das wurde die ganze Zubereitung zu einem
+                // einzigen, seitenlangen Schritt.
+                val punkte = block.select("li, p").map { it.text().cleanText().trim() }
+                punkte.filter { it.isNotBlank() }.ifEmpty { listOf(block.text().cleanText().trim()) }
+            }.filter { it.isNotBlank() }
+            .distinct()
 
         return WebRecipe(
             title = title,
@@ -127,11 +140,36 @@ class StructuredRecipeExtractor @Inject constructor() {
         ).takeIf { it.isUsable }
     }
 
-    private fun Document.microdataIngredients(): List<String> =
+    /**
+     * Der Rezeptname aus dem ausgezeichneten Bereich.
+     *
+     * Genommen wird nur ein `name`, das nicht selbst in einer Zutat oder einem anderen
+     * verschachtelten Objekt steht - sonst heisst das Rezept am Ende "Mehl".
+     */
+    private fun Element.recipeName(): String? =
+        select("[itemprop=name]")
+            .firstOrNull { kandidat ->
+                kandidat.parents().none { eltern ->
+                    eltern !== this && eltern.hasAttr("itemscope")
+                }
+            }?.text()
+            ?.cleanText()
+            ?.takeIf { it.isNotBlank() }
+
+    private fun Element.microdataIngredients(): List<String> =
         select("[itemprop=recipeIngredient], [itemprop=ingredients]")
             .map { it.text().cleanText() }
             .filter { it.isNotBlank() }
             .distinct()
+
+    /**
+     * Nur die Bildadresse einer Seite - fuer Karten, deren Quelle im Verzeichnis
+     * keins nennt. Ein ganzes Rezept auszulesen waere dafuer zu viel Arbeit.
+     */
+    fun imageOf(html: String, sourceUrl: String): String? {
+        val document = Jsoup.parse(html, sourceUrl)
+        return WebUrl.absolute(document.metaImage(), sourceUrl)
+    }
 
     private fun Document.metaImage(): String? =
         selectFirst("meta[property=og:image]")?.attr("content")?.takeIf { it.isNotBlank() }
