@@ -55,11 +55,11 @@ import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.PrepTimeLabel
 import ch.rezeptli.app.presentation.common.components.RecipeImage
+import ch.rezeptli.app.presentation.common.formatChf
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 import kotlinx.coroutines.launch
 import java.time.LocalTime
-import java.util.Locale
 
 /** Die Plan-Seite: Gruss, Kosten gegen Budget, Einkaufsliste, dann Tag fuer Tag die Mahlzeiten. */
 @Composable
@@ -258,7 +258,7 @@ private fun CostCard(uiState: PlanUiState) {
         Text(
             text = stringResource(
                 R.string.plan_kosten_von,
-                String.format(Locale.GERMAN, "%.2f", uiState.estimatedCost),
+                formatChf(uiState.estimatedCost),
                 uiState.budget,
             ),
             style = MaterialTheme.typography.titleLarge,
@@ -375,7 +375,7 @@ private fun MealCard(
                     Text(
                         text = stringResource(
                             R.string.plan_karte_preis,
-                            String.format(Locale.GERMAN, "%.2f", meal.cost),
+                            formatChf(meal.cost),
                         ),
                         style = MaterialTheme.typography.labelLarge,
                     )

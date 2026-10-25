@@ -41,6 +41,7 @@ import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.profile.mainDiet
 import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
+import ch.rezeptli.app.presentation.common.formatChf
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.theme.Tokens
 
@@ -230,7 +231,7 @@ fun BudgetSlider(
         )
         val perMeal = budget.toDouble() / (persons.coerceAtLeast(1) * meals.coerceAtLeast(1))
         Text(
-            text = stringResource(R.string.setup_budget_pro_mahlzeit, "%.2f".format(perMeal)),
+            text = stringResource(R.string.setup_budget_pro_mahlzeit, formatChf(perMeal)),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),

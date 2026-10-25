@@ -4,6 +4,7 @@ import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.ShoppingItem
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
+import ch.rezeptli.app.domain.profile.LanguageRegion
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.repository.RecipeRepository
@@ -82,7 +83,7 @@ class PlanCandidateSource @Inject constructor(
             .map { PlanCandidate(it, classifier.classify(it)) }
 
     private suspend fun loadFresh(exclude: Set<String>): List<PlanCandidate> {
-        val entries = buildDeck(size = DECK_SIZE, exclude = exclude)
+        val entries = buildDeck(size = DECK_SIZE, exclude = exclude, onlyRegion = LanguageRegion.DEUTSCH)
         if (entries.isEmpty()) return emptyList()
 
         val gate = Semaphore(PARALLEL)

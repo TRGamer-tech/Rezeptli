@@ -55,10 +55,10 @@ import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.ShoppingItem
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.formatChf
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.shareText
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /** Die Einkaufsliste: nach Warengruppen sortiert, zum Abhaken. */
 @Composable
@@ -215,7 +215,7 @@ fun ShoppingListScreen(
                                 Text(
                                     text = stringResource(
                                         R.string.einkauf_gesamt,
-                                        String.format(Locale.GERMAN, "%.2f", uiState.estimatedTotal),
+                                        formatChf(uiState.estimatedTotal),
                                     ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -346,7 +346,7 @@ private fun ShoppingItemRow(
                 )
                 item.price?.let { price ->
                     Text(
-                        text = String.format(Locale.GERMAN, "CHF %.2f", price),
+                        text = "CHF " + formatChf(price),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

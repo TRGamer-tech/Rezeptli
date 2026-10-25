@@ -111,4 +111,17 @@ class RecipeClassifierTest {
 
         assertEquals(MealLabel.PROTEIN, traits.label)
     }
+
+    @Test
+    fun `versteht Schweizer Zutaten`() {
+        val poulet = classifier.classify(recipe("Rahmgeschnetzeltes", "Pouletbrust", "Vollrahm", "Hörnli"))
+        val gemuese = classifier.classify(recipe("Gemüsepfanne", "Rüebli", "Peperoni", "Zucchetti"))
+        val hack = classifier.classify(recipe("Hörnli mit Gehacktem", "Gehacktes", "Hörnli"))
+
+        assertEquals(DietClass.FLEISCH, poulet.diet)
+        assertTrue(Intolerance.LAKTOSE in poulet.allergens)
+        assertTrue(Intolerance.GLUTEN in poulet.allergens)
+        assertEquals(DietClass.VEGAN, gemuese.diet)
+        assertEquals(DietClass.FLEISCH, hack.diet)
+    }
 }
