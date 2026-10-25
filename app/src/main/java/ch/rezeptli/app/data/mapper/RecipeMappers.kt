@@ -136,6 +136,9 @@ fun ShoppingItemEntity.toDomain(): ShoppingItem = ShoppingItem(
     isManual = isManual,
     sourceNote = sourceNote,
     addedAt = addedAt,
+    packText = packText,
+    price = price,
+    fromPlan = fromPlan,
 )
 
 fun ShoppingItem.toEntity(): ShoppingItemEntity = ShoppingItemEntity(
@@ -149,4 +152,7 @@ fun ShoppingItem.toEntity(): ShoppingItemEntity = ShoppingItemEntity(
     isManual = isManual,
     sourceNote = sourceNote,
     addedAt = addedAt,
+    packText = packText,
+    price = price,
+    fromPlan = fromPlan,
 )

@@ -5,10 +5,12 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import ch.rezeptli.app.data.local.dao.PlanDao
 import ch.rezeptli.app.data.local.dao.RecipeDao
 import ch.rezeptli.app.data.local.dao.ShoppingListDao
 import ch.rezeptli.app.data.local.dao.SwipeSessionDao
 import ch.rezeptli.app.data.local.entity.IngredientEntity
+import ch.rezeptli.app.data.local.entity.PlanEntryEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
 import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.data.local.entity.RecipeTagEntity
@@ -34,8 +36,9 @@ import ch.rezeptli.app.domain.steps.InstructionSplitter
         SwipeResultEntity::class,
         ShoppingItemEntity::class,
         RecipeStepEntity::class,
+        PlanEntryEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -45,6 +48,8 @@ abstract class RezeptliDatabase : RoomDatabase() {
     abstract fun swipeSessionDao(): SwipeSessionDao
 
     abstract fun shoppingListDao(): ShoppingListDao
+
+    abstract fun planDao(): PlanDao
 
     companion object {
         const val DATABASE_NAME = "rezeptli.db"
@@ -140,7 +145,42 @@ abstract class RezeptliDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 5 fuehrt den Wochenplan ein.
+         *
+         * Rezepte merken sich ihre Portionszahl, damit der Einkauf auf die Personenzahl
+         * umgerechnet werden kann. Posten der Einkaufsliste bekommen Packung und Preis und
+         * die Kennzeichnung, ob sie vom Plan stammen - nur diese werden beim Neubau des
+         * Plans ersetzt, von Hand ergaenzte bleiben stehen. Bestehende Daten bleiben
+         * unveraendert.
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `recipes` ADD COLUMN `servings` INTEGER")
+                db.execSQL("ALTER TABLE `shopping_items` ADD COLUMN `packText` TEXT")
+                db.execSQL("ALTER TABLE `shopping_items` ADD COLUMN `price` REAL")
+                db.execSQL("ALTER TABLE `shopping_items` ADD COLUMN `fromPlan` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `plan_entries` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `day` TEXT NOT NULL,
+                        `recipeId` INTEGER NOT NULL,
+                        `servings` INTEGER NOT NULL,
+                        `cost` REAL NOT NULL,
+                        `label` TEXT NOT NULL,
+                        FOREIGN KEY(`recipeId`) REFERENCES `recipes`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_plan_entries_recipeId` ON `plan_entries` (`recipeId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_entries_day` ON `plan_entries` (`day`)")
+            }
+        }
+
         /** Alle Migrationen in aufsteigender Reihenfolge. */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val MIGRATIONS: Array<Migration> =
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
     }
 }

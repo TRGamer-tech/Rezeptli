@@ -87,6 +87,10 @@ class RecipeRepositoryImpl @Inject constructor(
         )
     }
 
+    override suspend fun findIdBySourceUrl(url: String): Long? = withContext(ioDispatcher) {
+        recipeDao.idBySourceUrl(url)
+    }
+
     override suspend fun deleteRecipe(id: Long) = withContext(ioDispatcher) {
         // Das Foto gehoert zum Rezept - beim Loeschen darf keine verwaiste Datei zurueckbleiben.
         val photoUri = recipeDao.recipeWithDetails(id)?.recipe?.photoUri

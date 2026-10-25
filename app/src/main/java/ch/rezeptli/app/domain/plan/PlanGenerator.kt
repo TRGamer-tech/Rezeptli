@@ -111,8 +111,11 @@ class PlanGenerator @Inject constructor(
     }
 
     private fun mealCost(recipe: Recipe, persons: Int, profile: UserProfile): Double =
-        aggregator.aggregate(listOf(scaledRecipe(recipe, persons)))
-            .sumOf { PriceCatalog.fractionalCost(it, profile.store) }
+        mealCostOf(scaledRecipe(recipe, persons), profile)
+
+    /** Anteilige Kosten eines bereits auf die Personenzahl umgerechneten Rezepts. */
+    fun mealCostOf(scaled: Recipe, profile: UserProfile): Double =
+        aggregator.aggregate(listOf(scaled)).sumOf { PriceCatalog.fractionalCost(it, profile.store) }
 
     private fun daysOf(profile: UserProfile): List<Weekday> =
         profile.cookDays.sortedBy { it.ordinal }.ifEmpty { Weekday.entries.take(UserProfile.DEFAULT_COOK_DAYS) }

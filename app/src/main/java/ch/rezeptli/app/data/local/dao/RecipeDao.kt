@@ -115,6 +115,9 @@ abstract class RecipeDao {
     @Update
     abstract suspend fun updateRecipe(recipe: RecipeEntity)
 
+    @Query("SELECT id FROM recipes WHERE sourceUrl = :url LIMIT 1")
+    abstract suspend fun idBySourceUrl(url: String): Long?
+
     @Query("DELETE FROM recipes WHERE id = :id")
     abstract suspend fun deleteRecipe(id: Long)
 

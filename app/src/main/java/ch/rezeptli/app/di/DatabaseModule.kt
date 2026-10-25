@@ -3,6 +3,7 @@ package ch.rezeptli.app.di
 import android.content.Context
 import androidx.room.Room
 import ch.rezeptli.app.data.local.RezeptliDatabase
+import ch.rezeptli.app.data.local.dao.PlanDao
 import ch.rezeptli.app.data.local.dao.RecipeDao
 import ch.rezeptli.app.data.local.dao.ShoppingListDao
 import ch.rezeptli.app.data.local.dao.SwipeSessionDao
@@ -34,4 +35,7 @@ object DatabaseModule {
 
     @Provides
     fun provideShoppingListDao(database: RezeptliDatabase): ShoppingListDao = database.shoppingListDao()
+
+    @Provides
+    fun providePlanDao(database: RezeptliDatabase): PlanDao = database.planDao()
 }

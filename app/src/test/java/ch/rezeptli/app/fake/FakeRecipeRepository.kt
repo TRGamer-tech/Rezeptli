@@ -66,6 +66,9 @@ class FakeRecipeRepository(
         return id
     }
 
+    override suspend fun findIdBySourceUrl(url: String): Long? =
+        recipes.value.values.firstOrNull { it.sourceUrl == url }?.id
+
     override suspend fun deleteRecipe(id: Long) {
         deletedIds.add(id)
         recipes.value = recipes.value - id
