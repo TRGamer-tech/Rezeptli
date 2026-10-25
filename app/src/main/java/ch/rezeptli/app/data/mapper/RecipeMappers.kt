@@ -27,6 +27,7 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     ingredients = ingredients.sortedBy { it.position }.map { it.toDomain() },
     tags = tags.map { it.tag }.sorted(),
     prepTimeMinutes = recipe.prepTimeMinutes,
+    servings = recipe.servings,
     photoUri = recipe.photoUri,
     createdAt = recipe.createdAt,
     updatedAt = recipe.updatedAt,
@@ -78,6 +79,7 @@ fun Recipe.toEntity(now: Long): RecipeEntity = RecipeEntity(
     title = title.trim(),
     instructions = instructions.trim(),
     prepTimeMinutes = prepTimeMinutes,
+    servings = servings,
     photoUri = photoUri,
     createdAt = if (createdAt == 0L) now else createdAt,
     updatedAt = now,
@@ -134,6 +136,9 @@ fun ShoppingItemEntity.toDomain(): ShoppingItem = ShoppingItem(
     isManual = isManual,
     sourceNote = sourceNote,
     addedAt = addedAt,
+    packText = packText,
+    price = price,
+    fromPlan = fromPlan,
 )
 
 fun ShoppingItem.toEntity(): ShoppingItemEntity = ShoppingItemEntity(
@@ -147,4 +152,7 @@ fun ShoppingItem.toEntity(): ShoppingItemEntity = ShoppingItemEntity(
     isManual = isManual,
     sourceNote = sourceNote,
     addedAt = addedAt,
+    packText = packText,
+    price = price,
+    fromPlan = fromPlan,
 )

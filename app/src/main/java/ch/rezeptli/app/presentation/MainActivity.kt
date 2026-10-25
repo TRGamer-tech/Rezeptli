@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                             sharedUrl = sharedUrl,
                             startDestination = when (startState) {
                                 StartState.Onboarding -> Destinations.ONBOARDING
-                                else -> Destinations.DECK
+                                else -> Destinations.PLAN
                             },
                         )
                     }

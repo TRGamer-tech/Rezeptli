@@ -16,10 +16,23 @@ data class UserProfile(
     val diets: Set<Diet> = emptySet(),
     val intolerances: Set<Intolerance> = emptySet(),
     val householdSize: Int? = null,
+    /** Postleitzahl - bestimmt nichts ausser der Anzeige; die App fragt keinen Standort ab. */
+    val zip: String = "",
+    val store: StoreChain? = null,
+    val cookDays: Set<Weekday> = emptySet(),
+    /** Wochenbudget in Franken fuer alle Einkaeufe des Plans. */
+    val weeklyBudget: Int? = null,
+    val moods: Set<Mood> = emptySet(),
+    val appliances: Set<Appliance> = emptySet(),
     /** Wurde das Onboarding gesehen - unabhaengig davon, ob etwas ausgefuellt wurde. */
     val onboardingCompleted: Boolean = false,
 ) {
     val hasName: Boolean get() = firstName.isNotBlank()
+
+    /** Anzahl Mahlzeiten pro Woche; ohne Auswahl kocht man an fuenf Tagen. */
+    val mealsPerWeek: Int get() = cookDays.size.takeIf { it > 0 } ?: DEFAULT_COOK_DAYS
+
+    val persons: Int get() = householdSize ?: 2
 
     /** Sprachregionen, aus denen Quellen bevorzugt werden. */
     val preferredRegions: List<LanguageRegion>
@@ -30,6 +43,12 @@ data class UserProfile(
 
         /** Mehr als das kocht kaum jemand auf einmal - schuetzt vor Tippfehlern. */
         const val MAX_HOUSEHOLD_SIZE = 12
+
+        const val DEFAULT_COOK_DAYS = 5
+        const val MAX_MOODS = 3
+        const val MIN_BUDGET = 20
+        const val MAX_BUDGET = 400
+        const val DEFAULT_BUDGET = 120
     }
 }
 

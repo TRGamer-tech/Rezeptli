@@ -23,15 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.Country
 import ch.rezeptli.app.domain.profile.Cuisine
-import ch.rezeptli.app.domain.profile.Diet
-import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
@@ -39,7 +36,7 @@ import ch.rezeptli.app.presentation.common.label
 
 @Composable
 fun SettingsRoute(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -50,9 +47,6 @@ fun SettingsRoute(
         onFirstNameChange = viewModel::onFirstNameChange,
         onCountrySelect = viewModel::onCountrySelect,
         onCuisineToggle = viewModel::onCuisineToggle,
-        onDietToggle = viewModel::onDietToggle,
-        onIntoleranceToggle = viewModel::onIntoleranceToggle,
-        onHouseholdSizeChange = viewModel::onHouseholdSizeChange,
         onResetRequest = viewModel::onResetRequest,
         onResetDismiss = viewModel::onResetDismiss,
         onResetConfirm = viewModel::onResetConfirm,
@@ -63,13 +57,10 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     uiState: SettingsUiState,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onFirstNameChange: (String) -> Unit,
     onCountrySelect: (Country) -> Unit,
     onCuisineToggle: (Cuisine) -> Unit,
-    onDietToggle: (Diet) -> Unit,
-    onIntoleranceToggle: (Intolerance) -> Unit,
-    onHouseholdSizeChange: (Int?) -> Unit,
     onResetRequest: () -> Unit,
     onResetDismiss: () -> Unit,
     onResetConfirm: () -> Unit,
@@ -125,49 +116,6 @@ fun SettingsScreen(
                     selected = uiState.profile.cuisines,
                     label = { it.label() },
                     onToggle = onCuisineToggle,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            SettingsSection(stringResource(R.string.onboarding_ernaehrung_titel)) {
-                ChoiceChipGroup(
-                    options = Diet.entries,
-                    selected = uiState.profile.diets,
-                    label = { it.label() },
-                    onToggle = onDietToggle,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            SettingsSection(stringResource(R.string.onboarding_unvertraeglichkeiten_frage)) {
-                Text(
-                    stringResource(R.string.onboarding_unvertraeglichkeiten_hinweis),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ChoiceChipGroup(
-                    options = Intolerance.entries,
-                    selected = uiState.profile.intolerances,
-                    label = { it.label() },
-                    onToggle = onIntoleranceToggle,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            SettingsSection(stringResource(R.string.onboarding_haushalt_titel)) {
-                OutlinedTextField(
-                    value = uiState.profile.householdSize
-                        ?.toString()
-                        .orEmpty(),
-                    onValueChange = { text ->
-                        onHouseholdSizeChange(text.filter { it.isDigit() }.take(2).toIntOrNull())
-                    },
-                    label = { Text(stringResource(R.string.onboarding_haushalt_label)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done,
-                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

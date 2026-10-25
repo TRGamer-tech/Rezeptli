@@ -35,6 +35,9 @@ interface RecipeRepository {
     /** Legt ein Rezept an oder aktualisiert es und liefert dessen ID zurueck. */
     suspend fun saveRecipe(recipe: Recipe): Long
 
+    /** Die ID des Rezepts, das von dieser Adresse importiert wurde - damit es nicht doppelt landet. */
+    suspend fun findIdBySourceUrl(url: String): Long?
+
     suspend fun deleteRecipe(id: Long)
 
     /** Haelt fest, wann ein Rezept zuletzt gekocht wurde. */

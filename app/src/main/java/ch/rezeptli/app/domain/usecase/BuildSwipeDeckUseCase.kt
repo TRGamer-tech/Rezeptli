@@ -2,6 +2,7 @@ package ch.rezeptli.app.domain.usecase
 
 import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.domain.profile.LanguageRegion
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import kotlinx.coroutines.flow.first
@@ -26,8 +27,18 @@ class BuildSwipeDeckUseCase @Inject constructor(
     suspend operator fun invoke(
         size: Int = CuratedDeckBuilder.DEFAULT_SIZE,
         exclude: Set<String> = emptySet(),
+        onlyRegion: LanguageRegion? = null,
     ): List<DeckEntry> {
-        val pool = webRepository.deckPool()
+        val fullPool = webRepository.deckPool()
+        // Der Wochenplan liest Zutaten und Zubereitung selbst, um Ernaehrung und Allergien
+        // einzuhalten - das geht nur in der Sprache, die er versteht.
+        val pool = if (onlyRegion == null) {
+            fullPool
+        } else {
+            fullPool.copy(
+                entriesBySource = fullPool.entriesBySource.filterKeys { fullPool.origins[it]?.region == onlyRegion },
+            )
+        }
         if (pool.isEmpty) return emptyList()
 
         val profile = profileRepository.profile.first()

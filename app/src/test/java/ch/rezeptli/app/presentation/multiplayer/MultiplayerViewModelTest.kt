@@ -7,6 +7,10 @@ import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.parser.IngredientTextParser
+import ch.rezeptli.app.domain.plan.AddToPlanUseCase
+import ch.rezeptli.app.domain.plan.PlanGenerator
+import ch.rezeptli.app.domain.plan.PlanPersister
+import ch.rezeptli.app.domain.plan.RecipeClassifier
 import ch.rezeptli.app.domain.profile.Country
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.ranking.SourceOrigin
@@ -24,6 +28,7 @@ import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SendSharedVotesUseCase
 import ch.rezeptli.app.domain.usecase.StartSharedSessionUseCase
 import ch.rezeptli.app.fake.FakePairingRepository
+import ch.rezeptli.app.fake.FakePlanRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
 import ch.rezeptli.app.fake.FakeShoppingListRepository
 import ch.rezeptli.app.fake.FakeUserProfileRepository
@@ -110,6 +115,8 @@ class MultiplayerViewModelTest {
 
     private val selectionHolder = SharedSelectionHolder()
     private val shoppingRepository = FakeShoppingListRepository()
+    private val planRepository = FakePlanRepository()
+    private val planRecipes = FakeRecipeRepository()
 
     /**
      * [webRepository] liefert per Voreinstellung einen gefuellten Vorrat, mit dem
@@ -136,6 +143,20 @@ class MultiplayerViewModelTest {
             FakeRecipeRepository(),
             shoppingRepository,
             ShoppingListAggregator(),
+        ),
+        addToPlan = AddToPlanUseCase(
+            profileRepository = FakeUserProfileRepository(),
+            planRepository = planRepository,
+            recipeRepository = planRecipes,
+            loadWebRecipe = LoadWebRecipeUseCase(
+                FakeWebRecipeRepository(),
+                IngredientTextParser(),
+                InstructionSplitter(),
+                NoTranslation,
+            ),
+            classifier = RecipeClassifier(),
+            generator = PlanGenerator(ShoppingListAggregator()),
+            persister = PlanPersister(planRecipes, shoppingRepository, planRepository),
         ),
         joinSession = JoinSharedSessionUseCase(pairing),
         sendVotes = SendSharedVotesUseCase(pairing),

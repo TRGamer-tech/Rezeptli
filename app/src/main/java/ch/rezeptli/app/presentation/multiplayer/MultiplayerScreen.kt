@@ -81,6 +81,7 @@ fun MultiplayerRoute(
         onSwiped = viewModel::onSwiped,
         onDismissError = viewModel::onDismissError,
         onKeep = viewModel::onKeepMatches,
+        onAddToPlan = viewModel::onAddToPlan,
     )
 }
 
@@ -98,6 +99,7 @@ fun MultiplayerScreen(
     onSwiped: (Long, Boolean) -> Unit,
     onDismissError: () -> Unit,
     onKeep: () -> Unit = {},
+    onAddToPlan: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -144,7 +146,7 @@ fun MultiplayerScreen(
                     message = stringResource(R.string.mehrspieler_warten_text),
                 )
 
-                MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, onKeep = onKeep)
+                MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, onKeep = onKeep, onAddToPlan = onAddToPlan)
             }
         }
     }
@@ -331,7 +333,7 @@ private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -
 }
 
 @Composable
-private fun MatchesStep(uiState: MultiplayerUiState, onKeep: () -> Unit) {
+private fun MatchesStep(uiState: MultiplayerUiState, onKeep: () -> Unit, onAddToPlan: () -> Unit) {
     if (uiState.matches.isEmpty()) {
         WaitingNote(
             title = stringResource(R.string.mehrspieler_keine_treffer_titel),
@@ -359,6 +361,28 @@ private fun MatchesStep(uiState: MultiplayerUiState, onKeep: () -> Unit) {
                     Text(match.title, style = MaterialTheme.typography.titleMedium)
                 }
             }
+        }
+
+        // Der Hauptweg: die Treffer auf freie Tage des Wochenplans legen.
+        val geplant = uiState.plannedMeals
+        if (geplant == null) {
+            Button(
+                onClick = onAddToPlan,
+                enabled = !uiState.isPlanning,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.zuzweit_in_plan)) }
+        } else {
+            Text(
+                text = if (geplant > 0) {
+                    stringResource(R.string.zuzweit_in_plan_ergebnis, geplant)
+                } else {
+                    stringResource(R.string.zuzweit_in_plan_nichts)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         // Bis hierhin waren die Treffer nur Titel. Ein Griff bringt sie in die

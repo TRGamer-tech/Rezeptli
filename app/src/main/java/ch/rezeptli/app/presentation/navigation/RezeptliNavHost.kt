@@ -16,7 +16,10 @@ import androidx.navigation.navArgument
 import ch.rezeptli.app.presentation.cooking.CookingRoute
 import ch.rezeptli.app.presentation.deck.DeckRoute
 import ch.rezeptli.app.presentation.multiplayer.MultiplayerRoute
-import ch.rezeptli.app.presentation.onboarding.OnboardingRoute
+import ch.rezeptli.app.presentation.plan.PlanBuildRoute
+import ch.rezeptli.app.presentation.plan.PlanRoute
+import ch.rezeptli.app.presentation.plan.PlanSetupRoute
+import ch.rezeptli.app.presentation.plan.PreferencesRoute
 import ch.rezeptli.app.presentation.recipedetail.RecipeDetailRoute
 import ch.rezeptli.app.presentation.recipeedit.RecipeEditRoute
 import ch.rezeptli.app.presentation.recipeimport.RecipeImportRoute
@@ -32,7 +35,7 @@ import ch.rezeptli.app.presentation.websearch.WebSearchRoute
 @Composable
 fun RezeptliNavHost(
     sharedUrl: String? = null,
-    startDestination: String = Destinations.DECK,
+    startDestination: String = Destinations.PLAN,
     navController: NavHostController = rememberNavController(),
 ) {
     // Ein geteilter Link fuehrt einmalig direkt in den Import.
@@ -59,14 +62,44 @@ fun RezeptliNavHost(
             modifier = Modifier.padding(leistenAbstand),
         ) {
             composable(Destinations.ONBOARDING) {
-                OnboardingRoute(
+                PlanSetupRoute(
                     onFinished = {
-                        navController.navigate(Destinations.DECK) {
-                            // Das Onboarding soll nicht ueber "Zurueck" wiederkehren.
+                        navController.navigate(Destinations.PLAN_BUILD) {
+                            // Die Einrichtung soll nicht ueber "Zurueck" wiederkehren.
                             popUpTo(Destinations.ONBOARDING) { inclusive = true }
                         }
                     },
                 )
+            }
+
+            composable(Destinations.PLAN) {
+                PlanRoute(
+                    onOpenRecipe = { recipeId -> navController.navigate(Destinations.recipeDetail(recipeId)) },
+                    onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
+                    onBuildPlan = { navController.navigate(Destinations.PLAN_BUILD) },
+                )
+            }
+
+            composable(Destinations.PLAN_BUILD) {
+                val toPlan: () -> Unit = {
+                    navController.navigate(Destinations.PLAN) {
+                        popUpTo(Destinations.PLAN_BUILD) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                PlanBuildRoute(
+                    onBuilt = toPlan,
+                    onSkip = toPlan,
+                    onEditPreferences = {
+                        navController.navigate(Destinations.PREFERENCES) {
+                            popUpTo(Destinations.PLAN_BUILD) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            composable(Destinations.PREFERENCES) {
+                PreferencesRoute(onBuildPlan = { navController.navigate(Destinations.PLAN_BUILD) })
             }
 
             composable(Destinations.DECK) {
@@ -76,7 +109,7 @@ fun RezeptliNavHost(
             }
 
             composable(Destinations.SETTINGS) {
-                SettingsRoute(onBack = { navController.popBackStack() })
+                SettingsRoute()
             }
 
             composable(Destinations.RECIPE_LIST) {

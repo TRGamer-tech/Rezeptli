@@ -4,6 +4,7 @@ import androidx.room.TypeConverter
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.SwipeMode
+import ch.rezeptli.app.domain.profile.Weekday
 
 /**
  * Enums werden als Name gespeichert, nicht als Ordinalwert. Damit bleibt die Datenbank
@@ -31,4 +32,11 @@ class Converters {
 
     @TypeConverter
     fun fromSwipeMode(mode: SwipeMode): String = mode.name
+
+    @TypeConverter
+    fun toWeekday(value: String?): Weekday =
+        value?.let { name -> Weekday.entries.firstOrNull { it.name == name } } ?: Weekday.MONTAG
+
+    @TypeConverter
+    fun fromWeekday(day: Weekday): String = day.name
 }

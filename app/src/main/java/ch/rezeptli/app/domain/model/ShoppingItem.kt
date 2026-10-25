@@ -19,4 +19,10 @@ data class ShoppingItem(
     val isManual: Boolean = false,
     val sourceNote: String? = null,
     val addedAt: Long = 0L,
+    /** Was im Regal gekauft wird, z. B. "2 × 500 g"; `null` bei von Hand ergaenzten Posten. */
+    val packText: String? = null,
+    /** Geschaetzter Preis in Franken. */
+    val price: Double? = null,
+    /** Gehoert zum Wochenplan und wird beim Neuaufbau ersetzt. */
+    val fromPlan: Boolean = false,
 )

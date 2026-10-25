@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Relation
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
+import ch.rezeptli.app.domain.profile.Weekday
 
 @Entity(tableName = "recipes")
 data class RecipeEntity(
@@ -23,6 +24,7 @@ data class RecipeEntity(
     val lastCookedAt: Long?,
     val sourceUrl: String? = null,
     val sourceName: String? = null,
+    val servings: Int? = null,
 )
 
 @Entity(
@@ -148,4 +150,49 @@ data class ShoppingItemEntity(
     val isManual: Boolean,
     val sourceNote: String?,
     val addedAt: Long,
+    val packText: String? = null,
+    val price: Double? = null,
+    @ColumnInfo(defaultValue = "0")
+    val fromPlan: Boolean = false,
+)
+
+/**
+ * Eine Mahlzeit im Wochenplan.
+ *
+ * Pro Tag genau eine - der Plan kennt kein Mittag- und Abendessen. Das Rezept liegt als
+ * gewoehnliches gespeichertes Rezept in der Sammlung; der Plan verweist nur darauf und
+ * merkt sich, fuer wie viele gekocht wird und was die Mahlzeit anteilig kostet.
+ */
+@Entity(
+    tableName = "plan_entries",
+    foreignKeys = [
+        ForeignKey(
+            entity = RecipeEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["recipeId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("recipeId"), Index(value = ["day"], unique = true)],
+)
+data class PlanEntryEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val day: Weekday,
+    val recipeId: Long,
+    val servings: Int,
+    val cost: Double,
+    val label: String,
+)
+
+/** Ein Planeintrag zusammen mit dem, was die Karte zeigt. */
+data class PlanEntryRow(
+    val day: Weekday,
+    val recipeId: Long,
+    val servings: Int,
+    val cost: Double,
+    val label: String,
+    val title: String,
+    val photoUri: String?,
+    val prepTimeMinutes: Int?,
 )

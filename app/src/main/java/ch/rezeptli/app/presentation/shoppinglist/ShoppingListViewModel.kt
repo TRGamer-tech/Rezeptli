@@ -33,12 +33,19 @@ data class ShoppingListUiState(
             .groupBy { it.category }
             .toList()
             .sortedBy { (category, _) -> category.ordinal }
+            // Abgehakte sinken ans Ende ihrer Gruppe: Was noch fehlt, bleibt oben im Blick.
+            .map { (category, group) ->
+                category to group.sortedWith(compareBy({ it.isChecked }, { it.name.lowercase() }))
+            }
 
     val openCount: Int get() = items.count { !it.isChecked }
 
     val checkedCount: Int get() = items.count { it.isChecked }
 
     val isEmpty: Boolean get() = items.isEmpty()
+
+    /** Geschaetzter Preis aller Posten, fuer die einer bekannt ist. */
+    val estimatedTotal: Double get() = items.sumOf { it.price ?: 0.0 }
 }
 
 sealed interface ShoppingListEvent {
