@@ -74,7 +74,8 @@ class PlanCandidateSource @Inject constructor(
     }
 
     private suspend fun ownRecipes(): List<PlanCandidate> =
-        recipeRepository.getFilteredRecipeIds(RecipeFilter())
+        recipeRepository
+            .getFilteredRecipeIds(RecipeFilter())
             .shuffled()
             .take(OWN_LIMIT)
             .mapNotNull { recipeRepository.getRecipe(it) }
@@ -86,13 +87,14 @@ class PlanCandidateSource @Inject constructor(
 
         val gate = Semaphore(PARALLEL)
         return coroutineScope {
-            entries.map { entry ->
-                async {
-                    gate.withPermit {
-                        withTimeoutOrNull(PAGE_TIMEOUT_MS) { loadWebRecipe(entry.url) }
+            entries
+                .map { entry ->
+                    async {
+                        gate.withPermit {
+                            withTimeoutOrNull(PAGE_TIMEOUT_MS) { loadWebRecipe(entry.url) }
+                        }
                     }
-                }
-            }.awaitAll()
+                }.awaitAll()
         }.mapNotNull { outcome ->
             (outcome as? WebImportOutcome.Loaded)?.recipe
         }.map { PlanCandidate(it, classifier.classify(it)) }
@@ -129,7 +131,8 @@ class PlanPersister @Inject constructor(
     /** Was schon abgehakt war, bleibt es - wer mitten im Einkauf eine Mahlzeit tauscht, fängt nicht von vorn an. */
     private suspend fun carryChecked(basket: List<ShoppingItem>, keep: Boolean): List<ShoppingItem> {
         if (!keep) return basket
-        val checked = shoppingRepository.getItems()
+        val checked = shoppingRepository
+            .getItems()
             .filter { it.fromPlan && it.isChecked }
             .mapTo(mutableSetOf()) { it.matchKey }
         return basket.map { if (it.matchKey in checked) it.copy(isChecked = true) else it }
@@ -232,7 +235,8 @@ class AddToPlanUseCase @Inject constructor(
         val existing = planRepository.currentPlan()
         val occupied = existing.mapTo(mutableSetOf()) { it.day }
 
-        val preferred = profile.cookDays.sortedBy { it.ordinal }
+        val preferred = profile.cookDays
+            .sortedBy { it.ordinal }
             .ifEmpty { Weekday.entries.take(UserProfile.DEFAULT_COOK_DAYS) }
         val free = (preferred + Weekday.entries).distinct().filter { it !in occupied }
         if (free.isEmpty()) return 0

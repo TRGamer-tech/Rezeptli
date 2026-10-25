@@ -49,7 +49,13 @@ object PriceCatalog {
         val pack = (rule?.pack ?: defaultPack(item.category, item.unit.dimension))
 
         val needed = neededIn(item, pack.dimension)
-        val count = if (needed == null || needed <= 0.0) 1 else ceil(needed / pack.size - TOLERANCE).toInt().coerceAtLeast(1)
+        val count = if (needed == null ||
+            needed <= 0.0
+        ) {
+            1
+        } else {
+            ceil(needed / pack.size - TOLERANCE).toInt().coerceAtLeast(1)
+        }
 
         return PackChoice(
             packs = count,
@@ -79,8 +85,10 @@ object PriceCatalog {
     private fun neededIn(item: ShoppingItem, dimension: UnitDimension): Double? {
         val amount = item.amount ?: return null
         return when (item.unit.dimension) {
-            UnitDimension.MASS, UnitDimension.VOLUME -> UnitConverter.toBase(amount, item.unit)
-                .takeIf { item.unit.dimension == dimension }
+            UnitDimension.MASS, UnitDimension.VOLUME ->
+                UnitConverter
+                    .toBase(amount, item.unit)
+                    .takeIf { item.unit.dimension == dimension }
             UnitDimension.SPOON -> if (dimension == UnitDimension.MASS || dimension == UnitDimension.VOLUME) {
                 // Ein Teeloeffel fasst rund 5 g oder ml.
                 UnitConverter.toBase(amount, item.unit) * TEASPOON
@@ -115,7 +123,12 @@ object PriceCatalog {
 
     private fun volume(label: String, ml: Double, price: Double) = PackSpec(label, ml, price, UnitDimension.VOLUME)
 
-    private fun count(label: String, pieces: Double, price: Double) = PackSpec(label, pieces, price, UnitDimension.COUNT)
+    private fun count(label: String, pieces: Double, price: Double) = PackSpec(
+        label,
+        pieces,
+        price,
+        UnitDimension.COUNT,
+    )
 
     private fun defaultPack(category: IngredientCategory, dimension: UnitDimension): PackSpec = when (dimension) {
         UnitDimension.COUNT, UnitDimension.DISCRETE -> count("Stück", 1.0, CATEGORY_PIECE[category] ?: 0.9)
@@ -181,7 +194,10 @@ object PriceCatalog {
         Rule(listOf("mehl"), mass("1 kg", 1000.0, 1.6)),
         Rule(listOf("zucker"), mass("1 kg", 1000.0, 1.7)),
         Rule(listOf("haferflocken"), mass("500 g", 500.0, 2.0)),
-        Rule(listOf("spaghetti", "penne", "nudel", "pasta", "hoernli", "fusilli", "teigwaren"), mass("500 g", 500.0, 1.9)),
+        Rule(
+            listOf("spaghetti", "penne", "nudel", "pasta", "hoernli", "fusilli", "teigwaren"),
+            mass("500 g", 500.0, 1.9),
+        ),
         Rule(listOf("brot"), mass("500 g", 500.0, 3.4)),
         Rule(listOf("tortilla", "wrap"), count("8er-Packung", 8.0, 3.2)),
         Rule(listOf("linsen", "kichererbsen", "bohnen"), mass("Dose 400 g", 400.0, 1.4)),
@@ -193,7 +209,10 @@ object PriceCatalog {
         Rule(listOf("wurst"), mass("300 g", 300.0, 5.2)),
         Rule(listOf("tofu"), mass("200 g", 200.0, 3.1)),
         Rule(listOf("salz"), mass("500 g", 500.0, 0.9)),
-        Rule(listOf("pfeffer", "paprikapulver", "curry", "kreuzkuemmel", "zimt", "oregano", "thymian", "chili"), mass("Glas", 40.0, 2.9)),
+        Rule(
+            listOf("pfeffer", "paprikapulver", "curry", "kreuzkuemmel", "zimt", "oregano", "thymian", "chili"),
+            mass("Glas", 40.0, 2.9),
+        ),
         Rule(listOf("petersilie", "basilikum", "schnittlauch", "koriander", "dill", "minze"), count("Bund", 1.0, 1.9)),
         Rule(listOf("wasser"), volume("1 l", 1000.0, 0.0)),
     ).map { it.copy(keywords = it.keywords.map(IngredientNameNormalizer::normalize)) }

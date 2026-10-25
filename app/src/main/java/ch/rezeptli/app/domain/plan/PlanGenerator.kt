@@ -82,10 +82,14 @@ class PlanGenerator @Inject constructor(
             ?: return draft
 
         val meals = draft.meals.map {
-            if (it.day != day) it else current.copy(
-                candidate = replacement,
-                cost = mealCost(replacement.recipe, persons, profile),
-            )
+            if (it.day != day) {
+                it
+            } else {
+                current.copy(
+                    candidate = replacement,
+                    cost = mealCost(replacement.recipe, persons, profile),
+                )
+            }
         }
         return draft.copy(
             meals = meals,
@@ -145,7 +149,10 @@ class PlanGenerator @Inject constructor(
         var score = 0.0
         profile.moods.forEach { if (it in candidate.traits.moods) score += MOOD_POINTS }
         if (Mood.SCHNELL in profile.moods) {
-            candidate.recipe.prepTimeMinutes?.let { score += (QUICK_LIMIT - it).coerceIn(-QUICK_LIMIT, QUICK_LIMIT) / QUICK_LIMIT }
+            candidate.recipe.prepTimeMinutes?.let {
+                score +=
+                    (QUICK_LIMIT - it).coerceIn(-QUICK_LIMIT, QUICK_LIMIT) / QUICK_LIMIT
+            }
         }
         if (candidate.recipe.photoUri != null) score += IMAGE_POINTS
         return score
@@ -159,7 +166,11 @@ class PlanGenerator @Inject constructor(
         val picked = mutableListOf<Pair<PlanCandidate, Double>>()
         val pool = ranked.toMutableList()
         while (picked.size < count && pool.isNotEmpty()) {
-            val lastLabel = picked.lastOrNull()?.first?.traits?.label
+            val lastLabel = picked
+                .lastOrNull()
+                ?.first
+                ?.traits
+                ?.label
             val next = pool.firstOrNull { it.first.traits.label != lastLabel } ?: pool.first()
             picked += next
             pool.remove(next)

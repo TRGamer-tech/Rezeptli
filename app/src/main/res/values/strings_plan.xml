@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Einrichtung -->
+    <string name="setup_schritt">Schritt %1$d von %2$d</string>
+    <string name="setup_weiter">Weiter</string>
+    <string name="setup_plan_erstellen">Plan erstellen</string>
+    <string name="setup_zurueck">Zurück</string>
+    <string name="setup_ueberspringen">Überspringen</string>
+
+    <string name="setup_plz_titel">Wo wohnst du?</string>
+    <string name="setup_plz_text">Die Postleitzahl bestimmt, welche Rezeptquellen zuerst kommen. Rezeptli fragt keinen Standort ab, die Angabe bleibt auf deinem Gerät.</string>
+    <string name="setup_plz_label">Postleitzahl</string>
+
+    <string name="setup_laden_titel">Wo kaufst du ein?</string>
+    <string name="setup_laden_text">Rezeptli schätzt die Preise für diesen Laden. Das sind Richtwerte, keine Tagespreise.</string>
+
+    <string name="setup_personen_titel">Für wie viele kochst du?</string>
+    <string name="setup_personen_text">Alle Mengen im Plan und auf der Einkaufsliste werden darauf umgerechnet.</string>
+    <string name="setup_personen_anzahl">%1$d Personen</string>
+    <string name="setup_personen_eine">1 Person</string>
+    <string name="setup_personen_weniger">Eine Person weniger</string>
+    <string name="setup_personen_mehr">Eine Person mehr</string>
+
+    <string name="setup_tage_titel">An welchen Tagen kochst du?</string>
+    <string name="setup_tage_text">Für jeden gewählten Tag plant Rezeptli ein Abendessen.</string>
+    <string name="setup_tage_anzahl">%1$d Mahlzeiten pro Woche</string>
+
+    <string name="setup_budget_titel">Dein Wochenbudget</string>
+    <string name="setup_budget_text">Ist der Einkauf teurer, tauscht Rezeptli die teuerste Mahlzeit gegen eine günstigere.</string>
+    <string name="setup_budget_betrag">CHF %1$d</string>
+    <string name="setup_budget_pro_mahlzeit">ca. CHF %1$s pro Person und Mahlzeit</string>
+
+    <string name="setup_stimmung_titel">Wonach ist dir diese Woche?</string>
+    <string name="setup_stimmung_text">Wähle bis zu drei. Das gewichtet die Auswahl, schliesst aber nichts aus.</string>
+    <string name="setup_stimmung_zaehler">%1$d von %2$d gewählt</string>
+
+    <string name="setup_ernaehrung_titel">Ernährst du dich besonders?</string>
+    <string name="setup_ernaehrung_text">Was nicht passt, kommt nicht in den Plan.</string>
+    <string name="setup_ernaehrung_keine">Keine besondere</string>
+    <string name="setup_unvertraeglich_titel">Verträgst du etwas nicht?</string>
+    <string name="setup_unvertraeglich_hinweis">Rezeptli liest die Zutaten, kann aber nicht prüfen, ob ein Rezept wirklich frei davon ist – Spuren und Fertigprodukte sieht die App nicht. Verlass dich auf die Zutatenliste.</string>
+
+    <string name="setup_geraete_titel">Was steht in deiner Küche?</string>
+    <string name="setup_geraete_text">Rezepte, die ein Gerät brauchen, das du nicht hast, kommen nicht in den Plan.</string>
+
+    <!-- Plan wird gebaut -->
+    <string name="bauen_titel">Wir bauen deine Woche …</string>
+    <string name="bauen_text">Das dauert einen Moment, die Rezepte werden geladen.</string>
+    <string name="bauen_schritt_finden">Rezepte finden</string>
+    <string name="bauen_schritt_waehlen">Passende auswählen</string>
+    <string name="bauen_schritt_einkauf">Einkaufsliste erstellen</string>
+    <string name="bauen_fehler_keine_rezepte_titel">Keine Rezepte geladen</string>
+    <string name="bauen_fehler_keine_rezepte_text">Ohne Verbindung kann Rezeptli keinen Plan bauen. Prüfe dein Netz und versuch es noch einmal.</string>
+    <string name="bauen_fehler_passt_nichts_titel">Nichts passt dazu</string>
+    <string name="bauen_fehler_passt_nichts_text">Mit deiner Ernährung, deinen Unverträglichkeiten und deinen Geräten gab es keine passenden Rezepte. Lockere eine der Angaben in den Vorlieben.</string>
+    <string name="bauen_nochmal">Nochmal versuchen</string>
+    <string name="bauen_vorlieben">Vorlieben ändern</string>
+    <string name="bauen_ohne_plan">Ohne Plan weiter</string>
+
+    <!-- Plan -->
+    <string name="plan_gruss_morgen">Guten Morgen, %1$s!</string>
+    <string name="plan_gruss_tag">Guten Tag, %1$s!</string>
+    <string name="plan_gruss_abend">Guten Abend, %1$s!</string>
+    <string name="plan_gruss_name_standard">Chef</string>
+    <string name="plan_geplant_fuer">Geplant für %1$s</string>
+    <string name="plan_kosten_titel">Geschätzte Kosten</string>
+    <string name="plan_kosten_von">ca. CHF %1$s von CHF %2$d</string>
+    <string name="plan_kosten_ueber">Über dem Budget</string>
+    <string name="plan_kosten_hinweis">Richtwerte für die Schweiz, keine Tagespreise.</string>
+    <string name="plan_einkauf_titel">Einkaufsliste</string>
+    <string name="plan_einkauf_stand">%1$d/%2$d Artikel gekauft</string>
+    <string name="plan_einkauf_leer">Noch nichts auf der Liste</string>
+    <string name="plan_woche_titel">Deine Woche</string>
+    <string name="plan_karte_portionen">%1$d Portionen</string>
+    <string name="plan_karte_portion">1 Portion</string>
+    <string name="plan_karte_preis">CHF %1$s</string>
+    <string name="plan_tauschen">Mahlzeit tauschen</string>
+    <string name="plan_tauschen_keine">Es gibt keine andere passende Mahlzeit.</string>
+    <string name="plan_neu_bauen">Plan neu bauen</string>
+    <string name="plan_neu_bauen_titel">Plan neu bauen?</string>
+    <string name="plan_neu_bauen_text">Die Mahlzeiten und die Einkaufsliste dieses Plans werden ersetzt. Von Hand Ergänztes bleibt stehen.</string>
+    <string name="plan_neu_bauen_bestaetigen">Neu bauen</string>
+    <string name="plan_leer_titel">Noch kein Plan</string>
+    <string name="plan_leer_text">Rezeptli baut dir eine Woche aus Rezepten, die zu deinen Vorlieben passen.</string>
+    <string name="plan_leer_aktion">Plan bauen</string>
+    <string name="plan_unvollstaendig">Nur %1$d von %2$d Mahlzeiten gefunden. Lockere eine Vorliebe oder bau den Plan neu.</string>
+    <string name="plan_bild_beschreibung">Bild von %1$s</string>
+
+    <!-- Vorlieben -->
+    <string name="vorlieben_titel">Vorlieben</string>
+    <string name="vorlieben_laden">Laden</string>
+    <string name="vorlieben_plan_neu">Mit diesen Vorlieben neu bauen</string>
+
+    <!-- Einkaufsliste -->
+    <string name="einkauf_gesamt">ca. CHF %1$s</string>
+    <string name="einkauf_benoetigt">%1$s nötig</string>
+    <string name="einkauf_kopieren">Liste kopieren</string>
+    <string name="einkauf_teilen">Liste teilen</string>
+    <string name="einkauf_kopiert">Liste kopiert</string>
+    <string name="einkauf_zeile_preis">%1$s · CHF %2$s</string>
+
+    <!-- Zu zweit: Treffer in den Plan -->
+    <string name="zuzweit_in_plan">In den Wochenplan übernehmen</string>
+    <string name="zuzweit_in_plan_ergebnis">%1$d Mahlzeiten im Plan</string>
+    <string name="zuzweit_in_plan_nichts">Nichts übernommen – die Woche ist voll oder die Rezepte liessen sich nicht laden.</string>
+
+    <!-- Tabs -->
+    <string name="tab_plan">Plan</string>
+    <string name="tab_vorlieben">Vorlieben</string>
+    <string name="tab_einstellungen">Einstellungen</string>
+</resources>

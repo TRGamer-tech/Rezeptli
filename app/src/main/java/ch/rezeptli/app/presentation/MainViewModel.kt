@@ -22,7 +22,7 @@ sealed interface StartState {
 
     data object Onboarding : StartState
 
-    /** Onboarding ist erledigt - es geht auf den Wischstapel, den Startbildschirm. */
+    /** Onboarding ist erledigt - es geht auf den Wochenplan, den Startbildschirm. */
     data object Bereit : StartState
 }
 

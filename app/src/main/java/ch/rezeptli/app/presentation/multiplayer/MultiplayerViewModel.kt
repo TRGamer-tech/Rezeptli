@@ -11,6 +11,7 @@ import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSession
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
+import ch.rezeptli.app.domain.plan.AddToPlanUseCase
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.BuildSwipeDeckUseCase
 import ch.rezeptli.app.domain.usecase.CloseSharedSessionUseCase
@@ -73,6 +74,10 @@ data class MultiplayerUiState(
     val keptRecipes: Int = 0,
     /** Wie viele Zutaten dabei auf der Einkaufsliste gelandet sind, sobald fertig. */
     val addedItems: Int? = null,
+    /** Laeuft gerade das Uebernehmen in den Wochenplan? */
+    val isPlanning: Boolean = false,
+    /** Wie viele Treffer im Wochenplan gelandet sind, sobald fertig. */
+    val plannedMeals: Int? = null,
 ) {
     /** Die noch nicht bewerteten Rezepte, als Karten fuer den bestehenden Stapel. */
     val remainingCards: List<RecipeSummary>
@@ -113,6 +118,7 @@ class MultiplayerViewModel @Inject constructor(
     private val loadWebRecipe: LoadWebRecipeUseCase,
     private val saveRecipe: SaveRecipeUseCase,
     private val addToShoppingList: AddRecipesToShoppingListUseCase,
+    private val addToPlan: AddToPlanUseCase,
     private val joinSession: JoinSharedSessionUseCase,
     private val sendVotes: SendSharedVotesUseCase,
     private val closeSession: CloseSharedSessionUseCase,
@@ -284,6 +290,23 @@ class MultiplayerViewModel @Inject constructor(
 
             val zutaten = if (kennungen.isEmpty()) 0 else addToShoppingList(kennungen)
             _uiState.update { it.copy(isKeeping = false, addedItems = zutaten) }
+        }
+    }
+
+    /**
+     * Legt die gemeinsamen Treffer auf freie Tage des Wochenplans.
+     *
+     * Das ist der eigentliche Zweck der gemeinsamen Runde: Am Ende steht nicht eine Liste,
+     * sondern eine Woche, auf die sich beide geeinigt haben.
+     */
+    fun onAddToPlan() {
+        val treffer = _uiState.value.matches
+        if (treffer.isEmpty() || _uiState.value.isPlanning) return
+
+        _uiState.update { it.copy(isPlanning = true, plannedMeals = null) }
+        viewModelScope.launch {
+            val anzahl = addToPlan(treffer)
+            _uiState.update { it.copy(isPlanning = false, plannedMeals = anzahl) }
         }
     }
 

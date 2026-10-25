@@ -103,7 +103,10 @@ class PlanGeneratorTest {
     fun `Stimmung schiebt passende Rezepte nach vorn`() {
         val schnell = pool.map { c ->
             if (c.recipe.title == "Omelette") {
-                c.copy(recipe = c.recipe.copy(prepTimeMinutes = 10)).let { it.copy(traits = classifier.classify(it.recipe)) }
+                c
+                    .copy(
+                        recipe = c.recipe.copy(prepTimeMinutes = 10),
+                    ).let { it.copy(traits = classifier.classify(it.recipe)) }
             } else {
                 c
             }
@@ -111,7 +114,12 @@ class PlanGeneratorTest {
 
         val plan = generator.generate(schnell, profile(tage = 1) { it.copy(moods = setOf(Mood.SCHNELL)) }, Random(5))
 
-        assertEquals("Omelette", plan.meals.single().recipe.title)
+        assertEquals(
+            "Omelette",
+            plan.meals
+                .single()
+                .recipe.title,
+        )
     }
 
     @Test
