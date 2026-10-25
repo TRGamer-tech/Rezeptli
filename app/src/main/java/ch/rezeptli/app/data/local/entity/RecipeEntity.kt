@@ -23,6 +23,7 @@ data class RecipeEntity(
     val lastCookedAt: Long?,
     val sourceUrl: String? = null,
     val sourceName: String? = null,
+    val servings: Int? = null,
 )
 
 @Entity(

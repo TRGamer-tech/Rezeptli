@@ -3,6 +3,7 @@ package ch.rezeptli.app.domain.usecase
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.parser.IngredientTextParser
+import ch.rezeptli.app.domain.plan.ServingsParser
 import ch.rezeptli.app.domain.ranking.SourceRankingService
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebImportError
@@ -127,6 +128,7 @@ class LoadWebRecipeUseCase @Inject constructor(
         // Die Quelle kommt als Tag dazu, damit sich importierte Rezepte filtern lassen.
         tags = (keywords + listOfNotNull(sourceName)).distinctBy { it.lowercase() },
         prepTimeMinutes = totalMinutes,
+        servings = ServingsParser.parse(servings),
         photoUri = imageUrl,
         sourceUrl = sourceUrl,
         sourceName = sourceName,

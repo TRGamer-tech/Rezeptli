@@ -22,6 +22,8 @@ data class Recipe(
     val ingredients: List<Ingredient> = emptyList(),
     val tags: List<String> = emptyList(),
     val prepTimeMinutes: Int? = null,
+    /** Fuer wie viele Personen die Mengen der Quelle gedacht sind; `null`, wenn sie es nicht sagt. */
+    val servings: Int? = null,
     val photoUri: String? = null,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,
