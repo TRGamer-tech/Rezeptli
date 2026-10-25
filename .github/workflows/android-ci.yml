@@ -49,6 +49,10 @@ jobs:
 
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v3
+        with:
+          # Das Paket "tools" gibt es in den neuen cmdline-tools nicht mehr; der Standard
+          # (tools + platform-tools) liess den Schritt abstuerzen. Gradle holt, was es braucht.
+          packages: ''
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
@@ -165,6 +169,10 @@ jobs:
 
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v3
+        with:
+          # Das Paket "tools" gibt es in den neuen cmdline-tools nicht mehr; der Standard
+          # (tools + platform-tools) liess den Schritt abstuerzen. Gradle holt, was es braucht.
+          packages: ''
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
@@ -225,6 +233,10 @@ jobs:
 
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v3
+        with:
+          # Das Paket "tools" gibt es in den neuen cmdline-tools nicht mehr; der Standard
+          # (tools + platform-tools) liess den Schritt abstuerzen. Gradle holt, was es braucht.
+          packages: ''
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
@@ -332,6 +344,10 @@ jobs:
 
       - name: Android SDK einrichten
         uses: android-actions/setup-android@v3
+        with:
+          # Das Paket "tools" gibt es in den neuen cmdline-tools nicht mehr; der Standard
+          # (tools + platform-tools) liess den Schritt abstuerzen. Gradle holt, was es braucht.
+          packages: ''
 
       - name: Gradle einrichten
         uses: gradle/actions/setup-gradle@v4
