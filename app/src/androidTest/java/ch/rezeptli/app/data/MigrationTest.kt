@@ -72,10 +72,31 @@ class MigrationTest {
 
             assertEquals("Genau zwei Schritte", 2, cursor.count)
         }
+
+        // Version 5 bringt den Wochenplan: Alte Rezepte haben keine Portionszahl, der
+        // Plan startet leer, und die Einkaufsliste kennt Packung, Preis und Planherkunft.
+        db.query("SELECT servings FROM recipes").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue("Alte Rezepte haben keine Portionszahl", cursor.isNull(0))
+        }
+        db.query("SELECT COUNT(*) FROM plan_entries").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Der Plan startet leer", 0, cursor.getInt(0))
+        }
+        db.execSQL(
+            "INSERT INTO shopping_items (name, matchKey, unit, category, isChecked, isManual, addedAt) " +
+                "VALUES ('Salz', 'salz', 'NONE', 'SONSTIGES', 0, 1, 1)",
+        )
+        db.query("SELECT fromPlan, packText, price FROM shopping_items").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Neue Posten gehoeren nicht zum Plan, solange nichts anderes gesagt ist", 0, cursor.getInt(0))
+            assertTrue(cursor.isNull(1))
+            assertTrue(cursor.isNull(2))
+        }
     }
 
     private companion object {
         const val TEST_DB = "migration-test"
-        const val CURRENT_VERSION = 4
+        const val CURRENT_VERSION = 5
     }
 }
