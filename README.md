@@ -1,10 +1,11 @@
 # Rezeptli
 
-**Was koche ich heute?** Rezeptli beantwortet die Frage so, wie man heute Entscheidungen
-trifft: durch Wischen. Du legst deine eigenen Rezepte an oder fügst sie per Copy-Paste ein,
-und wenn dir nichts einfällt, swipest du durch deine eigene Sammlung – nach rechts für Ja,
-nach links für Nein. Am Ende steht eine Liste mit allem, was dir zugesagt hat, inklusive
-Zutaten, damit du sofort weisst, was noch einzukaufen ist.
+**Was koche ich diese Woche?** Du sagst Rezeptli, wo du einkaufst, für wie viele du kochst,
+an welchen Tagen, was es kosten darf, wonach dir ist und was du nicht isst oder nicht
+hast. Daraus baut die App einen Wochenplan mit Rezepten aus dem Netz und deiner Sammlung –
+samt Einkaufsliste mit Packungen und geschätztem Preis. Wenn dir ein Gericht nicht passt,
+tauschst du es mit einem Tipp; wenn ihr zu zweit seid, wischt ihr gemeinsam und legt die
+Treffer auf freie Tage der Woche.
 
 Rezeptli ist eine native Android-App ohne Konto, ohne Werbung, ohne Tracking – und
 quelloffen unter der MIT-Lizenz. Deine Sammlung liegt auf deinem Gerät; ins Internet
@@ -12,31 +13,32 @@ geht die App nur für zwei Dinge, die ohne es nicht gehen: Rezepte im Web suchen
 gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten unter
 [Datenschutz](#datenschutz).
 
-## Funktionen (Version 1.0)
+## Funktionen
 
+- **Einrichtung in acht Fragen** – Postleitzahl, Laden, Personen, Kochtage, Wochenbudget,
+  Stimmung (bis zu drei), Ernährung samt Unverträglichkeiten und Küchengeräte. Alles
+  vorbelegt und überspringbar; später im Tab *Vorlieben* änderbar.
+- **Wochenplan** – ein Abendessen pro Kochtag. Ernährung, Unverträglichkeiten und Geräte
+  schliessen Rezepte hart aus, Stimmungen gewichten nur. Dazu Kosten gegen Budget, eine
+  Mahlzeit lässt sich mit einem Tipp tauschen, der ganze Plan neu bauen.
+- **Einkaufsliste mit Packungen** – Bedarf in der Menge des Rezepts, darunter die Packung,
+  die man kauft, und der geschätzte Preis. Abgehaktes sinkt ans Ende der Gruppe; die
+  Liste lässt sich kopieren und teilen und um eigene Posten ergänzen.
+- **Zu zweit wischen** – beide wischen am eigenen Handy durch Rezeptbilder, am Ende zeigt
+  die App, worauf ihr beide Lust habt, und legt es in den Wochenplan.
+- **Wischen allein** – Kartenstapel aus dem Rezeptverzeichnis, mit Undo
 - **Rezepte verwalten** – anlegen, bearbeiten, löschen; mit Zutaten, Zubereitung, Foto,
-  Tags und Zubereitungszeit
-- **Text-Import** – ein aus Google Docs, einer Notiz-App oder einer Website kopiertes
-  Rezept einfügen; ein regelbasierter Parser erkennt Titel, Zutaten, Zubereitung und
-  Zubereitungszeit. Jede erkannte Zeile lässt sich vor dem Speichern korrigieren.
+  Tags und Zubereitungszeit; Text-Import per Copy-Paste mit regelbasiertem Parser
 - **Rezepte im Web finden** – Suche bei elf Quellen aus der Schweiz, Deutschland,
-  Österreich, Frankreich und Italien; Import per Link zusätzlich von Fooby und Chefkoch.
-  Ein Rezept aus dem Browser lässt sich über "Teilen" direkt an Rezeptli schicken.
-  Welche Quellen zuoberst stehen, richtet sich nach deinem Wohnland.
-- **Kochmodus** – ein Arbeitsschritt pro Karte statt einer Textwand, mit den Zutaten
-  dieses Schritts und einem Timer, wo etwas ziehen oder backen muss
-- **Zu zweit entscheiden** – gemeinsam durch dieselben Rezepte wischen und am Schluss
-  sehen, worauf ihr beide Lust habt. Die Treffer erscheinen erst, wenn beide fertig sind.
-- **Onboarding** – vier Fragen beim ersten Start (Vorname, Wohnland, Küchen, Ernährung,
-  Haushaltsgrösse), alle überspringbar und später in den Einstellungen änderbar
-- **Einkaufsliste** – nach dem Swipen die Zutaten aller Treffer übernehmen:
-  zusammengefasst, nach Warengruppen sortiert und zum Abhaken.
-- **Swipe-Modus** – Kartenstapel mit deinen Rezepten, wischen für Ja/Nein, mit Undo und
-  optionalem Vorab-Filter nach Tags und Zeit
+  Österreich, Frankreich und Italien; ein Rezept aus dem Browser lässt sich über "Teilen"
+  direkt an Rezeptli schicken
+- **Kochmodus** – ein Arbeitsschritt pro Karte, mit den Zutaten dieses Schritts und Timer
 - **Hell und dunkel** – folgt der Einstellung des Geräts
-- **Ergebnisliste** – alle Treffer einer Session auf einen Blick, samt vollständiger
-  Zutatenliste
-- **Suche und Filter** – über Titel, Zubereitung und Zutatennamen
+
+**Zu den Preisen:** Rezeptli fragt kein Geschäft ab. Die Preise sind Richtwerte für die
+Schweiz, je nach Laden mit einem Faktor verschoben, und überall als Schätzung beschriftet.
+Auch die Einstufung eines Rezepts (vegetarisch, enthält Gluten, braucht den Ofen …) ist
+eine Heuristik aus den Zutaten – bei Allergien gilt die Zutatenliste der Quelle.
 
 ### Screenshots
 
