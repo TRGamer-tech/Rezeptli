@@ -134,7 +134,7 @@ jobs:
             if [ "$code" != "200" ]; then
               echo "  FEHLER $pfad: HTTP $code"
               fehler=1
-            elif ! grep -q "$muster" /tmp/seite; then
+            elif ! grep -q -e "$muster" /tmp/seite; then
               echo "  FEHLER $pfad: HTTP 200, aber $beschreibung fehlt"
               fehler=1
             else
