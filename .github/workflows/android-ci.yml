@@ -197,7 +197,10 @@ jobs:
           # tee, also immer 0 - fehlgeschlagene Geraetetests haben den Job so gruen
           # gemeldet. Die Action fuehrt jede Zeile mit /usr/bin/sh aus, und dash kennt
           # kein "set -o pipefail". Deshalb ausdruecklich eine Bash, in einer Zeile.
-          script: bash -c 'set -o pipefail; ./gradlew connectedDebugAndroidTest --console=plain 2>&1 | tee /tmp/ui.log'
+          # --no-build-cache: Room schreibt das Schema waehrend der Kompilierung. Kommt die
+          # Kompilierung aus dem Cache, wird nichts geschrieben, und der Migrationstest
+          # findet seine Schema-Datei nicht (so geschehen bei 5.json).
+          script: bash -c 'set -o pipefail; ./gradlew connectedDebugAndroidTest --no-build-cache --console=plain 2>&1 | tee /tmp/ui.log'
 
       - name: Fehler zusammenfassen
         if: failure()
