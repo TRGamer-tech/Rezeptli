@@ -65,12 +65,13 @@ jobs:
         timeout-minutes: 12
         run: |
           set -o pipefail
-          ./gradlew testDebugUnitTest --console=plain 2>&1 | tee /tmp/build.log
+          # --no-build-cache gehoert an den ERSTEN Gradle-Aufruf: Dort wird kompiliert. Kommt
+          # die Kompilierung hier aus dem Cache, schreibt Room sein Schema nie, und spaetere
+          # Aufrufe im selben Lauf kompilieren nicht erneut.
+          ./gradlew testDebugUnitTest --no-build-cache --console=plain 2>&1 | tee /tmp/build.log
 
       - name: Debug-APK bauen
-        # --no-build-cache: Das Schema schreibt Room nur beim echten Kompilieren. Aus dem
-        # Cache kaeme es nicht, und die Schema-Pruefung unten pruefte dann nichts.
-        run: ./gradlew assembleDebug --no-build-cache --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Testergebnis zusammenfassen
         if: always()
