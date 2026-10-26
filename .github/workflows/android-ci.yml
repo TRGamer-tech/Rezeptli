@@ -65,7 +65,10 @@ jobs:
         timeout-minutes: 12
         run: |
           set -o pipefail
-          ./gradlew testDebugUnitTest --console=plain 2>&1 | tee /tmp/build.log
+          # --no-build-cache gehoert an den ERSTEN Gradle-Aufruf: Dort wird kompiliert. Kommt
+          # die Kompilierung hier aus dem Cache, schreibt Room sein Schema nie, und spaetere
+          # Aufrufe im selben Lauf kompilieren nicht erneut.
+          ./gradlew testDebugUnitTest --no-build-cache --console=plain 2>&1 | tee /tmp/build.log
 
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
@@ -108,10 +111,21 @@ jobs:
 
       - name: Room-Schema auf Abweichungen prüfen
         run: |
-          # Room exportiert das Schema bei jedem Build nach app/schemas/. Sobald die
-          # Datei eingecheckt ist, muss jede Schema-Aenderung mitcommittet werden -
-          # sonst laesst sich spaeter keine Migration mehr gegen sie testen.
-          # Solange sie noch nicht eingecheckt ist (--untracked-files=no), stoert das nicht.
+          # Room exportiert das Schema bei jedem echten Build nach app/schemas/. Zwei
+          # Dinge muessen stimmen: Das Schema der aktuellen Version muss da sein (sonst
+          # laesst sich keine Migration gegen sie testen), und was eingecheckt ist, darf
+          # sich nicht still veraendern.
+          db=app/src/main/java/ch/rezeptli/app/data/local/RezeptliDatabase.kt
+          dir=app/schemas/ch.rezeptli.app.data.local.RezeptliDatabase
+          version="$(grep -oP 'version = \K[0-9]+' "$db" | head -1)"
+          if [ ! -f "$dir/$version.json" ]; then
+            echo "::error::Room hat das Schema der Version $version nicht exportiert ($dir/$version.json fehlt)."
+            ls -l "$dir" || true
+            exit 1
+          fi
+          if ! git ls-files --error-unmatch "$dir/$version.json" >/dev/null 2>&1; then
+            echo "::notice::Das Schema der Version $version ist nicht eingecheckt - Abweichungen daran faellt diese Pruefung nicht auf. Die Datei steht im Artefakt room-schema."
+          fi
           drift="$(git status --porcelain --untracked-files=no app/schemas)"
           if [ -n "$drift" ]; then
             echo "::error::Das exportierte Room-Schema weicht vom eingecheckten Stand ab."
