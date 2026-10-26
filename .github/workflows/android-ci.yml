@@ -134,6 +134,17 @@ jobs:
             exit 1
           fi
 
+      - name: Room-Schema ausgeben
+        if: always()
+        run: |
+          # Das Schema steht damit auch im Protokoll - wer es einchecken will, braucht
+          # kein Artefakt herunterzuladen.
+          for f in app/schemas/*/*.json; do
+            echo "=== $f ==="
+            cat "$f"
+            echo
+          done
+
       - name: Room-Schema hochladen
         if: always()
         uses: actions/upload-artifact@v5
