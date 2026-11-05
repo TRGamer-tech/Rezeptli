@@ -77,7 +77,7 @@ object RecipeSourceCatalog {
         name = "Migusto",
         homeUrl = "https://migusto.migros.ch",
         urlPattern = Regex("migusto\\.migros\\.ch/de/rezepte/", RegexOption.IGNORE_CASE),
-        sitemapUrls = listOf("https://migusto.migros.ch/.rest/sitemap/migusto/de.xml"),
+        sitemapUrls = listOf("https://migusto.migros.ch/de/sitemap.xml"),
     )
 
     val BETTYS_KUECHENSCHAETZE = RecipeSource(

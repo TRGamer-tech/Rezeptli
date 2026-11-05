@@ -33,7 +33,7 @@ QUELLEN = [
     ("cookaround", "https://www.cookaround.com/sitemap/ricette.xml", r"cookaround\.com/ricetta/"),
     ("swissmilk", "https://www.swissmilk.ch/de/sitemap.xml", r"swissmilk\.ch/de/rezepte-kochideen/rezepte/"),
     ("bettybossi", "https://www.bettybossi.ch/sitemap.xml", r"bettybossi\.ch/de/Rezept/"),
-    ("migusto", "https://migusto.migros.ch/.rest/sitemap/migusto/de.xml", r"migusto\.migros\.ch/de/rezepte/"),
+    ("migusto", "https://migusto.migros.ch/de/sitemap.xml", r"migusto\.migros\.ch/de/rezepte/"),
 ]
 
 
