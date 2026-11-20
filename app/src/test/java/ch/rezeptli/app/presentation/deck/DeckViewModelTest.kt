@@ -6,6 +6,9 @@ import ch.rezeptli.app.domain.deck.DeckTitles
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
+import ch.rezeptli.app.domain.nutrition.NutritionBasis
+import ch.rezeptli.app.domain.nutrition.NutritionValue
+import ch.rezeptli.app.domain.nutrition.SourceNutrition
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.CourseChoice
@@ -457,9 +460,43 @@ class DeckViewModelTest {
         // Die Zubereitung gehoert zum gespeicherten Rezept, nicht auf eine Karte: Sie kommt
         // im Blatt an keiner Stelle vor.
         assertFalse(info.toString().contains("Geheime Zubereitung"))
+        // Unter den Zutaten stehen Kalorien und Eiweiss. Die Seite nennt keine - also geschaetzt:
+        // 616 kcal Kartoffeln und 680 kcal Rahm, durch vier.
+        assertTrue(info.showsNutrition)
+        val werte = info.nutrition!!
+        assertEquals(NutritionBasis.SERVING, werte.basis)
+        assertTrue(werte.isEstimate)
+        assertTrue(werte.kcal!!.amount in 310..340, "geschaetzt: ${werte.kcal}")
+        assertEquals(5, werte.protein!!.amount)
 
         viewModel.onInfoDismiss()
         assertNull(viewModel.uiState.value.info)
+    }
+
+    @Test
+    fun `nennt die Rezeptseite Kalorien und Eiweiss, stehen ihre Werte im Blatt - nicht die Schaetzung`() = runTest {
+        val gratin = karte("Kartoffelgratin")
+        val (adresse, rezept) = seite(gratin, "800 g Kartoffeln", "2 dl Rahm")
+        val web = FakeWebRecipeRepository(
+            pool = pool(gratin),
+            recipeByUrl = mapOf(
+                adresse to rezept.copy(nutrition = SourceNutrition(kcal = 398, proteinGrams = 7.4)),
+            ),
+        )
+        val viewModel = createViewModel(webRepository = web)
+        viewModel.onStart()
+
+        viewModel.onInfoRequest(
+            viewModel.uiState.value.remainingCards
+                .first()
+                .id,
+        )
+
+        val werte = viewModel.uiState.value.info!!
+            .nutrition!!
+        assertEquals(NutritionValue(398, estimated = false), werte.kcal)
+        assertEquals(NutritionValue(7, estimated = false), werte.protein)
+        assertTrue(werte.isFromSource)
     }
 
     @Test
@@ -480,6 +517,8 @@ class DeckViewModelTest {
         assertEquals("Kartoffelgratin", info.title)
         assertEquals(gratin.url, info.sourceUrl)
         assertTrue(info.lines.isEmpty())
+        // Ohne Seite gibt es auch nichts ueber Naehrwerte zu sagen.
+        assertFalse(info.showsNutrition)
     }
 
     @Test

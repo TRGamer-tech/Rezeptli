@@ -11,9 +11,12 @@ import ch.rezeptli.app.domain.profile.Mood
 import ch.rezeptli.app.domain.profile.StoreChain
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
+import ch.rezeptli.app.domain.settings.AppearanceRepository
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import ch.rezeptli.app.fake.FakeUserProfileRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -28,26 +31,114 @@ class PlanSetupViewModelTest {
     @RegisterExtension
     val mainDispatcher = MainDispatcherExtension()
 
-    private val repository = FakeUserProfileRepository()
+    private class FakeAppearance : AppearanceRepository {
+        override val reduceMotion = MutableStateFlow(false)
 
-    private fun createViewModel() = PlanSetupViewModel(repository)
+        override suspend fun setReduceMotion(reduce: Boolean) {
+            reduceMotion.value = reduce
+        }
+
+        override val theme = MutableStateFlow(ThemeChoice.SYSTEM)
+
+        override suspend fun setTheme(choice: ThemeChoice) {
+            theme.value = choice
+        }
+    }
+
+    private val repository = FakeUserProfileRepository()
+    private val appearance = FakeAppearance()
+
+    private fun createViewModel() = PlanSetupViewModel(repository, appearance)
 
     @Test
-    fun `beginnt beim Namen und ist vorbelegt`() {
+    fun `beginnt mit einer Begruessung, nicht mit einer Frage`() {
+        // Genau das stoerte: Wer die App zum ersten Mal oeffnete, sollte sofort seinen Namen eintippen.
+        val viewModel = createViewModel()
+        val state = viewModel.uiState.value
+
+        assertEquals(SetupStep.WILLKOMMEN, state.step)
+        assertTrue(state.step.isIntro)
+        assertTrue(state.step.isFirst)
+
+        // Danach kommt, was die App kann - und erst dann die erste Frage.
+        viewModel.onNext()
+        assertEquals(SetupStep.UEBERBLICK, viewModel.uiState.value.step)
+        assertTrue(viewModel.uiState.value.step.isIntro)
+
+        viewModel.onNext()
+        assertEquals(SetupStep.NAME, viewModel.uiState.value.step)
+        assertFalse(viewModel.uiState.value.step.isIntro)
+    }
+
+    @Test
+    fun `gezaehlt werden nur die Fragen`() {
+        val viewModel = createViewModel()
+        assertEquals(0, viewModel.uiState.value.stepNumber)
+        assertEquals(12, viewModel.uiState.value.stepCount)
+
+        viewModel.onNext()
+        viewModel.onNext()
+        assertEquals(1, viewModel.uiState.value.stepNumber)
+        assertEquals(1f / 12, viewModel.uiState.value.progress)
+
+        repeat(11) { viewModel.onNext() }
+        assertTrue(viewModel.uiState.value.step.isLast)
+        assertEquals(12, viewModel.uiState.value.stepNumber)
+        assertEquals(1f, viewModel.uiState.value.progress)
+    }
+
+    @Test
+    fun `von der ersten Frage geht es zurueck bis zur Begruessung`() {
+        val viewModel = createViewModel()
+        viewModel.onNext()
+        viewModel.onNext()
+
+        viewModel.onBack()
+        assertEquals(SetupStep.UEBERBLICK, viewModel.uiState.value.step)
+        viewModel.onBack()
+        assertEquals(SetupStep.WILLKOMMEN, viewModel.uiState.value.step)
+        // Weiter zurueck geht es nicht.
+        viewModel.onBack()
+        assertEquals(SetupStep.WILLKOMMEN, viewModel.uiState.value.step)
+    }
+
+    @Test
+    fun `das Aussehen gilt sofort - nicht erst am Ende der Einrichtung`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        assertEquals(ThemeChoice.SYSTEM, viewModel.uiState.value.theme)
+
+        viewModel.onThemeSelect(ThemeChoice.DUNKEL)
+        advanceUntilIdle()
+
+        assertEquals(ThemeChoice.DUNKEL, appearance.theme.value)
+        assertEquals(ThemeChoice.DUNKEL, viewModel.uiState.value.theme)
+        // Das Profil ist davon unberuehrt: Die Einrichtung ist noch nicht abgeschlossen.
+        assertFalse(repository.current.onboardingCompleted)
+    }
+
+    @Test
+    fun `die Fragen sind vorbelegt`() {
         val state = createViewModel().uiState.value
 
-        assertEquals(SetupStep.NAME, state.step)
         assertEquals(2, state.profile.persons)
         assertEquals(UserProfile.DEFAULT_COOK_DAYS, state.profile.cookDays.size)
         assertEquals(setOf(Appliance.HERD, Appliance.BACKOFEN), state.profile.appliances)
     }
 
     @Test
-    fun `fragt nach Name, Land und Geschmack, bevor es um den Plan geht`() {
-        // Genau diese drei Fragen fehlten: Name, wo man kocht, was man gern isst.
+    fun `fragt nach Name, Aussehen, Land und Geschmack, bevor es um den Plan geht`() {
+        // Wer man ist und was man mag, kommt vor dem, wie geplant wird.
         assertEquals(
-            listOf(SetupStep.NAME, SetupStep.LAND, SetupStep.KUECHEN, SetupStep.ERNAEHRUNG, SetupStep.ABNEIGUNGEN),
-            SetupStep.entries.take(5),
+            listOf(
+                SetupStep.NAME,
+                SetupStep.DESIGN,
+                SetupStep.LAND,
+                SetupStep.KUECHEN,
+                SetupStep.ERNAEHRUNG,
+                SetupStep.ABNEIGUNGEN,
+            ),
+            SetupStep.questions.take(6),
         )
         // Die Laeden kommen nach dem Land - sie haengen davon ab.
         assertTrue(SetupStep.LAND.ordinal < SetupStep.LADEN.ordinal)

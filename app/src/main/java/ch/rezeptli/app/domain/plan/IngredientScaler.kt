@@ -34,7 +34,8 @@ object IngredientScaler {
 
     private fun roundTo(value: Double, step: Double): Double = round(value / step) * step
 
-    private const val DEFAULT_SERVINGS = 4
+    /** Wofuer ein Rezept gedacht ist, das es nicht sagt: die uebliche Menge fuer vier. */
+    const val DEFAULT_SERVINGS = 4
     private const val SMALL = 20.0
     private const val FIVE = 5.0
     private const val MIN_AMOUNT = 0.25

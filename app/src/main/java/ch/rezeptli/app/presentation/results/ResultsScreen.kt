@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SentimentDissatisfied
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -38,6 +37,7 @@ import ch.rezeptli.app.presentation.common.components.BouncyIconButton
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.PortionDialog
 import ch.rezeptli.app.presentation.common.components.RecipeListCard
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
@@ -76,9 +76,18 @@ fun ResultsRoute(
         onBackToRecipes = onBackToRecipes,
         onRecipeClick = onRecipeClick,
         onNewSession = onNewSession,
-        onOpenShoppingList = onOpenShoppingList,
-        onAddToShoppingList = viewModel::onAddToShoppingList,
+        onAddToShoppingList = viewModel::onAddToShoppingListRequest,
     )
+
+    if (uiState.isPortionDialogVisible) {
+        PortionDialog(
+            defaultPersons = uiState.persons,
+            recipeServings = null,
+            several = true,
+            onConfirm = { persons, _ -> viewModel.onAddToShoppingList(persons) },
+            onDismiss = viewModel::onAddToShoppingListDismiss,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,7 +98,6 @@ fun ResultsScreen(
     onBackToRecipes: () -> Unit,
     onRecipeClick: (Long) -> Unit,
     onNewSession: () -> Unit,
-    onOpenShoppingList: () -> Unit,
     onAddToShoppingList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -101,12 +109,6 @@ fun ResultsScreen(
                 title = stringResource(R.string.results_title),
                 onBack = onBackToRecipes,
                 actions = {
-                    BouncyIconButton(onClick = onOpenShoppingList) {
-                        Icon(
-                            imageVector = Icons.Filled.ShoppingCart,
-                            contentDescription = stringResource(R.string.shopping_title),
-                        )
-                    }
                     BouncyIconButton(onClick = onNewSession) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,

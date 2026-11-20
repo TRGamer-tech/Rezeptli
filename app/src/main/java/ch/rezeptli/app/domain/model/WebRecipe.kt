@@ -1,5 +1,6 @@
 package ch.rezeptli.app.domain.model
 
+import ch.rezeptli.app.domain.nutrition.SourceNutrition
 import ch.rezeptli.app.domain.profile.Country
 import ch.rezeptli.app.domain.ranking.SourceOrigin
 import ch.rezeptli.app.domain.translate.SourceLanguage
@@ -34,6 +35,8 @@ data class WebRecipe(
      * Steht hier etwas, kann die App das Rezept beim Import uebersetzen.
      */
     val sourceLanguage: SourceLanguage? = null,
+    /** Kalorien und Eiweiss einer Portion, sofern die Seite sie nennt - sonst schaetzt die App. */
+    val nutrition: SourceNutrition? = null,
 ) {
     val isUsable: Boolean
         get() = title.isNotBlank() && (ingredientLines.isNotEmpty() || instructions.isNotBlank())

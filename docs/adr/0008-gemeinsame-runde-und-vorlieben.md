@@ -120,3 +120,46 @@ Zweifel löscht sie nichts.
   übernehmen – geteilt wird davon nur der Titel. Die App sagt das, statt still nichts zu tun.
 - Wer neue Einstellungen ergänzt, ergänzt den Test, der ihre Wirkung zeigt. Eine
   Einstellung ohne Folge ist ein Fehler, kein Platzhalter.
+
+## Nachtrag: Frist und selbst erfasste Treffer
+
+Zwei Lücken der Fassung 2 fielen im Gebrauch auf und sind geschlossen, ohne die
+Schnittstelle zu brechen (ältere Apps spielen weiter mit):
+
+- **Eine Runde wartet nicht mehr endlos auf Karten.** Schickte ein Telefon seinen Beitrag
+  nie, blieb die Runde stehen. Jetzt läuft mit dem ersten Beitrag eine Frist von einer
+  Minute; danach baut der Dienst den Stapel aus dem, was da ist. Die App zeigt die Frist an.
+- **Ein selbst erfasster Treffer lässt sich übernehmen.** Er hat keine Adresse, von der die
+  andere Person ihn holen könnte. Die App hinterlegt deshalb Zutaten und Zubereitung beim
+  Dienst – nur für gemeinsame Treffer, nur vom Gerät, das die Karte beigesteuert hat, ohne
+  Foto, und gelöscht mit der Runde. Das weicht den Satz "Zutaten und Zubereitung bleiben auf
+  dem Gerät" auf; die App sagt es vor dem Start, und es steht in der Datenschutzerklärung.
+
+Dazu in der App: "Übernehmen" unterscheidet jetzt, *warum* etwas nicht ging (Woche voll,
+schon im Plan, Seite nicht erreichbar, Inhalt noch unterwegs), bietet "Nochmal versuchen" an
+und fragt bei voller Woche, ob noch nicht Gekochtes weichen soll. Auf die Einkaufsliste
+kommt dabei nichts mehr von selbst. Einzelheiten: `pairing/README.md`.
+
+## Nachtrag: Woche überschreiben, Dubletten, Ladezeit
+
+Aus dem Gebrauch der Fassung mit Frist kamen drei weitere Punkte:
+
+- **Woche überschreiben.** "In den Wochenplan" legt Treffer auf freie Plätze und fragt bei
+  voller Woche, ob noch nicht Gekochtes weichen soll. Wer die Woche ganz den Treffern
+  überlassen will, hat dafür einen eigenen Knopf: Ein Blatt zeigt jeden Treffer mit den
+  sieben Tagen darunter (und Mittag/Abend, wenn beides geplant wird). Vorgeschlagen wird
+  eine Verteilung ab heute; ein Tipp auf einen vergebenen Tag tauscht die beiden Gerichte,
+  derselbe Tag noch einmal lässt eines weg. Ersetzt wird mit dem, was sich holen liess –
+  lässt sich gar nichts holen, bleibt die Woche stehen, und was fehlte, kommt mit
+  "Erneut versuchen" später an seinen Tag.
+- **Keine Dubletten beim Übernehmen.** Ein Rezept wurde an der buchstabengleichen Adresse
+  wiedererkannt; kannte das andere Telefon dieselbe Seite mit "www." oder Schrägstrich am
+  Ende, entstand eine zweite Kopie. Wiedererkannt wird jetzt an einer vereinheitlichten
+  Adresse und – bei selbst erfassten Rezepten – am Titel, an einer einzigen Stelle für
+  Sammlung, Plan und Runde. Selbst erfasste Rezepte tragen auch als Karte einen Schlüssel
+  aus dem Titel: Haben beide dasselbe, liegt es nur einmal im Stapel.
+- **Neue Karten laden schneller, bei voller Zahl.** Die Seiten neuer Karten wurden
+  stapelweise geprüft, und jeder Stapel wartete auf seine langsamste Seite. Jetzt laufen die
+  Prüfungen als gleitendes Fenster (zwölf zugleich, höchstens zwei je Quelle – die Abstände,
+  die robots.txt verlangt, bleiben eingehalten) und hören auf, sobald genug Karten bestanden
+  haben. Die Zahl der Karten ist dieselbe wie zuvor.

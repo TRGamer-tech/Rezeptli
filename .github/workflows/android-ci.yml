@@ -73,6 +73,11 @@ jobs:
       - name: Debug-APK bauen
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Unterschrift prüfen
+        # Bei jedem Push, nicht erst beim Veroeffentlichen: Faellt der Build auf einen
+        # Zufallsschluessel zurueck, soll das hier auffallen und nicht auf einem Telefon.
+        run: tools/pruefe-unterschrift.sh app/build/outputs/apk/debug/app-debug.apk
+
       - name: Testergebnis zusammenfassen
         if: always()
         run: |
@@ -270,6 +275,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       - name: Debug-APK bauen
+        env:
+          # Die Laufnummer steigt mit jedem Lauf - damit nimmt Android die neue APK als
+          # Update der installierten an, statt eine Neuinstallation zu verlangen.
+          REZEPTLI_BUILD_NUMBER: ${{ github.run_number }}
         run: ./gradlew assembleDebug --console=plain
 
       - name: APK benennen
@@ -282,27 +291,35 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           sha256sum "$target"
 
+      - name: Unterschrift prüfen
+        run: tools/pruefe-unterschrift.sh "${{ steps.apk.outputs.name }}"
+
       - name: Release veröffentlichen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: apk-debug
           APK: ${{ steps.apk.outputs.name }}
           VERSION: ${{ steps.apk.outputs.version }}
+          BUILD: ${{ github.run_number }}
           COMMIT: ${{ github.sha }}
           REPO: ${{ github.repository }}
         run: |
           notes=$(cat <<NOTES
           **Debug-Build zum Ausprobieren - kein fertiges Release.**
 
-          Diese APK ist mit dem Android-Debug-Schlüssel signiert und nicht optimiert.
+          Diese APK ist mit dem Test-Schlüssel des Projekts signiert und nicht optimiert.
           Sie ist zum Testen gedacht, nicht zur Weitergabe.
 
-          - Version: \`$VERSION\`
+          - Version: \`$VERSION\`, Build \`$BUILD\`
           - Paketname: \`ch.rezeptli.app.debug\` (läuft parallel zu einem späteren Release-Build)
           - Stand: \`$COMMIT\`
 
           **Installation:** APK auf dem Handy herunterladen und öffnen. Android fragt einmalig,
           ob Browser bzw. Datei-Manager Apps installieren dürfen - das muss erlaubt werden.
+
+          **Aktualisieren:** Einfach über die installierte App installieren - Rezepte, Plan
+          und Vorlieben bleiben. Nur wer noch einen Build vor Version 1.1.0 hat, muss ihn
+          einmalig deinstallieren: Jene Builds trugen bei jedem Lauf eine andere Unterschrift.
 
           **Die App braucht Internet.** Rezepte kommen aus dem Verzeichnis auf rezeptli.app
           und von den Seiten der Anbieter; das gemeinsame Wischen laeuft ueber einen eigenen
@@ -311,11 +328,16 @@ jobs:
           )
 
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # Aeltere APKs mit anderem Namen wuerden neben der neuen liegen bleiben - und
+            # jemand laedt dann die falsche herunter.
+            gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r alt; do
+              if [ -n "$alt" ] && [ "$alt" != "$APK" ]; then gh release delete-asset "$TAG" "$alt" --yes; fi
+            done
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --notes "$notes" --prerelease
+            gh release edit "$TAG" --title "Rezeptli $VERSION (Debug-Build $BUILD)" --notes "$notes" --prerelease
           else
             gh release create "$TAG" "$APK" \
-              --title "Rezeptli $VERSION (Debug-Build)" \
+              --title "Rezeptli $VERSION (Debug-Build $BUILD)" \
               --notes "$notes" \
               --prerelease
           fi
@@ -381,6 +403,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       - name: Debug-APK bauen
+        env:
+          REZEPTLI_BUILD_NUMBER: ${{ github.run_number }}
         run: ./gradlew assembleDebug --console=plain
 
       - name: Marke und Datei bestimmen
@@ -410,7 +434,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           notes=$(cat <<NOTES
-          **Vorabversion zum Ausprobieren.** Mit dem Android-Debug-Schlüssel signiert und
+          **Vorabversion zum Ausprobieren.** Mit dem Test-Schlüssel des Projekts signiert und
           nicht optimiert - zum Testen gedacht, nicht zur Weitergabe.
 
           - Version: \`$VERSION\`

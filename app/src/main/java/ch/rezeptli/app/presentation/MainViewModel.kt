@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.settings.AppearanceRepository
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +39,17 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = false,
+        )
+
+    /**
+     * Das gewaehlte Design. `null`, solange es noch gelesen wird - der Startbildschirm
+     * bleibt so lange stehen, sonst blitzt die App kurz im falschen Design auf.
+     */
+    val theme: StateFlow<ThemeChoice?> = appearanceRepository.theme
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = null,
         )
 
     val startState: StateFlow<StartState> = profileRepository.profile

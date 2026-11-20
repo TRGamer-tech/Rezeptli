@@ -8,6 +8,11 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+// Android nimmt eine APK nur dann als Update an, wenn ihre Nummer hoeher ist als die der
+// installierten. Veroeffentlichte Builds bekommen deshalb die Laufnummer der CI; lokal und
+// in den Pruef-Jobs bleibt es bei 1, damit der Build-Cache nicht bei jedem Lauf verfaellt.
+val buildNumber = System.getenv("REZEPTLI_BUILD_NUMBER")?.toIntOrNull()?.takeIf { it > 0 } ?: 1
+
 android {
     namespace = "ch.rezeptli.app"
     compileSdk = 35
@@ -16,8 +21,8 @@ android {
         applicationId = "ch.rezeptli.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = buildNumber
+        versionName = "1.1.0"
 
         // Adresse des Pairing-Dienstes. Nur der Mehrspieler-Modus nutzt sie;
         // alles andere in der App kommt ohne Server aus.
@@ -39,10 +44,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Der Test-Schluessel liegt im Projekt, damit jeder Build dieselbe Unterschrift traegt.
+    // Vorher erzeugte jede CI-Maschine ihren eigenen Wegwerf-Schluessel: Android hielt jede
+    // neue APK fuer eine fremde App und verlangte, die alte samt ihren Daten zu loeschen.
+    // Er ist bewusst oeffentlich und schuetzt nichts - ein Release fuer einen Store braucht
+    // einen eigenen, geheimen Schluessel (siehe docs/adr/0009).
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("rezeptli-test.keystore")
+            storePassword = "rezeptli-test"
+            keyAlias = "rezeptli-test"
+            keyPassword = "rezeptli-test"
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = true

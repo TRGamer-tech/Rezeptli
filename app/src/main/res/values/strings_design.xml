@@ -9,4 +9,80 @@
     <string name="einstellungen_bewegung">Bewegung reduzieren</string>
     <string name="einstellungen_bewegung_text">Keine federnden Übergänge, kein Konfetti, nichts was hüpft – nur ruhige Blenden.</string>
     <string name="einstellungen_bewegung_system">Android hat «Animationen entfernen» eingeschaltet – Rezeptli bleibt deshalb ohnehin ruhig.</string>
+
+    <string name="design_titel">Wie soll Rezeptli aussehen?</string>
+    <string name="design_system">Wie das Gerät</string>
+    <string name="design_hell">Hell</string>
+    <string name="design_dunkel">Dunkel</string>
+    <string name="design_material_you">Material You</string>
+    <string name="design_material_you_hinweis">Material You nimmt die Farben aus deinem Hintergrundbild. Ja und Nein beim Wischen bleiben grün und rot.</string>
+    <string name="setup_ernaehrung_zusaetzlich">lässt sich mit jeder Ernährungsform kombinieren</string>
+    <string name="app_version">Rezeptli %1$s · Build %2$d</string>
+
+    <!-- Rezepte sichern und übertragen -->
+    <string name="sichern_titel">Rezepte sichern und übertragen</string>
+    <string name="sichern_text">Alle Rezepte deiner Sammlung samt eigenen Fotos in einer Datei – zum Aufbewahren oder für ein anderes Telefon. Deine Vorlieben gehen mit, wenn du willst. Wochenplan und Einkaufsliste gehören nicht dazu.</string>
+    <string name="sichern_export">Exportieren</string>
+    <string name="sichern_import">Importieren</string>
+    <string name="sichern_laeuft">Einen Moment …</string>
+    <string name="sichern_leer">Du hast noch keine Rezepte, die sich exportieren liessen.</string>
+    <string name="sichern_fehler_schreiben">Die Datei liess sich nicht schreiben. Ist genug Speicher frei?</string>
+    <string name="sichern_fehler_lesen">Die Datei liess sich nicht lesen. Vielleicht ist sie beschädigt oder unvollständig.</string>
+    <string name="sichern_fehler_format">Das ist keine Exportdatei von Rezeptli.</string>
+    <string name="sichern_fehler_neuer">Diese Datei stammt aus einer neueren Version von Rezeptli. Aktualisiere die App und versuche es noch einmal.</string>
+    <string name="sichern_fehler_gross">Diese Datei ist zu gross für eine Rezeptsammlung.</string>
+    <string name="sichern_fehler_leer">In dieser Datei stehen weder Rezepte noch Vorlieben.</string>
+    <plurals name="sichern_exportiert">
+        <item quantity="one">%d Rezept exportiert.</item>
+        <item quantity="other">%d Rezepte exportiert.</item>
+    </plurals>
+    <plurals name="sichern_importiert">
+        <item quantity="one">%d Rezept importiert.</item>
+        <item quantity="other">%d Rezepte importiert.</item>
+    </plurals>
+    <plurals name="sichern_uebergangen">
+        <item quantity="one">%d gab es schon.</item>
+        <item quantity="other">%d gab es schon.</item>
+    </plurals>
+    <plurals name="sichern_alle_bekannt">
+        <item quantity="one">Nichts Neues: Dieses Rezept gibt es schon.</item>
+        <item quantity="other">Nichts Neues: Alle %d Rezepte gibt es schon.</item>
+    </plurals>
+
+    <!-- Einrichtung: Begrüssung und Überblick -->
+    <string name="willkommen_gruss">Schön, dass du da bist</string>
+    <string name="willkommen_titel">Willkommen bei Rezeptli</string>
+    <string name="willkommen_text">Rezeptli nimmt dir die Frage ab, die jeden Tag wiederkommt: Was kochen wir heute?</string>
+    <string name="willkommen_los">Los geht’s</string>
+    <string name="ueberblick_titel">Das macht Rezeptli für dich</string>
+    <string name="ueberblick_plan_titel">Plant deine Woche</string>
+    <string name="ueberblick_plan_text">Aus deinen Vorlieben entsteht ein Wochenplan, der zu deinem Budget und deinem Alltag passt.</string>
+    <string name="ueberblick_einkauf_titel">Schreibt die Einkaufsliste</string>
+    <string name="ueberblick_einkauf_text">Alle Zutaten der Woche, zusammengezählt und in ganzen Packungen gerechnet.</string>
+    <string name="ueberblick_wischen_titel">Wischen statt suchen</string>
+    <string name="ueberblick_wischen_text">Rezepte durchblättern wie Karten – allein oder zu zweit, bis ihr euch einig seid.</string>
+    <string name="ueberblick_sammlung_titel">Sammelt deine Rezepte</string>
+    <string name="ueberblick_sammlung_text">Eigene Rezepte und Fundstücke aus dem Web an einem Ort, mit Kochmodus und Timer.</string>
+    <string name="ueberblick_privat_titel">Bleibt bei dir</string>
+    <string name="ueberblick_privat_text">Kein Konto, keine Werbung. Deine Angaben liegen auf deinem Telefon – was es verlässt, sagen wir dir vorher.</string>
+    <string name="ueberblick_fragen">Gleich kommen ein paar kurze Fragen, damit die Vorschläge zu dir passen. Nichts davon ist Pflicht, und alles lässt sich später unter «Vorlieben» ändern.</string>
+    <string name="ueberblick_einrichten">Einrichten</string>
+    <string name="setup_design_titel">Wie soll Rezeptli aussehen?</string>
+    <string name="setup_design_text">Tipp eines an – du siehst es sofort. Ändern kannst du es jederzeit unter «Vorlieben».</string>
+
+    <string name="sichern_vorlieben">Vorlieben mit in die Datei</string>
+    <string name="sichern_vorlieben_text">Ernährung, Unverträglichkeiten, Abneigungen, Haushalt, Läden, Budget und Aussehen. Schalte es aus, wenn du die Datei weitergibst.</string>
+    <string name="sichern_nur_vorlieben_exportiert">Deine Vorlieben sind exportiert.</string>
+    <string name="sichern_vorlieben_frage_titel">Auch die Vorlieben übernehmen?</string>
+    <string name="sichern_vorlieben_frage_text">In der Datei stehen auch Vorlieben: Ernährung, Unverträglichkeiten, Abneigungen, Haushalt, Kochtage, Läden, Budget und Aussehen. Übernimmst du sie, ersetzen sie deine jetzigen.</string>
+    <string name="sichern_vorlieben_frage_von">Sie gehören zu %1$s.</string>
+    <string name="sichern_vorlieben_uebernehmen">Übernehmen</string>
+    <string name="sichern_vorlieben_behalten">Meine behalten</string>
+    <string name="sichern_vorlieben_uebernommen">Die Vorlieben aus der Datei gelten jetzt.</string>
+    <string name="sichern_vorlieben_geblieben">Deine Vorlieben sind geblieben, wie sie waren.</string>
+    <string name="sichern_vorlieben_gleich">In der Datei stehen nur Vorlieben, und sie gleichen deinen.</string>
+    <plurals name="sichern_exportiert_mit_vorlieben">
+        <item quantity="one">%d Rezept und deine Vorlieben exportiert.</item>
+        <item quantity="other">%d Rezepte und deine Vorlieben exportiert.</item>
+    </plurals>
 </resources>

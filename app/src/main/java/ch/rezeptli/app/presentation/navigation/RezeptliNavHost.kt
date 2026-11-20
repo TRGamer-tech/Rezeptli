@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -47,6 +49,7 @@ fun RezeptliNavHost(
     sharedUrl: String? = null,
     startDestination: String = Destinations.PLAN,
     navController: NavHostController = rememberNavController(),
+    shell: NavShellViewModel = hiltViewModel(),
 ) {
     // Ein geteilter Link fuehrt einmalig direkt in den Import.
     LaunchedEffect(sharedUrl) {
@@ -56,6 +59,7 @@ fun RezeptliNavHost(
     }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
+    val openShoppingItems by shell.openShoppingItems.collectAsStateWithLifecycle()
     val motion = RezeptliTheme.motion
 
     Scaffold(
@@ -76,7 +80,7 @@ fun RezeptliNavHost(
                     slideOutVertically(motion.offsetSpring()) { it } + fadeOut(motion.fade())
                 },
             ) {
-                RezeptliBottomBar(navController = navController)
+                RezeptliBottomBar(navController = navController, openShoppingItems = openShoppingItems)
             }
         },
     ) { leistenAbstand ->
@@ -136,7 +140,7 @@ fun RezeptliNavHost(
             composable(Destinations.PLAN) {
                 PlanRoute(
                     onOpenRecipe = { recipeId -> navController.navigate(Destinations.recipeDetail(recipeId)) },
-                    onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
+                    onOpenShoppingList = { navController.openTab(TabZiel.EINKAUF) },
                     onBuildPlan = { navController.navigate(Destinations.PLAN_BUILD) },
                 )
             }
@@ -179,7 +183,6 @@ fun RezeptliNavHost(
                     onImportRecipe = { navController.navigate(Destinations.recipeImport()) },
                     onSearchWeb = { navController.navigate(Destinations.WEB_SEARCH) },
                     onStartSwipe = { navController.navigate(Destinations.SWIPE_SETUP) },
-                    onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
                 )
             }
 
@@ -191,7 +194,7 @@ fun RezeptliNavHost(
                     onBack = { navController.popBackStack() },
                     onEdit = { recipeId -> navController.navigate(Destinations.recipeEdit(recipeId)) },
                     onStartCooking = { recipeId -> navController.navigate(Destinations.cooking(recipeId)) },
-                    onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
+                    onOpenShoppingList = { navController.openTab(TabZiel.EINKAUF) },
                 )
             }
 
@@ -315,12 +318,12 @@ fun RezeptliNavHost(
                             popUpTo(Destinations.RECIPE_LIST)
                         }
                     },
-                    onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
+                    onOpenShoppingList = { navController.openTab(TabZiel.EINKAUF) },
                 )
             }
 
             composable(Destinations.SHOPPING_LIST) {
-                ShoppingListRoute(onBack = { navController.popBackStack() })
+                ShoppingListRoute()
             }
         }
     }

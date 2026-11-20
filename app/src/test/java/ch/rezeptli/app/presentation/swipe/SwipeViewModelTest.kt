@@ -1,7 +1,11 @@
 package ch.rezeptli.app.presentation.swipe
 
 import androidx.lifecycle.SavedStateHandle
+import ch.rezeptli.app.domain.model.Ingredient
+import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.nutrition.NutritionBasis
+import ch.rezeptli.app.domain.nutrition.NutritionValue
 import ch.rezeptli.app.domain.swipe.SwipeMatcher
 import ch.rezeptli.app.domain.usecase.FinishSwipeSessionUseCase
 import ch.rezeptli.app.domain.usecase.RecordSwipeUseCase
@@ -28,8 +32,26 @@ class SwipeViewModelTest {
     private val recipeRepository = FakeRecipeRepository(
         listOf(
             Recipe(id = 1L, title = "Älplermagronen"),
-            Recipe(id = 2L, title = "Zürcher Geschnetzeltes"),
-            Recipe(id = 3L, title = "Rösti"),
+            // Von einer Rezeptseite, die ihre Naehrwerte nennt.
+            Recipe(
+                id = 2L,
+                title = "Zürcher Geschnetzeltes",
+                ingredients = listOf(Ingredient(name = "Kalbfleisch", amount = 500.0, unit = IngredientUnit.GRAMM)),
+                servings = 4,
+                kcalPerServing = 430,
+                proteinPerServing = 31.0,
+                sourceName = "Beispiel",
+            ),
+            // Selbst erfasst: Hier kann die App nur schaetzen.
+            Recipe(
+                id = 3L,
+                title = "Rösti",
+                ingredients = listOf(
+                    Ingredient(name = "Kartoffeln", amount = 800.0, unit = IngredientUnit.GRAMM),
+                    Ingredient(name = "Eier", amount = 4.0),
+                ),
+                servings = 4,
+            ),
         ),
     )
     private val sessionRepository = FakeSwipeSessionRepository()
@@ -139,5 +161,35 @@ class SwipeViewModelTest {
         assertEquals(3, state.totalCount)
         assertEquals(1, state.decidedCount)
         assertTrue(state.cards.none { it.id == firstCard.id })
+    }
+
+    @Test
+    fun `antippen zeigt unter den Zutaten Kalorien und Eiweiss - von der Quelle, sonst geschaetzt`() = runTest {
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.onInfoRequest(2L)
+        advanceUntilIdle()
+        val vonDerQuelle = viewModel.uiState.value.info!!
+        assertTrue(vonDerQuelle.showsNutrition)
+        assertEquals(NutritionValue(430, estimated = false), vonDerQuelle.nutrition?.kcal)
+        assertEquals(NutritionValue(31, estimated = false), vonDerQuelle.nutrition?.protein)
+
+        viewModel.onInfoRequest(3L)
+        advanceUntilIdle()
+        // 616 kcal Kartoffeln und 330 kcal Eier, durch vier - gerundet auf Zehner.
+        val geschaetzt = viewModel.uiState.value.info!!
+            .nutrition!!
+        assertEquals(NutritionValue(240, estimated = true), geschaetzt.kcal)
+        assertEquals(NutritionValue(11, estimated = true), geschaetzt.protein)
+        assertEquals(NutritionBasis.SERVING, geschaetzt.basis)
+
+        // Ein Rezept ohne Zutaten: nichts zu zeigen, auch kein "liess sich nicht schaetzen".
+        viewModel.onInfoRequest(1L)
+        advanceUntilIdle()
+        assertFalse(
+            viewModel.uiState.value.info!!
+                .showsNutrition,
+        )
     }
 }

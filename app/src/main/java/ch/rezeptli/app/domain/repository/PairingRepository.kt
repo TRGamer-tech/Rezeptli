@@ -4,6 +4,7 @@ import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.RoundState
+import ch.rezeptli.app.domain.multiplayer.SharedContent
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
@@ -74,6 +75,15 @@ interface PairingRepository {
      * zurueck: nichts Neues.
      */
     suspend fun roundState(code: String, revision: Int? = null, knownRound: Int = NO_ROUND): PairingResult<RoundState?>
+
+    /**
+     * Hinterlegt den Inhalt eines selbst erfassten Rezepts dieses Geraets, das ein gemeinsamer
+     * Treffer geworden ist - damit die andere Person es uebernehmen kann.
+     */
+    suspend fun shareContent(code: String, recipeId: Long, content: SharedContent): PairingResult<Unit>
+
+    /** Holt den Inhalt eines Treffers der anderen Person. `null`: Er liegt noch nicht bereit. */
+    suspend fun fetchContent(code: String, recipeId: Long): PairingResult<SharedContent?>
 
     /**
      * Die Kennung dieses Geraets innerhalb von Runden.

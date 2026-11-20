@@ -1,5 +1,7 @@
 package ch.rezeptli.app.domain.profile
 
+import java.time.LocalDate
+
 /** In welcher Waehrung ein Land rechnet. */
 enum class Currency(val symbol: String) {
     CHF("CHF"),
@@ -112,6 +114,9 @@ enum class Weekday(val short: String, val label: String) {
 
     companion object {
         fun fromName(value: String): Weekday? = entries.firstOrNull { it.name == value }
+
+        /** Der heutige Wochentag, nach der Uhr des Geraets. */
+        fun today(): Weekday = entries[LocalDate.now().dayOfWeek.value - 1]
     }
 }
 

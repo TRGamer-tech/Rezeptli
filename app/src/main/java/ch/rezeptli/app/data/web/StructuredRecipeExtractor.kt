@@ -1,6 +1,8 @@
 package ch.rezeptli.app.data.web
 
 import ch.rezeptli.app.domain.model.WebRecipe
+import ch.rezeptli.app.domain.nutrition.SourceNutrition
+import ch.rezeptli.app.domain.nutrition.SourceNutritionParser
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -68,6 +70,7 @@ class StructuredRecipeExtractor @Inject constructor() {
             keywords = recipe.toKeywords(),
             sourceUrl = sourceUrl,
             sourceName = sourceName,
+            nutrition = recipe["nutrition"].toNutrition() ?: document.microdataNutrition(),
         ).takeIf { it.isUsable }
     }
 
@@ -97,6 +100,7 @@ class StructuredRecipeExtractor @Inject constructor() {
             keywords = howTo.toKeywords(),
             sourceUrl = sourceUrl,
             sourceName = sourceName,
+            nutrition = howTo["nutrition"].toNutrition() ?: document.microdataNutrition(),
         ).takeIf { it.isUsable }
     }
 
@@ -137,6 +141,7 @@ class StructuredRecipeExtractor @Inject constructor() {
             imageUrl = WebUrl.absolute(document.metaImage(), sourceUrl),
             sourceUrl = sourceUrl,
             sourceName = sourceName,
+            nutrition = bereich.microdataNutrition(),
         ).takeIf { it.isUsable }
     }
 
@@ -155,6 +160,25 @@ class StructuredRecipeExtractor @Inject constructor() {
             }?.text()
             ?.cleanText()
             ?.takeIf { it.isNotBlank() }
+
+    /**
+     * Die Naehrwerte, wie Microdata sie auszeichnet - als sichtbarer Text ("512 kcal") oder im
+     * `content`-Attribut eines `meta`-Elements.
+     */
+    private fun Element.microdataNutrition(): SourceNutrition? {
+        fun wert(name: String): String? = selectFirst("[itemprop=$name]")?.let { element ->
+            element
+                .attr("content")
+                .ifBlank { element.text() }
+                .cleanText()
+                .takeIf { it.isNotBlank() }
+        }
+        return SourceNutritionParser.parse(
+            calories = wert("calories"),
+            protein = wert("proteinContent"),
+            servingSize = wert("servingSize"),
+        )
+    }
 
     private fun Element.microdataIngredients(): List<String> =
         select("[itemprop=recipeIngredient], [itemprop=ingredients]")
@@ -259,6 +283,20 @@ class StructuredRecipeExtractor @Inject constructor() {
         is JsonPrimitive -> contentOrEmpty().takeIf { it.isNotBlank() }
         is JsonArray -> firstNotNullOfOrNull { it.toImageUrl() }
         is JsonObject -> stringOrNull("url") ?: stringOrNull("contentUrl")
+        else -> null
+    }
+
+    /**
+     * Die Angaben aus `nutrition` (schema.org `NutritionInformation`): Kalorien und Eiweiss,
+     * als Text oder Zahl. Was davon zu halten ist, entscheidet der [SourceNutritionParser].
+     */
+    private fun JsonElement?.toNutrition(): SourceNutrition? = when (this) {
+        is JsonObject -> SourceNutritionParser.parse(
+            calories = stringOrNull("calories"),
+            protein = stringOrNull("proteinContent"),
+            servingSize = stringOrNull("servingSize"),
+        )
+        is JsonArray -> firstNotNullOfOrNull { it.toNutrition() }
         else -> null
     }
 

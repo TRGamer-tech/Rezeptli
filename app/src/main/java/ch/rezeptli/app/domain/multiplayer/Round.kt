@@ -1,5 +1,6 @@
 package ch.rezeptli.app.domain.multiplayer
 
+import ch.rezeptli.app.domain.deck.TitleKey
 import ch.rezeptli.app.domain.deck.UrlKey
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
@@ -8,7 +9,9 @@ import ch.rezeptli.app.domain.plan.DietaryFilter
  * Eine Karte der gemeinsamen Runde, wie beide sie sehen.
  *
  * Bewusst wenig: Geteilt wird nur, was zum Entscheiden noetig ist - Titel, Bild und Zeit.
- * Zutaten und Zubereitung bleiben auf dem Geraet.
+ * Zutaten und Zubereitung bleiben auf dem Geraet - mit einer Ausnahme: Wird ein selbst
+ * erfasstes Rezept zum gemeinsamen Treffer, hinterlegt sein Geraet den Inhalt beim Dienst,
+ * damit die andere Person es uebernehmen kann (siehe [SharedContent]).
  *
  * [recipeId] vergibt der Dienst und gilt nur in dieser Runde: Die Rezeptnummern der beiden
  * Telefone beginnen beide bei 1 und sagen einander nichts. Wiedererkannt wird ein Rezept
@@ -23,6 +26,35 @@ data class SharedRecipe(
     val key: String = "",
     /** Hat dieses Geraet die Karte beigesteuert? */
     val isMine: Boolean = false,
+    /** Nur bei Treffern: Liegt der Inhalt eines selbst erfassten Rezepts beim Dienst bereit? */
+    val hasContent: Boolean = false,
+) {
+    /** Selbst erfasst: Es gibt keine Adresse, von der sich das Rezept holen liesse. */
+    val isHandwritten: Boolean get() = sourceUrl == null
+}
+
+/**
+ * Zutaten und Zubereitung eines selbst erfassten Rezepts - fuer die Uebergabe an die andere
+ * Person, wenn es ein gemeinsamer Treffer geworden ist.
+ *
+ * Ohne Foto: Das liegt als Datei auf einem Telefon und waere fuer den kurzlebigen Dienst
+ * zu gross. Einheiten reisen als Name der Aufzaehlung ("GRAMM"); eine, die die andere App
+ * nicht kennt, faellt beim Lesen weg, die Zutat bleibt.
+ */
+data class SharedContent(
+    val instructions: String = "",
+    val steps: List<String> = emptyList(),
+    val ingredients: List<SharedIngredient> = emptyList(),
+    val servings: Int? = null,
+    val prepTimeMinutes: Int? = null,
+    val tags: List<String> = emptyList(),
+)
+
+data class SharedIngredient(
+    val name: String,
+    val amount: Double? = null,
+    val unit: String? = null,
+    val note: String? = null,
 )
 
 /** Eine Karte, die ein Geraet zum Stapel beisteuert - noch ohne Nummer, die vergibt der Dienst. */
@@ -114,6 +146,12 @@ data class RoundState(
     val othersDone: Boolean = false,
     val matchCount: Int = 0,
     val end: RoundEnd? = null,
+    /**
+     * Wie lange der Dienst noch auf fehlende Beitraege wartet, in Millisekunden ab diesem
+     * Stand - `null`, solange niemand beigetragen hat. Danach beginnt die Runde mit den
+     * Karten, die da sind.
+     */
+    val contributionWaitMs: Long? = null,
     val matches: List<SharedRecipe>? = null,
     val stack: List<SharedRecipe>? = null,
     val votes: List<SharedVote>? = null,
@@ -140,25 +178,17 @@ sealed interface RoundPoll {
 /**
  * Woran ein Rezept in einer Runde wiedererkannt wird.
  *
- * Ein Rezept aus dem Netz traegt den Fingerabdruck seiner Adresse: Kennen beide es, ist es
- * auf beiden Telefonen dasselbe und liegt nur einmal im Stapel. Ein selbst erfasstes Rezept
- * hat keine Adresse - sein Schluessel nennt das Geraet und die dortige Nummer, damit "Rezept
- * 7" der einen Person nicht mit "Rezept 7" der anderen verwechselt wird.
+ * Ein Rezept aus dem Netz traegt den Fingerabdruck seiner Adresse, ein selbst erfasstes den
+ * seines Titels. Kennen beide ein Rezept, hat es deshalb auf beiden Telefonen denselben
+ * Schluessel und liegt nur einmal im Stapel - auch ein selbst erfasstes, das die eine Person
+ * in einer frueheren Runde von der anderen uebernommen hat. Frueher nannte der Schluessel
+ * eines selbst erfassten Rezepts das Geraet und die dortige Nummer; dasselbe Gericht lag dann
+ * zweimal im Stapel, sobald beide es hatten.
  */
 object RoundKeys {
     fun forUrl(url: String): String = "u" + fingerprint(UrlKey.of(url))
 
-    fun forOwn(participantId: String, recipeId: Long): String = "e:${deviceTag(participantId)}:$recipeId"
-
-    /** Die Nummer des eigenen Rezepts hinter einem Schluessel - `null`, wenn es nicht von diesem Geraet stammt. */
-    fun ownRecipeId(key: String, participantId: String): Long? {
-        val prefix = "e:${deviceTag(participantId)}:"
-        return if (key.startsWith(prefix)) key.removePrefix(prefix).toLongOrNull() else null
-    }
-
-    /** Der Dienst laesst im Schluessel nur Buchstaben, Ziffern, Doppelpunkt, Binde- und Unterstrich zu. */
-    private fun deviceTag(participantId: String): String =
-        participantId.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(DEVICE_TAG_LENGTH)
+    fun forTitle(title: String): String = "t" + fingerprint(TitleKey.of(title))
 
     /**
      * FNV-1a ueber 64 Bit. Kein Geheimnis und keine Sicherheit - nur ein kurzer, auf beiden
@@ -175,7 +205,6 @@ object RoundKeys {
             .padStart(HEX_LENGTH, '0')
     }
 
-    private const val DEVICE_TAG_LENGTH = 10
     private const val HEX_LENGTH = 16
     private const val BYTE_MASK = 0xffL
     private const val FNV_PRIME = 0x100000001b3L

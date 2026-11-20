@@ -1,5 +1,6 @@
 package ch.rezeptli.app.data.web
 
+import ch.rezeptli.app.domain.nutrition.SourceNutrition
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -322,6 +323,92 @@ class StructuredRecipeExtractorTest {
             val rezept = extractor.extract(seite, "https://example.ch/rezepte/roesti", "Beispiel")
 
             assertEquals("https://example.ch/bilder/roesti.jpg", rezept?.imageUrl)
+        }
+    }
+
+    @Nested
+    @DisplayName("Naehrwerte der Quelle")
+    inner class Naehrwerte {
+        private fun rezeptMit(nutrition: String?, body: String = ""): String = page(
+            """
+            {"@context":"https://schema.org","@type":"Recipe","name":"Linsensuppe",
+             "recipeYield":"4 Portionen",
+             "recipeIngredient":["300 g Linsen","2 Karotten"],
+             "recipeInstructions":"Kochen."${nutrition?.let { ",\"nutrition\":$it" }.orEmpty()}}
+            """.trimIndent(),
+            body = body,
+        )
+
+        private fun naehrwerte(seite: String) =
+            extractor.extract(seite, "https://example.ch/rezepte/linsensuppe", "Beispiel")?.nutrition
+
+        @Test
+        fun `liest Kalorien und Eiweiss aus den Naehrwertangaben der Seite`() {
+            val seite = rezeptMit(
+                """{"@type":"NutritionInformation","calories":"412 kcal","proteinContent":"24 g","fatContent":"9 g"}""",
+            )
+
+            assertEquals(SourceNutrition(kcal = 412, proteinGrams = 24.0), naehrwerte(seite))
+        }
+
+        @Test
+        fun `versteht Zahlen ohne Einheit und Kilojoule`() {
+            assertEquals(
+                SourceNutrition(kcal = 412, proteinGrams = 24.5),
+                naehrwerte(rezeptMit("""{"calories":412,"proteinContent":24.5}""")),
+            )
+            assertEquals(
+                SourceNutrition(kcal = 412, proteinGrams = null),
+                naehrwerte(rezeptMit("""{"calories":"1724 kJ"}""")),
+            )
+        }
+
+        @Test
+        fun `Angaben pro 100 Gramm zaehlen nicht - dann schaetzt die App`() {
+            val seite = rezeptMit("""{"calories":"95 kcal","proteinContent":"6 g","servingSize":"100 g"}""")
+
+            assertNull(naehrwerte(seite))
+        }
+
+        @Test
+        fun `ohne Angabe oder mit leeren Feldern gibt es keine Naehrwerte`() {
+            assertNull(naehrwerte(rezeptMit(null)))
+            assertNull(
+                naehrwerte(rezeptMit("""{"@type":"NutritionInformation","calories":"","proteinContent":"0 g"}""")),
+            )
+            assertNull(naehrwerte(rezeptMit("""{"calories":"0 kcal"}""")))
+        }
+
+        @Test
+        fun `findet Naehrwerte auch als Microdata neben dem JSON-LD`() {
+            val seite = rezeptMit(
+                nutrition = null,
+                body = """
+                    <div itemprop="nutrition" itemscope itemtype="https://schema.org/NutritionInformation">
+                      <span itemprop="calories">412 kcal</span>
+                      <meta itemprop="proteinContent" content="24 g">
+                    </div>
+                """.trimIndent(),
+            )
+
+            assertEquals(SourceNutrition(kcal = 412, proteinGrams = 24.0), naehrwerte(seite))
+        }
+
+        @Test
+        fun `liest die Naehrwerte einer Seite, die nur Microdata hat`() {
+            val seite = """
+                <html><body>
+                <div itemscope itemtype="https://schema.org/Recipe">
+                  <h1 itemprop="name">Linsensuppe</h1>
+                  <span itemprop="recipeIngredient">300 g Linsen</span>
+                  <div itemprop="recipeInstructions">Kochen.</div>
+                  <span itemprop="calories">412 kcal</span>
+                  <span itemprop="proteinContent">24 g</span>
+                </div>
+                </body></html>
+            """.trimIndent()
+
+            assertEquals(SourceNutrition(kcal = 412, proteinGrams = 24.0), naehrwerte(seite))
         }
     }
 }

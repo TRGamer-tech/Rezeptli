@@ -19,6 +19,11 @@ import { Miniflare } from "miniflare";
 
 const WURZEL = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+/** Die Frist fuer fehlende Beitraege in diesem Testlauf. */
+const FRIST_MS = 600;
+
+const warte = (ms) => new Promise((fertig) => setTimeout(fertig, ms));
+
 let bestanden = 0;
 
 function pruefe(bedingung, beschreibung, anhang) {
@@ -47,6 +52,9 @@ async function dienstStarten() {
         script: gebaut.outputFiles[0].text,
         compatibilityDate: "2025-01-01",
         d1Databases: { DB: "pruefung" },
+        // Die Frist fuer fehlende Beitraege dauert im Betrieb eine Minute - so lange wartet
+        // hier niemand. Alle anderen Ablaeufe sind in Millisekunden durch und merken nichts davon.
+        bindings: { SAMMEL_FRIST_MS: String(FRIST_MS) },
     });
 
     // Die Migrationen in ihrer Reihenfolge - so, wie wrangler sie auch anwendet.
@@ -509,6 +517,178 @@ async function verlassenUndSchliessen(ruf, db) {
     pruefe(weg.status === 404, "eine gelöschte Runde gibt es nicht mehr");
 }
 
+async function fristFuerFehlendeBeitraege(ruf) {
+    console.log("\n-- Ein Telefon steuert nie etwas bei --");
+    const { code } = await lobby(ruf);
+    await ruf("POST", `/v2/sitzung/${code}/start`, { teilnehmer: ANNA });
+
+    const vorher = await stand(ruf, code, ANNA);
+    pruefe(vorher.daten.zustand === "sammeln" && vorher.daten.fristRestMs === null, "solange niemand beigetragen hat, läuft keine Frist");
+
+    const beitrag = await ruf("POST", `/v2/sitzung/${code}/beitrag`, {
+        teilnehmer: ANNA,
+        runde: 0,
+        rezepte: [karte("u1", "Rösti"), karte("u2", "Risotto")],
+    });
+    pruefe(
+        beitrag.daten.zustand === "sammeln" && beitrag.daten.fristRestMs > 0 && beitrag.daten.fristRestMs <= FRIST_MS,
+        "mit dem ersten Beitrag beginnt die Frist für die andere Person",
+        beitrag.daten,
+    );
+
+    const gleich = await stand(ruf, code, ANNA, `&stand=${beitrag.daten.standNr}`);
+    pruefe(gleich.daten.unveraendert === true, "vor Ablauf der Frist wartet die Runde weiter");
+
+    await warte(FRIST_MS + 150);
+    // Das Nachfragen selbst stoesst die Entscheidung an - auch wenn das Geraet den Stand schon kennt.
+    const danach = await stand(ruf, code, ANNA, `&stand=${beitrag.daten.standNr}&runde=-1`);
+    pruefe(
+        danach.daten.zustand === "laeuft" && danach.daten.stapel.map((eintrag) => eintrag.titel).join() === "Rösti,Risotto",
+        "ist die Frist um, beginnt die Runde mit den Karten, die da sind",
+        danach.daten,
+    );
+    pruefe(danach.daten.fristRestMs === null && danach.daten.wartetAuf === 0, "danach wartet niemand mehr auf jemanden");
+
+    const verspaetet = await ruf("POST", `/v2/sitzung/${code}/beitrag`, {
+        teilnehmer: BEAT,
+        runde: 0,
+        kenntRunde: -1,
+        rezepte: [karte("u3", "Zu spät")],
+    });
+    pruefe(
+        verspaetet.status === 200 && verspaetet.daten.zustand === "laeuft" && verspaetet.daten.stapel.length === 2,
+        "wer zu spät beisteuert, wischt den Stapel mit, der schon steht",
+        verspaetet.daten,
+    );
+
+    // Wer als Einzige beisteuert und nichts Passendes hat: Dann geht es mit neuen Rezepten weiter.
+    const leer = await lobby(ruf);
+    await ruf("POST", `/v2/sitzung/${leer.code}/start`, { teilnehmer: ANNA });
+    await ruf("POST", `/v2/sitzung/${leer.code}/beitrag`, { teilnehmer: BEAT, runde: 0, rezepte: [] });
+    await warte(FRIST_MS + 150);
+    const weiter = await stand(ruf, leer.code, BEAT);
+    pruefe(
+        weiter.daten.zustand === "sammeln" && weiter.daten.runde === 1 && weiter.daten.quelle === "neu" && weiter.daten.fristRestMs === null,
+        "hat die einzige Person, die da ist, nichts Gespeichertes, geht es nach der Frist mit neuen Rezepten weiter",
+        weiter.daten,
+    );
+    pruefe(weiter.daten.beigetragen === false, "für die neue Runde ist wieder jeder gefragt - die Frist beginnt von vorn");
+}
+
+async function selbstErfassteTreffer(ruf, db) {
+    console.log("\n-- Ein selbst erfasstes Rezept wird zum Treffer --");
+    const { code } = await lobby(ruf);
+    await ruf("POST", `/v2/sitzung/${code}/einstellungen`, { teilnehmer: ANNA, ziel: 2 });
+    await ruf("POST", `/v2/sitzung/${code}/start`, { teilnehmer: ANNA });
+    await ruf("POST", `/v2/sitzung/${code}/beitrag`, {
+        teilnehmer: ANNA,
+        runde: 0,
+        rezepte: [karte("e:anna:7", "Omas Hackbraten"), karte("e:anna:8", "Tante Rosas Eintopf")],
+    });
+    const laeuft = await ruf("POST", `/v2/sitzung/${code}/beitrag`, {
+        teilnehmer: BEAT,
+        runde: 0,
+        kenntRunde: -1,
+        rezepte: [karte("u1", "Rösti", { quelleUrl: "https://beispiel.ch/roesti" })],
+    });
+    const nachTitel = Object.fromEntries(laeuft.daten.stapel.map((eintrag) => [eintrag.titel, eintrag.rezeptId]));
+    const hackbraten = nachTitel["Omas Hackbraten"];
+    const eintopf = nachTitel["Tante Rosas Eintopf"];
+    const roesti = nachTitel["Rösti"];
+
+    const inhalt = {
+        zubereitung: "Alles mischen, formen, eine Stunde im Ofen backen.",
+        schritte: ["Mischen und formen.", "Eine Stunde backen."],
+        zutaten: [
+            { name: "Hackfleisch", menge: 800, einheit: "GRAMM" },
+            { name: "Zwiebeln", menge: 2, einheit: "NONE", notiz: "fein gehackt" },
+            { name: "Salz" },
+        ],
+        portionen: 4,
+        zeit: 75,
+        tags: ["Familie"],
+    };
+
+    const zuFrueh = await ruf("POST", `/v2/sitzung/${code}/inhalt`, { teilnehmer: ANNA, rezeptId: hackbraten, inhalt });
+    pruefe(zuFrueh.status === 409, "solange gewischt wird, verlässt kein Rezeptinhalt das Gerät");
+
+    await stimme(ruf, code, ANNA, [
+        { rezeptId: hackbraten, mag: true },
+        { rezeptId: eintopf, mag: true },
+        { rezeptId: roesti, mag: true },
+    ]);
+    const ende = await stimme(ruf, code, BEAT, [
+        { rezeptId: hackbraten, mag: true },
+        { rezeptId: eintopf, mag: false },
+        { rezeptId: roesti, mag: true },
+    ]);
+    pruefe(ende.daten.zustand === "beendet" && ende.daten.treffer.length === 2, "zwei Treffer: der Hackbraten und die Rösti", ende.daten);
+    pruefe(
+        ende.daten.treffer.every((treffer) => treffer.inhalt === false),
+        "zu Beginn liegt zu keinem Treffer ein Inhalt beim Dienst",
+        ende.daten.treffer,
+    );
+
+    const nochNicht = await ruf("GET", `/v2/sitzung/${code}/inhalt?teilnehmer=${BEAT}&rezept=${hackbraten}`);
+    pruefe(
+        nochNicht.status === 200 && nochNicht.daten.inhalt === null,
+        "was noch nicht hinterlegt ist, ist kein Fehler - es ist nur noch nicht da",
+        nochNicht.daten,
+    );
+
+    const keinTreffer = await ruf("POST", `/v2/sitzung/${code}/inhalt`, { teilnehmer: ANNA, rezeptId: eintopf, inhalt });
+    pruefe(keinTreffer.status === 409, "ein Rezept, das nur eine Person mochte, bleibt auf ihrem Gerät");
+
+    const fremdes = await ruf("POST", `/v2/sitzung/${code}/inhalt`, { teilnehmer: BEAT, rezeptId: hackbraten, inhalt });
+    pruefe(fremdes.status === 409, "den Inhalt hinterlegt nur das Gerät, von dem das Rezept stammt");
+
+    const mitAdresse = await ruf("POST", `/v2/sitzung/${code}/inhalt`, { teilnehmer: BEAT, rezeptId: roesti, inhalt });
+    pruefe(mitAdresse.status === 409, "ein Rezept mit Adresse braucht keinen Inhalt beim Dienst - es wird von seiner Seite geholt");
+
+    const leererInhalt = await ruf("POST", `/v2/sitzung/${code}/inhalt`, { teilnehmer: ANNA, rezeptId: hackbraten, inhalt: { tags: ["x"] } });
+    pruefe(leererInhalt.status === 400, "ein Inhalt ohne Zutaten und Zubereitung ist keiner");
+
+    const zuGross = await ruf("POST", `/v2/sitzung/${code}/inhalt`, {
+        teilnehmer: ANNA,
+        rezeptId: hackbraten,
+        inhalt: { ...inhalt, schritte: Array.from({ length: 60 }, () => "x".repeat(2000)) },
+    });
+    pruefe(zuGross.status === 413, "ein übergrosser Inhalt wird abgelehnt statt gekürzt gespeichert");
+
+    const hinterlegt = await ruf("POST", `/v2/sitzung/${code}/inhalt`, {
+        teilnehmer: ANNA,
+        rezeptId: hackbraten,
+        inhalt: { ...inhalt, geheim: "gehört nicht dazu", zutaten: [...inhalt.zutaten, { menge: 3 }, "kaputt"] },
+    });
+    pruefe(hinterlegt.status === 200 && hinterlegt.daten.gespeichert === true, "der Inhalt eines gemeinsamen Treffers lässt sich hinterlegen");
+
+    const geholt = await ruf("GET", `/v2/sitzung/${code}/inhalt?teilnehmer=${BEAT}&rezept=${hackbraten}`);
+    pruefe(
+        geholt.status === 200 &&
+            geholt.daten.inhalt.zutaten.length === 3 &&
+            geholt.daten.inhalt.zutaten[0].menge === 800 &&
+            geholt.daten.inhalt.zutaten[1].notiz === "fein gehackt" &&
+            geholt.daten.inhalt.zutaten[2].menge === null &&
+            geholt.daten.inhalt.schritte.length === 2 &&
+            geholt.daten.inhalt.portionen === 4 &&
+            geholt.daten.inhalt.zeit === 75,
+        "die andere Person bekommt Zutaten, Schritte, Portionen und Zeit",
+        geholt.daten,
+    );
+    pruefe(!("geheim" in geholt.daten.inhalt), "gespeichert wird nur, was der Dienst kennt");
+
+    const beiBeat = await stand(ruf, code, BEAT);
+    const marke = Object.fromEntries(beiBeat.daten.treffer.map((treffer) => [treffer.titel, treffer.inhalt]));
+    pruefe(marke["Omas Hackbraten"] === true && marke["Rösti"] === false, "der Stand zeigt, zu welchem Treffer der Inhalt da ist", beiBeat.daten.treffer);
+
+    const fremd = await ruf("GET", `/v2/sitzung/${code}/inhalt?teilnehmer=${CEM}&rezept=${hackbraten}`);
+    pruefe(fremd.status === 403, "wer nicht in der Runde ist, bekommt den Inhalt nicht");
+
+    await ruf("POST", `/v2/sitzung/${code}/schliessen`, { teilnehmer: ANNA });
+    const uebrig = await db.prepare("SELECT COUNT(*) AS anzahl FROM inhalte WHERE code = ?1").bind(code).first();
+    pruefe(uebrig.anzahl === 0, "mit der Runde verschwindet auch der hinterlegte Inhalt");
+}
+
 async function eingabenAbsichern(ruf) {
     console.log("\n-- Eingaben von aussen --");
     const ohneKennung = await ruf("POST", "/v2/sitzung", { einschraenkungen: {} });
@@ -553,6 +733,8 @@ async function main() {
         await ohneGespeicherte(ruf);
         await nurNeue(ruf);
         await verlassenUndSchliessen(ruf, db);
+        await fristFuerFehlendeBeitraege(ruf);
+        await selbstErfassteTreffer(ruf, db);
         await eingabenAbsichern(ruf);
         console.log(`\nAlle ${bestanden} Prüfungen bestanden.`);
     } finally {

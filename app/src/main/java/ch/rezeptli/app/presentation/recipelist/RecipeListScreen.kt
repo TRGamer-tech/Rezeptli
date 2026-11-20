@@ -28,10 +28,7 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwipeRight
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
@@ -79,7 +76,6 @@ import ch.rezeptli.app.presentation.common.components.RezeptliFilterChip
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.entrance
-import ch.rezeptli.app.presentation.common.components.popOnChange
 import ch.rezeptli.app.presentation.common.components.pressScale
 import ch.rezeptli.app.presentation.common.components.rememberEntranceState
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
@@ -99,7 +95,6 @@ fun RecipeListRoute(
     onImportRecipe: () -> Unit,
     onSearchWeb: () -> Unit,
     onStartSwipe: () -> Unit,
-    onOpenShoppingList: () -> Unit,
     viewModel: RecipeListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -134,7 +129,6 @@ fun RecipeListRoute(
         onCreateRecipe = onCreateRecipe,
         onImportRecipe = onImportRecipe,
         onSearchWeb = onSearchWeb,
-        onOpenShoppingList = onOpenShoppingList,
         onRemoveRequest = viewModel::onRemoveRequest,
         onCookedRequest = viewModel::onCookedRequest,
         onStartSwipe = {
@@ -180,7 +174,6 @@ fun RecipeListScreen(
     onCreateRecipe: () -> Unit,
     onImportRecipe: () -> Unit,
     onSearchWeb: () -> Unit,
-    onOpenShoppingList: () -> Unit,
     onRemoveRequest: (RecipeSummary) -> Unit,
     onCookedRequest: (RecipeSummary) -> Unit,
     onStartSwipe: () -> Unit,
@@ -198,25 +191,6 @@ fun RecipeListScreen(
                     stringResource(R.string.begruessung_mit_name, uiState.firstName)
                 },
                 actions = {
-                    if (uiState.openShoppingItems > 0) {
-                        BadgedBox(
-                            badge = {
-                                Badge(modifier = Modifier.popOnChange(uiState.openShoppingItems)) {
-                                    Text(uiState.openShoppingItems.toString())
-                                }
-                            },
-                        ) {
-                            BouncyIconButton(onClick = onOpenShoppingList) {
-                                Icon(
-                                    imageVector = Icons.Filled.ShoppingCart,
-                                    contentDescription = stringResource(
-                                        R.string.shopping_open_badge,
-                                        uiState.openShoppingItems,
-                                    ),
-                                )
-                            }
-                        }
-                    }
                     BouncyIconButton(onClick = onImportRecipe) {
                         Icon(
                             imageVector = Icons.Filled.ContentPaste,

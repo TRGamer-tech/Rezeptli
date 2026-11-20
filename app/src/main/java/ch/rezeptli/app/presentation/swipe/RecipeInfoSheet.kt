@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import ch.rezeptli.app.R
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
 import ch.rezeptli.app.presentation.common.components.CookingPot
+import ch.rezeptli.app.presentation.common.components.NutritionNote
 import ch.rezeptli.app.presentation.common.components.PrepTimeLabel
 import ch.rezeptli.app.presentation.common.displayText
 
@@ -128,6 +129,11 @@ fun RecipeInfoSheet(
                     info.ingredients.forEach { zutat -> IngredientLine(zutat.displayText()) }
                     if (info.isForeign) Note(R.string.karte_fremdsprachig)
                 }
+            }
+
+            // Unter den Zutaten: was eine Portion an Kalorien und Eiweiss bringt.
+            if (info.showsNutrition) {
+                NutritionNote(facts = info.nutrition, sourceName = info.sourceName)
             }
         }
     }

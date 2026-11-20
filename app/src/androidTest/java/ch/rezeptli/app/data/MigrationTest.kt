@@ -100,6 +100,43 @@ class MigrationTest {
             assertTrue(cursor.moveToFirst())
             assertEquals("Bestehende Rezepte bleiben in der Sammlung", 1, cursor.getInt(0))
         }
+
+        // Version 7 merkt sich die Naehrwerte der Quelle. Ein altes Rezept hat keine - dafuer
+        // schaetzt die App aus den Zutaten.
+        db.query("SELECT kcalPerServing, proteinPerServing FROM recipes").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue("Alte Rezepte haben keine Kalorienangabe der Quelle", cursor.isNull(0))
+            assertTrue("Alte Rezepte haben keine Eiweissangabe der Quelle", cursor.isNull(1))
+        }
+    }
+
+    @Test
+    fun dieNaehrwerteDerQuelleKommenDazuOhneBestehendesAnzufassen() {
+        helper.createDatabase(TEST_DB_NUTRITION, 6).use { db ->
+            db.execSQL(
+                "INSERT INTO recipes " +
+                    "(id, title, instructions, createdAt, updatedAt, servings, sourceUrl, inCollection) " +
+                    "VALUES (1, 'Risotto', 'Rühren.', 1, 1, 4, 'https://a.example/risotto', 0)",
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB_NUTRITION, CURRENT_VERSION, true, *RezeptliDatabase.MIGRATIONS)
+
+        db.query("SELECT servings, inCollection, kcalPerServing, proteinPerServing FROM recipes").use { cursor ->
+            assertTrue("Das Rezept muss die Migration ueberleben", cursor.moveToFirst())
+            assertEquals(4, cursor.getInt(0))
+            assertEquals("Ein Rezept nur fuer den Plan bleibt eines", 0, cursor.getInt(1))
+            assertTrue(cursor.isNull(2))
+            assertTrue(cursor.isNull(3))
+        }
+
+        // Die neuen Spalten nehmen auf, was eine Rezeptseite nennt - auch Nachkommastellen.
+        db.execSQL("UPDATE recipes SET kcalPerServing = 512, proteinPerServing = 23.5 WHERE id = 1")
+        db.query("SELECT kcalPerServing, proteinPerServing FROM recipes").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(512, cursor.getInt(0))
+            assertEquals(23.5, cursor.getDouble(1), 0.001)
+        }
     }
 
     @Test
@@ -151,6 +188,7 @@ class MigrationTest {
     private companion object {
         const val TEST_DB = "migration-test"
         const val TEST_DB_PLAN = "migration-test-plan"
-        const val CURRENT_VERSION = 6
+        const val TEST_DB_NUTRITION = "migration-test-nutrition"
+        const val CURRENT_VERSION = 7
     }
 }

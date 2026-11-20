@@ -7,6 +7,7 @@ import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.RoundState
+import ch.rezeptli.app.domain.multiplayer.SharedContent
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.CourseChoice
@@ -63,6 +64,15 @@ class FakePairingRepository(
     /** So viele der naechsten Beitraege scheitern am Netz - alles andere klappt weiter. */
     var failNextContributions = 0
 
+    /** Was die App an Rezeptinhalten hinterlegt hat - nur selbst erfasste Treffer gehoeren hierher. */
+    val sharedContents = linkedMapOf<Long, SharedContent>()
+
+    /** Zu welchen Karten die App einen Inhalt holen wollte - in der Reihenfolge der Anfragen. */
+    val contentRequests = mutableListOf<Long>()
+
+    /** So viele der naechsten Versuche, einen Inhalt zu hinterlegen oder zu holen, scheitern am Netz. */
+    var failNextContentCalls = 0
+
     /** Wie oft der Stand abgefragt wurde, und wie oft dabei der Stapel mitkam. */
     var stateRequests = 0
         private set
@@ -75,6 +85,7 @@ class FakePairingRepository(
     private val myVotes = linkedMapOf<Long, Boolean>()
     private val theirVotes = mutableMapOf<Long, Boolean>()
     private var partnerContribution: List<RoundOffer>? = null
+    private val partnerContents = mutableMapOf<Long, SharedContent>()
     private var nextId = 1L
 
     /** Der Stapel der laufenden Runde, wie beide ihn sehen. */
@@ -116,6 +127,23 @@ class FakePairingRepository(
     fun partnerContributes(vararg offers: RoundOffer) {
         partnerContribution = offers.toList()
         buildStackIfComplete()
+        changed()
+    }
+
+    /**
+     * Das andere Telefon meldet sich nicht - die Frist laeuft ab, und die Runde beginnt mit
+     * dem, was dieses Geraet beigesteuert hat.
+     */
+    fun contributionDeadlinePasses() {
+        if (phase != RoundPhase.SAMMELN || round !in myContributions) return
+        partnerContribution = partnerContribution ?: emptyList()
+        buildStackIfComplete()
+        changed()
+    }
+
+    /** Die andere Person hinterlegt den Inhalt eines ihrer selbst erfassten Treffer. */
+    fun partnerShares(recipeId: Long, content: SharedContent) {
+        partnerContents[recipeId] = content
         changed()
     }
 
@@ -258,6 +286,32 @@ class FakePairingRepository(
         return PairingResult.Success(state(knownRound))
     }
 
+    override suspend fun shareContent(code: String, recipeId: Long, content: SharedContent): PairingResult<Unit> {
+        failWith?.let { return PairingResult.Failure(it) }
+        if (failNextContentCalls > 0) {
+            failNextContentCalls -= 1
+            return PairingResult.Failure(PairingError.NO_CONNECTION)
+        }
+        if (!exists) return PairingResult.Failure(PairingError.UNKNOWN_CODE)
+        // Wie der echte Dienst: nur ein gemeinsamer Treffer, nur ohne Adresse, nur vom eigenen Geraet.
+        val karte = matches.firstOrNull { it.recipeId == recipeId }
+        if (karte == null || !karte.isMine || !karte.isHandwritten) return PairingResult.Failure(PairingError.FULL)
+        sharedContents[recipeId] = content
+        changed()
+        return PairingResult.Success(Unit)
+    }
+
+    override suspend fun fetchContent(code: String, recipeId: Long): PairingResult<SharedContent?> {
+        contentRequests += recipeId
+        failWith?.let { return PairingResult.Failure(it) }
+        if (failNextContentCalls > 0) {
+            failNextContentCalls -= 1
+            return PairingResult.Failure(PairingError.NO_CONNECTION)
+        }
+        if (!exists) return PairingResult.Failure(PairingError.UNKNOWN_CODE)
+        return PairingResult.Success(partnerContents[recipeId] ?: sharedContents[recipeId])
+    }
+
     override suspend fun participantId(): String = PARTICIPANT
 
     // ------------------------------------------------------------------ Regeln
@@ -357,7 +411,13 @@ class FakePairingRepository(
             othersDone = offen.isNotEmpty() && offen.all { it.recipeId in theirVotes },
             matchCount = matches.size,
             end = end,
-            matches = matches.takeIf { phase == RoundPhase.FRAGE || phase == RoundPhase.BEENDET },
+            // Die Frist laeuft, sobald genau eine Seite beigetragen hat.
+            contributionWaitMs = DEADLINE_MS.takeIf {
+                phase == RoundPhase.SAMMELN && (round in myContributions) != (partnerContribution != null)
+            },
+            matches = matches
+                .map { it.copy(hasContent = it.recipeId in partnerContents || it.recipeId in sharedContents) }
+                .takeIf { phase == RoundPhase.FRAGE || phase == RoundPhase.BEENDET },
             stack = offen.takeIf { mitStapel },
             votes = myVotes.filterKeys { it in kennungen }.map { SharedVote(it.key, it.value) }.takeIf { mitStapel },
         )
@@ -367,6 +427,7 @@ class FakePairingRepository(
         const val CODE = "ABC123"
         const val EXPIRY = 9_999_999_999_999L
         const val PARTICIPANT = "test-teilnehmer"
+        const val DEADLINE_MS = 60_000L
         private const val NO_STACK = Int.MIN_VALUE
     }
 }

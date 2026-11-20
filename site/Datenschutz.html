@@ -32,7 +32,8 @@
   <p class="lead">Rezeptli kennt dich nicht. Hier steht, was die App trotzdem tut.</p>
 
   <h2>Deine Rezepte bleiben auf dem Gerät</h2>
-  <p>Rezeptli speichert deine Rezepte, deinen Wochenplan, deine Einkaufsliste und deine Swipe-Entscheidungen ausschliesslich lokal in einer Datenbank auf deinem Android-Gerät. Nichts davon wird irgendwohin übertragen – mit genau einer Ausnahme, die du selbst auslöst: wenn du zu zweit entscheidest (siehe unten).</p>
+  <p>Rezeptli speichert deine Rezepte, deinen Wochenplan, deine Einkaufsliste, deine Swipe-Entscheidungen und was du zuletzt gekocht hast ausschliesslich lokal auf deinem Android-Gerät. Nichts davon wird irgendwohin übertragen – mit genau einer Ausnahme, die du selbst auslöst: wenn du zu zweit entscheidest (siehe unten).</p>
+  <p>Eines liegt nicht in unserer Hand: Hast du auf deinem Telefon die Sicherung von Android eingeschaltet, nimmt Android die Datenbank mit deinen Rezepten in diese Sicherung in deinem Google-Konto auf – ohne Fotos. Das ist die Sicherung deines Telefons, kein Dienst von Rezeptli; wir haben darauf keinen Zugriff.</p>
 
   <h2>Internet nur, wenn du selbst suchst oder importierst</h2>
   <p>Die App braucht die Berechtigung <code>INTERNET</code>. Sie wird ausschliesslich benutzt, wenn du selbst nach einem Rezept suchst oder eines von einer Adresse lädst – die App ruft dann genau diese eine Seite ab.</p>
@@ -48,10 +49,21 @@
     <li>eure <strong>Entscheidungen</strong> dazu, damit die Runde aufhören kann, sobald ihr genug gemeinsam gefunden habt.</li>
     <li>was ihr für die Runde <strong>ausschliesst</strong>: Ernährungsform, Unverträglichkeiten und Abneigungen. Das zweite Telefon muss davon erfahren, damit „kein Fisch“ der einen Person auch für die andere gilt. Die Angaben werden für beide zusammengelegt gespeichert – ohne Vermerk, von wem welche stammt.</li>
   </ul>
-  <p>Zutaten, Zubereitung und deine eigenen Fotos bleiben auf deinem Gerät. Der Dienst kennt keine Namen und keine Konten, die Kennung deines Geräts ist eine Zufallszahl ohne Bezug zu dir, und nach zwölf Stunden wird die Runde samt allen Stimmen gelöscht – wer sie eröffnet hat, kann das auch sofort tun. Wer nicht zu zweit entscheidet, erreicht diesen Dienst nie.</p>
+  <p>Zutaten, Zubereitung und deine eigenen Fotos bleiben auf deinem Gerät – mit einer Ausnahme: Mögt ihr beide ein Rezept, das eine von euch <strong>selbst erfasst</strong> hat, gehen dessen Zutaten und Zubereitung (ohne Foto) über den Dienst an die andere Person. Ein Rezept aus dem Web holt sie sich von seiner Adresse; ein selbst erfasstes hat keine, und ohne diesen Weg könnte nur eine von euch den gemeinsamen Treffer kochen. Was ihr nicht beide mögt, verlässt dein Telefon nie.</p>
+  <p>Der Dienst kennt keine Namen und keine Konten, die Kennung deines Geräts ist eine Zufallszahl ohne Bezug zu dir, und nach zwölf Stunden wird die Runde samt allen Stimmen und hinterlegten Rezepten gelöscht – wer sie eröffnet hat, kann das auch sofort tun. Wer nicht zu zweit entscheidet, erreicht diesen Dienst nie.</p>
 
   <h2>Vorlieben und Wochenplan</h2>
   <p>Name, Land, Läden, Budget und was du gern oder gar nicht isst, werden nur auf deinem Gerät gespeichert und nirgends hingeschickt – mit der einen Ausnahme von oben: Was du nicht isst, gilt in einer gemeinsamen Runde für euch beide. Preise stammen aus einer Tabelle in der App, nicht aus einer Abfrage beim Laden; ausserhalb der Schweiz sind es grobe Richtwerte.</p>
+
+  <h2>Sichern und übertragen</h2>
+  <p>Du kannst deine Sammlung samt eigenen Fotos als eine Datei exportieren und auf einem anderen Telefon wieder einlesen. Die Datei entsteht nur, wenn du sie anlegst, und liegt dort, wo du sie im Dateidialog deines Telefons hinlegst – Rezeptli lädt sie nirgends hoch. Sie ist nicht verschlüsselt: Wer die Datei hat, kann lesen, was darin steht. Eine Speicher-Berechtigung braucht die App dafür nicht; Android gibt ihr genau die eine Datei frei, die du wählst.</p>
+  <p>Solange der Schalter „Vorlieben mit in die Datei“ an ist, stehen in der Datei auch deine Vorlieben: Vorname, Land, Ernährungsform, Unverträglichkeiten, Abneigungen, Haushaltsgrösse, Kochtage, Läden, Budget und das gewählte Aussehen. Das erspart dir auf einem neuen Telefon die Einrichtung. Gibst du die Datei jemandem weiter, schalte ihn vorher aus – dann stehen nur die Rezepte darin. Liest jemand eine Datei mit Vorlieben ein, fragt die App, ob sie die eigenen ersetzen sollen; von selbst tut sie das nie.</p>
+
+  <h2>Kalorien und Eiweiss</h2>
+  <p>Die Nährwerte unter einer Zutatenliste stammen entweder von der Rezeptseite, von der das Rezept kommt, oder die App schätzt sie auf deinem Gerät aus den Zutaten – mit einer Tabelle, die in der App steckt. Dafür wird nichts abgefragt und nichts verschickt. Die Zahlen sind Richtwerte für den Alltag, keine medizinische Angabe.</p>
+
+  <h2>Der Timer im Kochmodus</h2>
+  <p>Damit ein Timer auch klingelt, wenn das Telefon gesperrt oder gerade eine andere App offen ist, zeigt Rezeptli währenddessen eine Mitteilung mit der Restzeit, hält das Gerät wach und vibriert am Ende. Dafür stehen im Manifest die Berechtigungen für Mitteilungen, Vibration und einen Dienst im Vordergrund. Sie werden nur benutzt, solange ein Timer läuft, und nichts davon verlässt dein Gerät. Um die Mitteilungen bittet die App, wenn du den ersten Timer startest – lehnst du ab, klingelt der Timer trotzdem.</p>
 
   <h2>Kein Konto, kein Tracking</h2>
   <p>Es gibt kein Nutzerkonto, kein Analytics-SDK und keinen Absturzbericht-Dienst. Rezeptli sammelt keine Nutzungsdaten.</p>

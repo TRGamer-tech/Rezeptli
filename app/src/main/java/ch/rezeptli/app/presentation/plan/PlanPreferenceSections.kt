@@ -31,6 +31,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.BrightnessAuto
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.SlowMotionVideo
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -49,8 +53,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +81,7 @@ import ch.rezeptli.app.domain.profile.StoreChain
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.profile.mainDiet
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import ch.rezeptli.app.presentation.common.components.BouncyFilledIconButton
 import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
 import ch.rezeptli.app.presentation.common.components.IconMotion
@@ -84,6 +92,7 @@ import ch.rezeptli.app.presentation.common.formatMoney
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
+import ch.rezeptli.app.presentation.common.theme.supportsMaterialYou
 
 /*
  * Die Bausteine, aus denen Einrichtung und Vorlieben bestehen.
@@ -508,12 +517,33 @@ fun DietPicker(
                 }
             }
         }
-        ChoiceChipGroup(
-            options = listOf(Diet.KOHLENHYDRATARM),
-            selected = profile.diets,
-            label = { it.label() },
-            onToggle = onToggleDiet,
-        )
+        // Dieselbe Kachel wie oben, aber ueber die ganze Breite: "Wenig Kohlenhydrate" ist
+        // keine fuenfte Ernaehrungsform, sondern laesst sich mit jeder kombinieren.
+        SelectableTile(
+            selected = Diet.KOHLENHYDRATARM in profile.diets,
+            onClick = { onToggleDiet(Diet.KOHLENHYDRATARM) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp),
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = Diet.KOHLENHYDRATARM.label(),
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(R.string.setup_ernaehrung_zusaetzlich),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }
 
@@ -664,6 +694,77 @@ private fun Appliance.emoji(): String = when (this) {
 }
 
 /**
+ * Das Aussehen der App: wie das Geraet, hell, dunkel - oder in den Farben des
+ * Hintergrundbilds.
+ *
+ * Material You steht nur zur Wahl, wo das Geraet es kennt (ab Android 12). Die Wahl gilt
+ * sofort: Wer hier tippt, sieht die App in derselben Sekunde umschalten.
+ */
+@Composable
+fun ThemePicker(
+    selected: ThemeChoice,
+    onSelect: (ThemeChoice) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = ThemeChoice.entries.filter { it != ThemeChoice.MATERIAL_YOU || supportsMaterialYou }
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        options.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                row.forEach { choice ->
+                    val gewaehlt = selected == choice
+                    SelectableTile(
+                        selected = gewaehlt,
+                        onClick = { onSelect(choice) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 88.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            MotionIcon(
+                                imageVector = choice.icon(),
+                                contentDescription = null,
+                                motion = IconMotion.POP,
+                                trigger = if (gewaehlt) true else null,
+                                tint = if (gewaehlt) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                            Text(
+                                text = choice.label(),
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+                // Eine einzelne Kachel in der letzten Reihe bleibt so breit wie die anderen.
+                if (row.size == 1) Box(modifier = Modifier.weight(1f))
+            }
+        }
+        if (supportsMaterialYou) {
+            Text(
+                text = stringResource(R.string.design_material_you_hinweis),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun ThemeChoice.icon(): ImageVector = when (this) {
+    ThemeChoice.SYSTEM -> Icons.Outlined.BrightnessAuto
+    ThemeChoice.HELL -> Icons.Outlined.LightMode
+    ThemeChoice.DUNKEL -> Icons.Outlined.DarkMode
+    ThemeChoice.MATERIAL_YOU -> Icons.Outlined.Palette
+}
+
+/**
  * Der Schalter fuer weniger Bewegung.
  *
  * Hat Android "Animationen entfernen" eingeschaltet, ist Rezeptli ohnehin ruhig - dann
@@ -720,13 +821,18 @@ fun MotionSetting(
 private const val BUDGET_STEP = 10
 private const val DISABLED_ALPHA = 0.38f
 
-/** Ein Wochentag als Pille: gewaehlt voll gruen, sonst Papier. Springt beim Umschalten. */
+/**
+ * Ein Wochentag als Pille: gewaehlt voll gruen, sonst Papier. Springt beim Umschalten.
+ *
+ * [description] ist, was vorgelesen wird - "Montag" statt des gezeigten "Mo".
+ */
 @Composable
-private fun DayPill(
+fun DayPill(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    description: String? = null,
 ) {
     val motion = RezeptliTheme.motion
     val fuellung by animateColorAsState(
@@ -755,7 +861,10 @@ private fun DayPill(
                 indication = LocalIndication.current,
                 role = Role.Checkbox,
                 onClick = onClick,
-            ).semantics { this.selected = selected },
+            ).semantics {
+                this.selected = selected
+                if (description != null) contentDescription = description
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -763,6 +872,9 @@ private fun DayPill(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = schrift,
+            maxLines = 1,
+            // Mit einer Beschreibung wird die vorgelesen - das Kuerzel dazu waere doppelt.
+            modifier = if (description != null) Modifier.clearAndSetSemantics {} else Modifier,
         )
     }
 }

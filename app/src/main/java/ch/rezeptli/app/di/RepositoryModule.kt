@@ -1,6 +1,8 @@
 package ch.rezeptli.app.di
 
 import ch.rezeptli.app.data.local.AppearanceStore
+import ch.rezeptli.app.data.local.DocumentStore
+import ch.rezeptli.app.data.local.PhotoStorage
 import ch.rezeptli.app.data.local.PlanMemoryStore
 import ch.rezeptli.app.data.local.UserProfileStore
 import ch.rezeptli.app.data.pairing.ActiveRoundStore
@@ -11,6 +13,8 @@ import ch.rezeptli.app.data.repository.ShoppingListRepositoryImpl
 import ch.rezeptli.app.data.repository.SwipeSessionRepositoryImpl
 import ch.rezeptli.app.data.repository.WebRecipeRepositoryImpl
 import ch.rezeptli.app.data.translate.MlKitRecipeTranslator
+import ch.rezeptli.app.domain.archive.DocumentAccess
+import ch.rezeptli.app.domain.archive.PhotoFiles
 import ch.rezeptli.app.domain.multiplayer.ActiveRoundRepository
 import ch.rezeptli.app.domain.plan.PlanMemory
 import ch.rezeptli.app.domain.plan.PlanRepository
@@ -58,6 +62,14 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPlanMemory(impl: PlanMemoryStore): PlanMemory
+
+    @Binds
+    @Singleton
+    abstract fun bindPhotoFiles(impl: PhotoStorage): PhotoFiles
+
+    @Binds
+    @Singleton
+    abstract fun bindDocumentAccess(impl: DocumentStore): DocumentAccess
 
     @Binds
     @Singleton

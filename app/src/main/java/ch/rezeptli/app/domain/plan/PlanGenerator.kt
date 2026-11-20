@@ -23,14 +23,24 @@ import kotlin.random.Random
  *    Mahlzeit gegen eine guenstigere getauscht, solange das hilft.
  * 4. **Verteilt** wird auf Mittag und Abend: Was schnell geht oder leicht ist, kommt
  *    mittags auf den Tisch.
+ *
+ * Ueber allem steht die Abwechslung: Was in den letzten zwei Wochen gekocht wurde, kommt
+ * erst in den Plan, wenn sonst nichts Passendes mehr da ist - siehe [RecentlyCooked].
  */
 class PlanGenerator @Inject constructor(
     private val aggregator: ShoppingListAggregator,
 ) {
+    /**
+     * [cooked] sagt, was in letzter Zeit gekocht wurde; [lastPlan] sind die Gerichte des Plans,
+     * der gerade ersetzt wird ([PlanCandidate.key]). Beides kommt erst wieder, wenn es sonst
+     * nicht reicht: Wer neu wuerfelt, will Neues sehen.
+     */
     fun generate(
         candidates: List<PlanCandidate>,
         profile: UserProfile,
         random: Random = Random.Default,
+        cooked: RecentlyCooked = RecentlyCooked.NONE,
+        lastPlan: Set<String> = emptySet(),
     ): PlanDraft {
         val persons = profile.persons
         val places = placesOf(profile)
@@ -40,14 +50,28 @@ class PlanGenerator @Inject constructor(
             .distinctBy { it.key }
         val priced = usable.map { it to mealCost(it.recipe, persons, profile) }
 
-        val ranked = priced.sortedByDescending { (candidate, _) -> score(candidate, profile) + random.nextDouble() }
-        var chosen = pickVaried(ranked, places.size)
+        val ranked = priced.sortedByDescending { (candidate, _) ->
+            score(candidate, profile) - cooked.fade(candidate.recipe) + random.nextDouble()
+        }
+        // Abwechslung in drei Stufen: zuerst, was es nicht eben erst gab. Reicht das nicht,
+        // die Gerichte des alten Plans. Und ganz zuletzt, was kuerzlich gekocht wurde - davon
+        // zuerst, was am laengsten zurueckliegt.
+        val (recent, notRecent) = ranked.partition { cooked.isRecent(it.first.recipe) }
+        val (again, fresh) = notRecent.partition { it.first.key in lastPlan }
+        val reserve = recent.sortedByDescending { cooked.daysSince(it.first.recipe) ?: 0 }
+        var chosen = pickVaried(fresh, places.size)
+        chosen = chosen + pickVaried(again, places.size - chosen.size)
+        chosen = chosen + reserve.take(places.size - chosen.size)
 
         var basket = basketFor(chosen, persons, profile)
         var cost = basket.sumOf { it.price ?: 0.0 }
         var rounds = 0
         while (cost > profile.budget && rounds < MAX_SWAPS) {
-            val unused = ranked.filter { entry -> chosen.none { it.first == entry.first } }
+            // Getauscht wird nie gegen kuerzlich Gekochtes: Sparen ist kein Grund, das Essen von
+            // gestern zu wiederholen. Und gegen Gerichte des alten Plans erst, wenn Frisches fehlt.
+            val unused = fresh.filter { entry -> chosen.none { it.first == entry.first } }.ifEmpty {
+                again.filter { entry -> chosen.none { it.first == entry.first } }
+            }
             val dearest = chosen.maxByOrNull { it.second } ?: break
             val cheaper = unused
                 .filter { it.second < dearest.second }
@@ -78,6 +102,7 @@ class PlanGenerator @Inject constructor(
         profile: UserProfile,
         avoid: Set<String> = emptySet(),
         random: Random = Random.Default,
+        cooked: RecentlyCooked = RecentlyCooked.NONE,
     ): PlanDraft {
         val current = draft.meals.firstOrNull { it.place == place } ?: return draft
         val taken = draft.meals.mapTo(mutableSetOf()) { it.candidate.key }
@@ -88,9 +113,13 @@ class PlanGenerator @Inject constructor(
             .distinctBy { it.key }
         if (free.isEmpty()) return draft
 
+        // Auch beim Tauschen gilt: kuerzlich Gekochtes nur, wenn nichts anderes frei ist.
         val replacement = free
-            .sortedByDescending { score(it, profile) + slotFit(it, place.slot) + random.nextDouble() }
-            .take(REPLACEMENT_CHOICES)
+            .filterNot { cooked.isRecent(it.recipe) }
+            .ifEmpty { free }
+            .sortedByDescending {
+                score(it, profile) - cooked.fade(it.recipe) + slotFit(it, place.slot) + random.nextDouble()
+            }.take(REPLACEMENT_CHOICES)
             .random(random)
 
         val meals = draft.meals.map {
@@ -109,9 +138,16 @@ class PlanGenerator @Inject constructor(
         )
     }
 
-    /** Wie viele Rezepte nach den harten Regeln ueberhaupt in Frage kommen. */
-    fun countUsable(candidates: List<PlanCandidate>, profile: UserProfile, without: Set<String> = emptySet()): Int =
-        candidates.count { isAllowed(it, profile) && it.key !in without }
+    /**
+     * Wie viele Rezepte nach den harten Regeln in Frage kommen - ohne [without] und ohne das,
+     * was laut [cooked] eben erst auf dem Tisch stand.
+     */
+    fun countUsable(
+        candidates: List<PlanCandidate>,
+        profile: UserProfile,
+        without: Set<String> = emptySet(),
+        cooked: RecentlyCooked = RecentlyCooked.NONE,
+    ): Int = candidates.count { isAllowed(it, profile) && it.key !in without && !cooked.isRecent(it.recipe) }
 
     fun basketFor(
         meals: List<Pair<PlanCandidate, Double>>,
@@ -228,6 +264,7 @@ class PlanGenerator @Inject constructor(
         ranked: List<Pair<PlanCandidate, Double>>,
         count: Int,
     ): List<Pair<PlanCandidate, Double>> {
+        if (count <= 0) return emptyList()
         val picked = mutableListOf<Pair<PlanCandidate, Double>>()
         val pool = ranked.toMutableList()
         while (picked.size < count && pool.isNotEmpty()) {

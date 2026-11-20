@@ -19,7 +19,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ch.rezeptli.app.BuildConfig
 import ch.rezeptli.app.R
+import ch.rezeptli.app.presentation.backup.RecipeBackupSection
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
@@ -134,11 +136,17 @@ fun PreferencesRoute(
             ) { Text(stringResource(R.string.vorlieben_plan_neu)) }
 
             GroupTitle(R.string.vorlieben_gruppe_app)
+            SectionCard(title = stringResource(R.string.design_titel), index = 6) {
+                ThemePicker(selected = uiState.theme, onSelect = viewModel::onThemeSelect)
+            }
             SectionCard(title = stringResource(R.string.einstellungen_darstellung), spacing = 8, index = 6) {
                 MotionSetting(
                     reduceMotion = uiState.reduceMotion,
                     onChange = viewModel::onReduceMotionChange,
                 )
+            }
+            SectionCard(title = stringResource(R.string.sichern_titel), index = 6) {
+                RecipeBackupSection()
             }
             BouncyTextButton(
                 onClick = viewModel::onResetRequest,
@@ -149,6 +157,13 @@ fun PreferencesRoute(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+            // Welcher Build laeuft - damit sich sagen laesst, ob ein Update angekommen ist.
+            Text(
+                text = stringResource(R.string.app_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
         }
     }
 

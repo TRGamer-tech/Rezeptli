@@ -21,12 +21,16 @@ import ch.rezeptli.app.domain.profile.LanguageRegion
 import ch.rezeptli.app.domain.repository.PairingRepository
 import ch.rezeptli.app.domain.repository.RecipeRepository
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
@@ -97,7 +101,6 @@ class ObserveRoundUseCase @Inject constructor(
  */
 class BuildRoundContributionUseCase @Inject constructor(
     private val recipeRepository: RecipeRepository,
-    private val pairingRepository: PairingRepository,
     private val classifier: RecipeClassifier,
     private val buildDeck: BuildSwipeDeckUseCase,
     private val checkCard: CheckRecipeCardUseCase,
@@ -119,12 +122,11 @@ class BuildRoundContributionUseCase @Inject constructor(
 
     /** Die eigene Sammlung, in zufaelliger Reihenfolge - soweit sie zu den Angaben beider passt. */
     private suspend fun saved(rules: CardRules): List<RoundOffer> = withContext(dispatcher) {
-        val participant = pairingRepository.participantId()
         val offers = mutableListOf<RoundOffer>()
         for (id in recipeRepository.getFilteredRecipeIds(RecipeFilter()).take(SAVED_SCAN)) {
             if (offers.size >= MAX_SAVED) break
             val recipe = recipeRepository.getRecipe(id) ?: continue
-            if (rules.allows(classifier.classify(recipe))) offers += recipe.toOffer(participant)
+            if (rules.allows(classifier.classify(recipe))) offers += recipe.toOffer()
         }
         offers
     }
@@ -133,9 +135,11 @@ class BuildRoundContributionUseCase @Inject constructor(
      * Zieht neue Karten aus dem Verzeichnis.
      *
      * Ohne Angaben genuegt der Titel. Sonst wird Seite um Seite geprueft, bis genug
-     * beisammen sind - in kleinen Schueben, damit nicht vierzig Seiten geladen werden, wenn
-     * die ersten zwoelf schon reichen, und mit einer Zeitgrenze: Lieber ein kleinerer
-     * Stapel als zwei Leute, die auf einen Ladebalken schauen.
+     * beisammen sind - siehe [checked].
+     *
+     * Jedes Geraet bringt den ganzen Stapel mit, nicht bloss seinen halben Anteil: Die Runde
+     * soll Auswahl haben. Schneller wird das Laden deshalb nicht ueber weniger Karten,
+     * sondern ueber die Art, wie geprueft wird.
      */
     private suspend fun fresh(rules: CardRules, missing: Int): List<RoundOffer> {
         val wanted = CuratedDeckBuilder.deckSizeFor(missing.coerceAtLeast(1))
@@ -163,25 +167,56 @@ class BuildRoundContributionUseCase @Inject constructor(
         }
     }
 
+    /**
+     * Prueft Karten an ihrer Rezeptseite, bis [wanted] bestanden haben.
+     *
+     * Frueher lief das in Schueben: sechs Seiten laden, auf die langsamste warten, dann die
+     * naechsten sechs. Eine einzige traege Seite pro Schub hielt alle anderen auf - daher die
+     * Viertelminute Wartezeit. Jetzt gibt es keine Schuebe mehr: Sobald eine Pruefung fertig
+     * ist, beginnt die naechste, und sobald genug Karten bestanden haben, ist Schluss - was
+     * noch unterwegs ist, wird nicht mehr abgewartet.
+     *
+     * Je Anbieter laufen hoechstens [CHECK_PER_SOURCE] Abrufe zugleich. Das schont die Seiten,
+     * und ein Anbieter, der sich Zeit laesst oder Abstand zwischen den Abrufen verlangt, haelt
+     * so nur seine eigenen Karten auf statt alle.
+     *
+     * Die Zeitgrenze bleibt als Notbremse: Lieber ein kleinerer Stapel als zwei Leute, die
+     * auf einen Ladebalken schauen.
+     */
     private suspend fun checked(entries: List<DeckEntry>, rules: CardRules, wanted: Int): List<DeckEntry> {
-        val passing = mutableListOf<DeckEntry>()
+        val passing = mutableMapOf<Int, DeckEntry>()
+        val lock = Mutex()
+        val overall = Semaphore(CHECK_PARALLEL)
+        val perSource = entries.map { it.sourceId }.distinct().associateWith { Semaphore(CHECK_PER_SOURCE) }
+
         withTimeoutOrNull(CHECK_BUDGET_MS) {
-            for (batch in entries.chunked(CHECK_BATCH)) {
-                if (passing.size >= wanted) break
-                passing += coroutineScope {
-                    batch
-                        .map { entry ->
-                            async {
+            coroutineScope {
+                val checks = this
+                entries.forEachIndexed { index, entry ->
+                    launch {
+                        // Erst der Platz beim Anbieter, dann der allgemeine: Sonst wuerden Karten
+                        // eines traegen Anbieters die allgemeinen Plaetze belegen, waehrend sie warten.
+                        perSource.getValue(entry.sourceId).withPermit {
+                            overall.withPermit {
                                 val check = withTimeoutOrNull(PAGE_TIMEOUT_MS) { checkCard(entry.url, rules) }
                                 val image = entry.imageUrl ?: check?.imageUrl
-                                if (check?.allowed == true && image != null) entry.copy(imageUrl = image) else null
+                                if (check?.allowed == true && image != null) {
+                                    val enough = lock.withLock {
+                                        passing[index] = entry.copy(imageUrl = image)
+                                        passing.size >= wanted
+                                    }
+                                    // Genug beisammen: Was noch unterwegs ist, braucht niemand mehr.
+                                    if (enough) checks.coroutineContext.cancelChildren()
+                                }
                             }
-                        }.awaitAll()
-                        .filterNotNull()
+                        }
+                    }
                 }
             }
         }
-        return passing.take(wanted)
+        // In der gezogenen Reihenfolge, nicht in der des Eintreffens - sonst laege immer vorn,
+        // wer am schnellsten antwortet.
+        return passing.toSortedMap().values.take(wanted)
     }
 
     /**
@@ -206,8 +241,10 @@ class BuildRoundContributionUseCase @Inject constructor(
             )
         }
 
-    private fun Recipe.toOffer(participantId: String): RoundOffer = RoundOffer(
-        key = sourceUrl?.let(RoundKeys::forUrl) ?: RoundKeys.forOwn(participantId, id),
+    private fun Recipe.toOffer(): RoundOffer = RoundOffer(
+        // Ein selbst erfasstes Rezept hat keine Adresse - es wird am Titel wiedererkannt. So
+        // liegt es nur einmal im Stapel, wenn beide es haben.
+        key = sourceUrl?.let(RoundKeys::forUrl) ?: RoundKeys.forTitle(title),
         title = title,
         sourceUrl = sourceUrl,
         // Ein Foto vom eigenen Telefon nuetzt dem anderen nichts - geteilt wird nur ein Bild aus dem Netz.
@@ -231,7 +268,12 @@ class BuildRoundContributionUseCase @Inject constructor(
         /** Mit Pruefung faellt zusaetzlich heraus, was nicht passt oder sich nicht laden laesst. */
         const val DRAW_FACTOR_CHECKED = 4
 
-        const val CHECK_BATCH = 6
+        /** So viele Rezeptseiten werden insgesamt gleichzeitig geprueft. */
+        const val CHECK_PARALLEL = 12
+
+        /** ... und so viele davon hoechstens beim selben Anbieter. */
+        const val CHECK_PER_SOURCE = 2
+
         const val PAGE_TIMEOUT_MS = 10_000L
         const val CHECK_BUDGET_MS = 30_000L
     }

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.nutrition.RecipeNutrition
 import ch.rezeptli.app.domain.repository.RecipeRepository
 import ch.rezeptli.app.domain.repository.SwipeSessionRepository
 import ch.rezeptli.app.domain.swipe.SwipeMatcher
@@ -189,6 +190,7 @@ class SwipeViewModel @Inject constructor(
                         minutes = recipe.prepTimeMinutes,
                         servings = recipe.servings?.toString(),
                         ingredients = recipe.ingredients,
+                        nutrition = RecipeNutrition.of(recipe),
                     ),
                 )
             }

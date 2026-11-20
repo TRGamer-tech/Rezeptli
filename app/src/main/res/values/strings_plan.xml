@@ -90,8 +90,6 @@
 
     <!-- Zu zweit: Treffer in den Plan -->
     <string name="zuzweit_in_plan">In den Wochenplan übernehmen</string>
-    <string name="zuzweit_in_plan_ergebnis">%1$d Mahlzeiten im Plan</string>
-    <string name="zuzweit_in_plan_nichts">Nichts übernommen – die Woche ist voll oder die Rezepte liessen sich nicht laden.</string>
 
     <!-- Tabs -->
     <string name="tab_plan">Plan</string>
@@ -148,8 +146,8 @@
     <string name="plan_vergleich_titel">Zum Vergleich</string>
     <string name="plan_vergleich_betrag">ca. %1$s</string>
     <string name="plan_gekocht">Gekocht</string>
-    <string name="setup_name_titel">Wie heisst du?</string>
-    <string name="setup_name_text">Freiwillig. Dein Name steht nur in der Begrüssung und bleibt auf deinem Gerät.</string>
+    <string name="setup_name_titel">Wie dürfen wir dich nennen?</string>
+    <string name="setup_name_text">Freiwillig. Dein Name steht nur in der Begrüssung und bleibt auf deinem Telefon.</string>
     <string name="vorlieben_land_text">Bestimmt, welche Rezeptquellen zuerst kommen, welche Läden zur Auswahl stehen und in welcher Währung gerechnet wird.</string>
     <string name="vorlieben_kuechen_text">Eine Vorliebe, kein Filter: Was du wählst, kommt beim Wischen und im Plan häufiger vor. Alles andere taucht weiterhin ab und zu auf.</string>
     <string name="setup_abneigung_titel">Was magst du nicht?</string>
@@ -182,7 +180,6 @@
     <string name="rezept_speichern">In meinen Rezepten speichern</string>
     <string name="rezept_nur_im_plan">Dieses Rezept gehört zu deinem Wochenplan. In deinen Rezepten steht es erst, wenn du es speicherst.</string>
     <string name="rezept_in_einkaufsliste">Auf die Einkaufsliste</string>
-    <string name="rezept_auf_liste">Zutaten für %1$d Personen stehen auf der Einkaufsliste.</string>
     <string name="rezept_liste_oeffnen">Öffnen</string>
 
     <!-- Wischen: Auswahl, zuruecknehmen, mehr zur Karte -->
@@ -264,10 +261,106 @@
         <item quantity="one">Noch %d Karte</item>
         <item quantity="other">Noch %d Karten</item>
     </plurals>
-    <plurals name="zuzweit_nicht_holbar">
-        <item quantity="one">%d eigenes Rezept deines Gegenübers lässt sich nicht übernehmen – lass es dir schicken.</item>
-        <item quantity="other">%d eigene Rezepte deines Gegenübers lassen sich nicht übernehmen – lass sie dir schicken.</item>
-    </plurals>
 
     <string name="vorlieben_plan_hinweis">Personenzahl und Hauptladen gelten sofort – auch für den Plan, der schon steht. Alles andere wirkt beim Wischen ab dem nächsten Stapel und im Plan, sobald du ihn neu baust oder eine Mahlzeit tauschst.</string>
+
+    <string name="portionen_titel">Für wie viele kaufst du ein?</string>
+    <string name="portionen_im_rezept">Portionen im Rezept</string>
+    <string name="portionen_unbekannt">Das Rezept nennt nicht, für wie viele es gedacht ist. Trag es ein, dann stimmt die Rechnung – Rezeptli merkt es sich.</string>
+    <string name="portionen_umrechnen">Das Rezept ist für %1$d gedacht. Die Mengen werden umgerechnet.</string>
+    <string name="portionen_passt">Das Rezept ist für %1$d gedacht – die Mengen bleiben, wie sie sind.</string>
+    <string name="portionen_mehrere">Jedes Rezept wird auf diese Zahl umgerechnet. Nennt eines keine Portionen, gilt es als für %1$d gedacht.</string>
+    <string name="portionen_bestaetigen">Auf die Liste</string>
+    <string name="portionen_weniger">Weniger</string>
+    <string name="portionen_mehr">Mehr</string>
+    <string name="tab_einkauf">Einkauf</string>
+    <string name="zuzweit_auf_liste">Zutaten auf die Einkaufsliste</string>
+    <plurals name="portionen_personen">
+        <item quantity="one">Person</item>
+        <item quantity="other">Personen</item>
+    </plurals>
+    <plurals name="rezept_auf_liste">
+        <item quantity="one">Zutaten für %1$d Person stehen auf der Einkaufsliste.</item>
+        <item quantity="other">Zutaten für %1$d Personen stehen auf der Einkaufsliste.</item>
+    </plurals>
+
+    <string name="zuzweit_holt">Wird geholt … %1$d von %2$d</string>
+    <string name="zuzweit_erneut">Erneut versuchen</string>
+    <string name="zuzweit_plan_einkauf">Der Einkauf dafür steht auf der Einkaufsliste.</string>
+    <string name="zuzweit_woche_voll_titel">Deine Woche ist voll</string>
+    <string name="zuzweit_woche_voll_ersetzen">Ersetzen</string>
+    <string name="zuzweit_woche_voll_lassen">So lassen</string>
+    <plurals name="zuzweit_frist_ich_bereit">
+        <item quantity="one">Noch %1$d Sekunde, dann geht es mit deinen Karten los.</item>
+        <item quantity="other">Noch %1$d Sekunden, dann geht es mit deinen Karten los.</item>
+    </plurals>
+    <plurals name="zuzweit_frist_andere_bereit">
+        <item quantity="one">Dein Gegenüber ist bereit. Noch %1$d Sekunde, sonst beginnt die Runde ohne deine Karten.</item>
+        <item quantity="other">Dein Gegenüber ist bereit. Noch %1$d Sekunden, sonst beginnt die Runde ohne deine Karten.</item>
+    </plurals>
+    <plurals name="zuzweit_behalten_ergebnis">
+        <item quantity="one">%1$d Rezept liegt in deinen Rezepten.</item>
+        <item quantity="other">%1$d Rezepte liegen in deinen Rezepten.</item>
+    </plurals>
+    <plurals name="zuzweit_nicht_geladen">
+        <item quantity="one">%1$d Rezept liess sich gerade nicht laden – die Seite antwortet nicht oder das Netz fehlt.</item>
+        <item quantity="other">%1$d Rezepte liessen sich gerade nicht laden – die Seiten antworten nicht oder das Netz fehlt.</item>
+    </plurals>
+    <plurals name="zuzweit_noch_nicht_da">
+        <item quantity="one">%1$d selbst erfasstes Rezept deines Gegenübers ist noch nicht da. Es kommt, sobald sein Telefon die Runde offen hat.</item>
+        <item quantity="other">%1$d selbst erfasste Rezepte deines Gegenübers sind noch nicht da. Sie kommen, sobald sein Telefon die Runde offen hat.</item>
+    </plurals>
+    <plurals name="zuzweit_plan_dazu">
+        <item quantity="one">%1$d Gericht steht neu im Wochenplan.</item>
+        <item quantity="other">%1$d Gerichte stehen neu im Wochenplan.</item>
+    </plurals>
+    <plurals name="zuzweit_plan_ersetzt">
+        <item quantity="one">%1$d Gericht ersetzt eine geplante Mahlzeit.</item>
+        <item quantity="other">%1$d Gerichte ersetzen geplante Mahlzeiten.</item>
+    </plurals>
+    <plurals name="zuzweit_plan_schon">
+        <item quantity="one">%1$d Gericht stand schon im Plan.</item>
+        <item quantity="other">%1$d Gerichte standen schon im Plan.</item>
+    </plurals>
+    <plurals name="zuzweit_plan_kein_platz">
+        <item quantity="one">%1$d Gericht fand keinen Platz in der Woche.</item>
+        <item quantity="other">%1$d Gerichte fanden keinen Platz in der Woche.</item>
+    </plurals>
+    <plurals name="zuzweit_woche_voll_text">
+        <item quantity="one">%1$d Treffer hat in deiner Woche keinen freien Platz mehr. Soll er eine geplante Mahlzeit ersetzen, die noch nicht gekocht ist?</item>
+        <item quantity="other">%1$d Treffer haben in deiner Woche keinen freien Platz mehr. Sollen sie geplante Mahlzeiten ersetzen, die noch nicht gekocht sind?</item>
+    </plurals>
+    <plurals name="zuzweit_liste_ergebnis">
+        <item quantity="one">Die Zutaten stehen auf der Einkaufsliste – sie hat jetzt einen Posten.</item>
+        <item quantity="other">Die Zutaten stehen auf der Einkaufsliste – sie hat jetzt %1$d Posten.</item>
+    </plurals>
+
+    <!-- Zu zweit: die Woche mit den Treffern ueberschreiben -->
+    <string name="zuzweit_ueberschreiben">Woche überschreiben</string>
+    <string name="zuzweit_ueberschreiben_text">Wähle für jedes Gericht den Tag. Ist der Tag schon vergeben, tauschen die beiden die Plätze.</string>
+    <string name="zuzweit_ueberschreiben_warnung">Dein bisheriger Wochenplan wird ersetzt – auch was schon gekocht ist.</string>
+    <string name="zuzweit_ueberschreiben_ohne_tag">Ohne Tag – kommt nicht in den Plan</string>
+    <string name="zuzweit_ueberschreiben_tag_mahlzeit">%1$s, %2$s</string>
+    <string name="zuzweit_ueberschreiben_weglassen">Den gewählten Tag nochmals antippen lässt ein Gericht weg.</string>
+    <plurals name="zuzweit_ueberschrieben">
+        <item quantity="one">Die Woche ist überschrieben: %1$d Gericht steht im Plan.</item>
+        <item quantity="other">Die Woche ist überschrieben: %1$d Gerichte stehen im Plan.</item>
+    </plurals>
+
+    <!-- Naehrwerte: Kalorien und Eiweiss unter der Zutatenliste -->
+    <string name="naehrwerte_pro_portion">Nährwerte pro Portion</string>
+    <string name="naehrwerte_ganzes_rezept">Nährwerte für das ganze Rezept</string>
+    <string name="naehrwerte_kalorien">Kalorien</string>
+    <string name="naehrwerte_eiweiss">Eiweiss</string>
+    <string name="naehrwerte_kcal">%1$d kcal</string>
+    <string name="naehrwerte_kcal_ca">ca. %1$d kcal</string>
+    <string name="naehrwerte_gramm">%1$d g</string>
+    <string name="naehrwerte_gramm_ca">ca. %1$d g</string>
+    <string name="naehrwerte_geschaetzt">Geschätzt aus den Zutaten.</string>
+    <string name="naehrwerte_geschaetzt_ganz">Geschätzt aus den Zutaten. Das Rezept sagt nicht, für wie viele es reicht.</string>
+    <string name="naehrwerte_quelle">Angaben der Quelle.</string>
+    <string name="naehrwerte_quelle_name">Angaben von %1$s.</string>
+    <string name="naehrwerte_kalorien_quelle">Kalorien laut Quelle, Eiweiss aus den Zutaten geschätzt.</string>
+    <string name="naehrwerte_eiweiss_quelle">Eiweiss laut Quelle, Kalorien aus den Zutaten geschätzt.</string>
+    <string name="naehrwerte_unbekannt">Für eine Schätzung von Kalorien und Eiweiss reichen die Angaben nicht.</string>
 </resources>

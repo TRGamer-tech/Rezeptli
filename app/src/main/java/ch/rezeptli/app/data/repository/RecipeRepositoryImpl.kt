@@ -12,7 +12,9 @@ import ch.rezeptli.app.di.IoDispatcher
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.repository.RecipeMatcher
 import ch.rezeptli.app.domain.repository.RecipeRepository
+import ch.rezeptli.app.domain.repository.StoredRecipe
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -90,8 +92,15 @@ class RecipeRepositoryImpl @Inject constructor(
     }
 
     override suspend fun findIdBySourceUrl(url: String): Long? = withContext(ioDispatcher) {
-        recipeDao.idBySourceUrl(url)
+        RecipeMatcher.byUrl(stored(), url)
     }
+
+    override suspend fun findHandwrittenIdByTitle(title: String): Long? = withContext(ioDispatcher) {
+        RecipeMatcher.byTitle(stored(), title)
+    }
+
+    private suspend fun stored(): List<StoredRecipe> =
+        recipeDao.identities().map { StoredRecipe(it.id, it.title, it.sourceUrl, it.inCollection) }
 
     override suspend fun savedSourceUrls(): Set<String> = withContext(ioDispatcher) {
         recipeDao.savedSourceUrls().toSet()
@@ -99,6 +108,10 @@ class RecipeRepositoryImpl @Inject constructor(
 
     override suspend fun setInCollection(id: Long, inCollection: Boolean) = withContext(ioDispatcher) {
         recipeDao.setInCollection(id, inCollection, System.currentTimeMillis())
+    }
+
+    override suspend fun setServings(id: Long, servings: Int) = withContext(ioDispatcher) {
+        recipeDao.setServings(id, servings, System.currentTimeMillis())
     }
 
     override suspend fun deleteRecipe(id: Long) = withContext(ioDispatcher) {

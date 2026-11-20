@@ -2,7 +2,6 @@ package ch.rezeptli.app.domain.multiplayer
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -29,22 +28,20 @@ class RoundKeysTest {
     }
 
     @Test
-    fun `selbst erfasste Rezepte zweier Telefone mit derselben Nummer bleiben verschieden`() {
-        // Beide Sammlungen beginnen bei 1 - genau daran hat sich frueher ein Rezept ueberschrieben.
-        val meins = RoundKeys.forOwn("aBcDeFgHiJkLmNoP", 7)
-        val deins = RoundKeys.forOwn("ZyXwVuTsRqPoNmLk", 7)
+    fun `ein selbst erfasstes Rezept hat auf beiden Telefonen denselben Schluessel`() {
+        // Hat die eine Person es von der anderen uebernommen, liegt es sonst zweimal im Stapel.
+        val meins = RoundKeys.forTitle("Omas Gratin")
+        val deins = RoundKeys.forTitle("  omas   GRATIN ")
 
-        assertNotEquals(meins, deins)
+        assertEquals(meins, deins)
+        assertEquals(17, meins.length)
         assertTrue(erlaubt.matches(meins), meins)
     }
 
     @Test
-    fun `das eigene Rezept findet nur das Telefon wieder, von dem es stammt`() {
-        val schluessel = RoundKeys.forOwn("aBcDeFgHiJkLmNoP", 7)
-
-        assertEquals(7L, RoundKeys.ownRecipeId(schluessel, "aBcDeFgHiJkLmNoP"))
-        assertNull(RoundKeys.ownRecipeId(schluessel, "ZyXwVuTsRqPoNmLk"))
-        // Ein Rezept aus dem Netz gehoert niemandem allein.
-        assertNull(RoundKeys.ownRecipeId(RoundKeys.forUrl("https://beispiel.ch/roesti"), "aBcDeFgHiJkLmNoP"))
+    fun `verschiedene Titel und ein Rezept aus dem Netz bleiben auseinander`() {
+        assertNotEquals(RoundKeys.forTitle("Omas Gratin"), RoundKeys.forTitle("Omas Hackbraten"))
+        // Ein Titel, der zufaellig wie eine Adresse aussieht, ist trotzdem kein Rezept aus dem Netz.
+        assertNotEquals(RoundKeys.forTitle("beispiel.ch/roesti"), RoundKeys.forUrl("https://beispiel.ch/roesti"))
     }
 }

@@ -6,8 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import ch.rezeptli.app.domain.settings.AppearanceRepository
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -31,7 +33,16 @@ class AppearanceStore @Inject constructor(
         context.appearanceDataStore.edit { it[REDUCE_MOTION] = reduce }
     }
 
+    override val theme: Flow<ThemeChoice> = context.appearanceDataStore.data
+        .catch { emit(emptyPreferences()) }
+        .map { ThemeChoice.fromName(it[THEME]) }
+
+    override suspend fun setTheme(choice: ThemeChoice) {
+        context.appearanceDataStore.edit { it[THEME] = choice.name }
+    }
+
     private companion object {
         val REDUCE_MOTION = booleanPreferencesKey("bewegung_reduzieren")
+        val THEME = stringPreferencesKey("design")
     }
 }

@@ -5,7 +5,9 @@ import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.plan.PlanRepository
+import ch.rezeptli.app.domain.repository.RecipeMatcher
 import ch.rezeptli.app.domain.repository.RecipeRepository
+import ch.rezeptli.app.domain.repository.StoredRecipe
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -89,11 +91,16 @@ class FakeRecipeRepository(
         return id
     }
 
-    override suspend fun findIdBySourceUrl(url: String): Long? =
-        recipes.value.values
-            .sortedByDescending { it.inCollection }
-            .firstOrNull { it.sourceUrl == url }
-            ?.id
+    /** Dieselbe Entscheidung wie in der echten Datenbank - sie steht in [RecipeMatcher]. */
+    override suspend fun findIdBySourceUrl(url: String): Long? = RecipeMatcher.byUrl(stored(), url)
+
+    override suspend fun findHandwrittenIdByTitle(title: String): Long? = RecipeMatcher.byTitle(stored(), title)
+
+    private fun stored(): List<StoredRecipe> =
+        recipes.value.values.map { StoredRecipe(it.id, it.title, it.sourceUrl, it.inCollection) }
+
+    /** Alles, was gespeichert ist - auch, was nur fuer den Plan geholt wurde. Fuer Tests, die Dubletten zaehlen. */
+    val everything: List<Recipe> get() = recipes.value.values.sortedBy { it.id }
 
     override suspend fun savedSourceUrls(): Set<String> =
         recipes.value.collection().mapNotNullTo(mutableSetOf()) { it.sourceUrl }
@@ -101,6 +108,12 @@ class FakeRecipeRepository(
     override suspend fun setInCollection(id: Long, inCollection: Boolean) {
         recipes.value[id]?.let { recipe ->
             recipes.value = recipes.value + (id to recipe.copy(inCollection = inCollection))
+        }
+    }
+
+    override suspend fun setServings(id: Long, servings: Int) {
+        recipes.value[id]?.let { recipe ->
+            recipes.value = recipes.value + (id to recipe.copy(servings = servings))
         }
     }
 

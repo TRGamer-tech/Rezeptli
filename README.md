@@ -15,28 +15,41 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
 
 ## Funktionen
 
-- **Einrichtung in elf kurzen Fragen** – Name, Land, Lieblingsküchen, Ernährung samt
-  Unverträglichkeiten, was du nicht magst, Personen, Kochtage und Mahlzeiten, bis zu drei
-  Läden, Wochenbudget, Stimmung (bis zu drei) und Küchengeräte. Alles vorbelegt und
-  überspringbar; später im Tab *Vorlieben* änderbar – dort stehen auch die Einstellungen
-  der App.
+- **Einrichtung mit Begrüssung** – erst ein Willkommen und in fünf Zeilen, was die App für
+  einen tut; dann zwölf kurze Fragen, jede mit ihrem bewegten Symbol: Name, Aussehen, Land,
+  Lieblingsküchen, Ernährung samt Unverträglichkeiten, was du nicht magst, Personen,
+  Kochtage und Mahlzeiten, bis zu drei Läden, Wochenbudget, Stimmung (bis zu drei) und
+  Küchengeräte. Alles vorbelegt und überspringbar; später im Tab *Vorlieben* änderbar – dort
+  stehen auch die Einstellungen der App.
 - **Wochenplan** – Mittag- und Abendessen pro Kochtag (oder nur eines davon). Ernährung,
   Unverträglichkeiten, Abneigungen und fehlende Geräte schliessen Rezepte hart aus;
   Stimmungen und Küchen gewichten nur. Getränke, Desserts und Saucen kommen nicht hinein.
   Dazu Kosten gegen Budget, gerechnet mit dem Hauptladen und mit den anderen verglichen.
   Eine Mahlzeit lässt sich mit einem Tipp tauschen – gegen etwas, das diese Woche noch
   nicht vorgeschlagen wurde. Was der Plan holt, landet nicht ungefragt in der Sammlung.
-- **Einkaufsliste mit Packungen** – Bedarf in der Menge des Rezepts, darunter die Packung,
-  die man kauft, und der geschätzte Preis. Abgehaktes sinkt ans Ende der Gruppe; die
-  Liste lässt sich kopieren und teilen und um eigene Posten ergänzen.
+  Abwechslung ist eingebaut: Was in den letzten zwei Wochen gekocht wurde, kommt erst
+  wieder, wenn sonst nichts passt, und ein neu gebauter Plan bringt andere Gerichte als
+  der alte.
+- **Einkaufsliste mit Packungen** – ein eigener Tab. Bedarf in der Menge des Rezepts,
+  darunter die Packung, die man kauft, und der geschätzte Preis. Abgehaktes sinkt ans Ende
+  der Gruppe; die Liste lässt sich kopieren und teilen und um eigene Posten ergänzen. Auf
+  die Liste kommt nur, was der Wochenplan braucht oder was du ausdrücklich darauf setzt –
+  und dann fragt die App, für wie viele Personen, und rechnet die Mengen um.
 - **Zu zweit wischen** – eine Person eröffnet und bekommt sofort den Code; sie legt fest,
   wie viele Gerichte gesucht werden und ob Essen, Getränke oder beides. Beide wischen
   denselben Stapel – zuerst die gespeicherten Rezepte beider, auf Wunsch danach neue. Was
   eine Person nicht isst, gilt für beide. Sobald genug gemeinsame Treffer da sind, ist
-  Schluss; sie lassen sich in den Wochenplan und auf die Einkaufsliste übernehmen.
+  Schluss; sie lassen sich in die eigene Sammlung, in den Wochenplan und auf die
+  Einkaufsliste übernehmen – auch ein Rezept, das die andere Person selbst erfasst hat.
+  Doppelt angelegt wird dabei nichts. Mit *Woche überschreiben* ersetzen die Treffer den
+  bisherigen Plan; für jedes Gericht wählt man den Tag. Schickt ein Telefon seine Karten
+  nicht, geht es nach einer Minute ohne es weiter.
 - **Wischen allein** – Kartenstapel aus dem Rezeptverzeichnis: nur Neues (nichts, was
   schon gespeichert ist), wahlweise Essen, Getränke oder beides. Ein Tipp auf die Karte
   zeigt Quelle und Zutaten, die letzte Entscheidung lässt sich zurücknehmen.
+- **Kalorien und Eiweiss** – unter jeder Zutatenliste, im Rezept wie beim Antippen einer
+  Wischkarte: pro Portion in kcal und Gramm. Nennt die Rezeptseite die Werte, gelten ihre;
+  sonst schätzt die App aus den Zutaten und schreibt „ca.“ und „geschätzt“ dazu.
 - **Rezepte verwalten** – anlegen, bearbeiten, löschen; mit Zutaten, Zubereitung, Foto,
   Tags und Zubereitungszeit; Text-Import per Copy-Paste mit regelbasiertem Parser. In der
   Liste nach links wischen entfernt, nach rechts vermerkt „gekocht“ (beides mit
@@ -44,9 +57,17 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
 - **Rezepte im Web finden** – Suche bei elf Quellen aus der Schweiz, Deutschland,
   Österreich, Frankreich und Italien; ein Rezept aus dem Browser lässt sich über "Teilen"
   direkt an Rezeptli schicken
-- **Kochmodus** – ein Arbeitsschritt pro Karte, mit den Zutaten dieses Schritts und Timer;
-  wer fertig gekocht hat, hat das Rezept als gekocht vermerkt – auch im Wochenplan
-- **Hell und dunkel** – folgt der Einstellung des Geräts
+- **Kochmodus** – ein Arbeitsschritt pro Karte, mit den Zutaten dieses Schritts und Timer.
+  Die Zeit lässt sich vor dem Start und während sie läuft um Minuten verschieben. Ist sie
+  um, klingelt es mit dem Weckton des Telefons und vibriert – auch bei gesperrtem
+  Bildschirm oder wenn gerade eine andere App offen ist. Wer fertig gekocht hat, hat das
+  Rezept als gekocht vermerkt – auch im Wochenplan.
+- **Sichern und umziehen** – die ganze Sammlung samt eigenen Fotos und, wenn gewünscht,
+  die Vorlieben als eine Datei exportieren und auf einem anderen Telefon wieder einlesen.
+  Die Datei ist ein gewöhnliches ZIP mit lesbarem JSON; doppelt angelegt wird beim
+  Einlesen nichts, und fremde Vorlieben ersetzen die eigenen nur nach Rückfrage.
+- **Aussehen nach Wahl** – wie das Gerät, hell, dunkel oder (ab Android 12) in den Farben
+  des Hintergrundbilds
 
 **Zu den Preisen:** Rezeptli fragt kein Geschäft ab. Die Preise sind Richtwerte für die
 Schweiz, je nach Laden mit einem Faktor verschoben, und überall als Schätzung beschriftet.
@@ -54,6 +75,11 @@ Für Deutschland, Österreich, Frankreich und Italien werden sie mit einem grobe
 Preisniveau des Landes in Euro umgerechnet – eine Grössenordnung, kein Kassenzettel.
 Auch die Einstufung eines Rezepts (vegetarisch, enthält Gluten, braucht den Ofen …) ist
 eine Heuristik aus den Zutaten – bei Allergien gilt die Zutatenliste der Quelle.
+
+**Zu den Nährwerten:** Geschätzte Kalorien und Eiweiss stammen aus einer Tabelle üblicher
+Richtwerte in der App, gerechnet aus der Zutatenliste – eine Grössenordnung für den Alltag,
+keine Grundlage für eine Diät oder eine Therapie. Erkennt die App zu wenig von einem
+Rezept, zeigt sie lieber keine Zahl.
 
 ### Screenshots
 
@@ -64,9 +90,18 @@ legen und hier einbinden. Für den Swipe-Flow eignet sich ein kurzes GIF am best
 ## Ausprobieren ohne Build
 
 Unter [Releases](https://github.com/TRGamer-tech/Rezeptli/releases) liegt eine Debug-APK
-zum direkten Herunterladen aufs Handy. Sie ist mit dem Android-Debug-Schlüssel signiert
-und nicht optimiert – zum Testen gedacht, nicht zur Weitergabe. Zusätzlich hängt die CI
-bei jedem Push eine Debug-APK als Artefakt an den Workflow-Lauf.
+zum direkten Herunterladen aufs Handy. Sie ist nicht optimiert – zum Testen gedacht, nicht
+zur Weitergabe. Zusätzlich hängt die CI bei jedem Push eine Debug-APK als Artefakt an den
+Workflow-Lauf.
+
+**Updates ohne Neuinstallation:** Ab Version 1.1.0 tragen alle Testbuilds dieselbe
+Unterschrift und eine steigende Build-Nummer. Eine neuere APK lässt sich deshalb einfach
+über die alte installieren – Rezepte, Wochenplan und Vorlieben bleiben. Welcher Build
+läuft, steht ganz unten im Tab *Vorlieben*. Wer noch einen Build von vor 1.1.0 auf dem
+Telefon hat, muss ihn **ein letztes Mal** deinstallieren: Jene Builds waren mit Schlüsseln
+unterschrieben, die es nicht mehr gibt, und Android nimmt ein Update nur von derselben
+Unterschrift an. Warum und wie, steht in
+[ADR 0009](docs/adr/0009-testschluessel-und-versionen.md).
 
 Schweizer Eigenheiten sind eingebaut: **dl** und **KL** sind vollwertige Einheiten, und
 regionale Begriffe wie *Rüebli*, *Peperoni* oder *Zucchetti* kennt die App als Synonyme
@@ -76,7 +111,8 @@ zu ihrer hochdeutschen Normalform.
 
 Es gibt kein Nutzerkonto, kein Analytics-SDK und keinen Absturzbericht-Dienst. Deine
 Rezepte, deine Einkaufsliste, deine Swipe-Entscheidungen und deine Angaben aus dem
-Onboarding bleiben auf dem Gerät.
+Onboarding bleiben auf dem Gerät. Eine Exportdatei entsteht nur, wenn du sie anlegst, und
+liegt dort, wo du sie hinlegst – die App lädt sie nirgends hoch.
 
 Drei Dinge verlassen es trotzdem – jedes nur dann, wenn du es auslöst:
 
@@ -96,11 +132,21 @@ Entscheidungen dazu, und was ihr für die Runde ausschliesst – Ernährungsform
 Unverträglichkeiten, Abneigungen. Das zweite Telefon muss davon erfahren, damit "kein
 Fisch" der einen Person auch für die andere gilt; gespeichert wird es für beide
 zusammengelegt, ohne Vermerk, von wem es stammt. Zutaten, Zubereitung und eigene Fotos
-bleiben hier. Der Dienst kennt keine Namen und keine Konten, die Kennung deines Geräts
-ist eine Zufallszahl, und nach zwölf Stunden wird die Runde gelöscht. Einzelheiten und
-der Quelltext stehen in [`pairing/`](pairing/README.md).
+bleiben hier – mit einer Ausnahme: Mögt ihr beide ein Rezept, das eine von euch selbst
+erfasst hat, gehen dessen Zutaten und Zubereitung (ohne Foto) über den Dienst an die
+andere Person, weil sie es sonst nicht übernehmen könnte. Der Dienst kennt keine Namen und
+keine Konten, die Kennung deines Geräts ist eine Zufallszahl, und nach zwölf Stunden wird
+die Runde samt allem, was dazugehört, gelöscht. Einzelheiten und der Quelltext stehen in
+[`pairing/`](pairing/README.md).
 
 Ohne diese drei Funktionen läuft die App vollständig ohne Netz.
+
+**Berechtigungen:** Internet für die drei Dinge oben. Mitteilungen, Vibration und ein
+Dienst im Vordergrund für den Timer im Kochmodus – nur während ein Timer läuft, damit er
+auch bei gesperrtem Telefon klingelt. Um die Mitteilungen bittet die App, wenn du den
+ersten Timer startest; ohne sie klingelt der Timer trotzdem, nur zeigt Android dann keine
+Restzeit an. Für Export und Import braucht die App keine Speicher-Berechtigung: Android
+gibt ihr genau die eine Datei frei, die du im Dateidialog wählst.
 
 ## Build
 
@@ -123,7 +169,12 @@ cd Rezeptli
 ./gradlew connectedAndroidTest   # UI-Tests, benötigt Emulator oder Gerät
 ```
 
-Die fertige Debug-APK liegt danach unter `app/build/outputs/apk/debug/`.
+Die fertige Debug-APK liegt danach unter `app/build/outputs/apk/debug/`. Sie ist mit dem
+Testschlüssel aus `app/rezeptli-test.keystore` unterschrieben – derselbe wie in der CI,
+damit sich ein selbst gebauter Build über einen heruntergeladenen installieren lässt und
+umgekehrt. Der Schlüssel ist absichtlich öffentlich und taugt nur für Testbuilds; eine
+Veröffentlichung im Play Store bekäme einen eigenen, geheimen
+([ADR 0009](docs/adr/0009-testschluessel-und-versionen.md)).
 
 ## Architektur
 
@@ -148,11 +199,10 @@ Die folgenden Funktionen sind bewusst noch nicht Teil von Version 1.0, die Daten
 ist aber darauf vorbereitet:
 
 - **Vorrats-Abgleich** – "das habe ich zuhause" mit den Zutaten abgleichen
-- **Einkaufsliste teilen** – die Liste als Text an andere Apps weitergeben
-- **Rezept-Historie** – Wiederholungen vermeiden, indem die App weiss, was zuletzt auf
-  dem Tisch stand (der Vermerk "gekocht" und der Filter dazu sind da; der Wochenplan
-  nutzt sie noch nicht)
-- **Backup als JSON** – Export und Import der ganzen Sammlung, kein Vendor-Lock-in
+- **Mehrere Timer** – im Kochmodus läuft heute einer aufs Mal; wer Reis und Sauce
+  gleichzeitig im Auge behalten will, stellt den zweiten noch am Herd
+- **Wochenplan im Export** – die Exportdatei enthält die Sammlung und die Vorlieben, nicht
+  den Stand der laufenden Woche
 
 ## Lizenz
 

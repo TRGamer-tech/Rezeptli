@@ -5,6 +5,11 @@
 
 export interface Env {
     DB: D1Database;
+    /**
+     * Wie lange nach dem ersten Beitrag auf die uebrigen gewartet wird, in Millisekunden.
+     * Nur fuer Tests gesetzt - im Betrieb gilt die Vorgabe.
+     */
+    SAMMEL_FRIST_MS?: string;
 }
 
 /** So lange lebt eine Sitzung. Danach raeumt der taegliche Auftrag sie weg. */

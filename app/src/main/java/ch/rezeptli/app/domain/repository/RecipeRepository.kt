@@ -37,15 +37,38 @@ interface RecipeRepository {
 
     /**
      * Die ID des Rezepts, das von dieser Adresse importiert wurde - damit es nicht doppelt
-     * landet. Findet auch Rezepte, die nur fuer den Plan gespeichert sind.
+     * landet. Findet auch Rezepte, die nur fuer den Plan gespeichert sind; gibt es beides,
+     * gewinnt das aus der Sammlung.
+     *
+     * Verglichen wird nicht Zeichen fuer Zeichen: Dieselbe Seite ist mit und ohne "www.",
+     * mit "http" oder "https", mit oder ohne Schraegstrich am Ende dasselbe Rezept. Zwei
+     * Telefone kennen dasselbe Rezept oft unter leicht verschiedenen Adressen - genau daran
+     * entstanden beim Uebernehmen gemeinsamer Treffer Dubletten.
      */
     suspend fun findIdBySourceUrl(url: String): Long?
+
+    /**
+     * Die ID eines selbst erfassten Rezepts (ohne Adresse) mit diesem Titel - ohne Ruecksicht
+     * auf Gross- und Kleinschreibung. Ein Rezept ohne Adresse laesst sich an nichts anderem
+     * wiedererkennen.
+     */
+    suspend fun findHandwrittenIdByTitle(title: String): Long?
+
+    /**
+     * Das Rezept, als das eine Karte oder ein geholtes Rezept schon auf diesem Geraet liegt:
+     * mit Adresse an der Adresse, ohne Adresse am Titel.
+     */
+    suspend fun findExisting(sourceUrl: String?, title: String): Long? =
+        if (sourceUrl != null) findIdBySourceUrl(sourceUrl) else findHandwrittenIdByTitle(title)
 
     /** Die Adressen aller Rezepte der Sammlung - der Wischstapel zeigt sie nicht noch einmal. */
     suspend fun savedSourceUrls(): Set<String>
 
     /** Nimmt ein gespeichertes Rezept in die Sammlung auf oder heraus. */
     suspend fun setInCollection(id: Long, inCollection: Boolean)
+
+    /** Haelt fest, fuer wie viele ein Rezept gedacht ist - wenn es das selbst nicht sagt. */
+    suspend fun setServings(id: Long, servings: Int)
 
     suspend fun deleteRecipe(id: Long)
 

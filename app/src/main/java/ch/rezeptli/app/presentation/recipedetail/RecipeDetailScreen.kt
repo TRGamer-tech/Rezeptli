@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -57,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.BringLink
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.nutrition.NutritionFacts
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.BouncyButton
@@ -67,6 +70,8 @@ import ch.rezeptli.app.presentation.common.components.CookedDialog
 import ch.rezeptli.app.presentation.common.components.CookedLabel
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.NutritionNote
+import ch.rezeptli.app.presentation.common.components.PortionDialog
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.components.RemoveRecipeDialog
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
@@ -96,8 +101,8 @@ fun RecipeDetailRoute(
     val cookedMessage = stringResource(R.string.recipe_marked_cooked)
     val clearedMessage = stringResource(R.string.rezept_gekocht_entfernt)
     val keptMessage = stringResource(R.string.rezept_gespeichert)
-    val listMessage = stringResource(R.string.rezept_auf_liste)
     val openList = stringResource(R.string.rezept_liste_oeffnen)
+    val resources = LocalContext.current.resources
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
@@ -107,7 +112,7 @@ fun RecipeDetailRoute(
             RecipeDetailEvent.Kept -> scope.launch { snackbarHostState.showSnackbar(keptMessage) }
             is RecipeDetailEvent.AddedToShoppingList -> scope.launch {
                 val ergebnis = snackbarHostState.showSnackbar(
-                    message = listMessage.format(event.persons),
+                    message = resources.getQuantityString(R.plurals.rezept_auf_liste, event.persons, event.persons),
                     actionLabel = openList,
                     duration = SnackbarDuration.Long,
                 )
@@ -130,8 +135,18 @@ fun RecipeDetailRoute(
         onCookedConfirm = viewModel::onCookedConfirm,
         onCookedClear = viewModel::onCookedClear,
         onKeep = viewModel::onKeep,
-        onAddToShoppingList = viewModel::onAddToShoppingList,
+        onAddToShoppingList = viewModel::onAddToShoppingListRequest,
     )
+
+    val recipe = uiState.recipe
+    if (uiState.isPortionDialogVisible && recipe != null) {
+        PortionDialog(
+            defaultPersons = uiState.persons,
+            recipeServings = recipe.servings,
+            onConfirm = viewModel::onAddToShoppingList,
+            onDismiss = viewModel::onAddToShoppingListDismiss,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -270,6 +285,7 @@ fun RecipeDetailScreen(
 
             else -> RecipeDetailContent(
                 recipe = recipe,
+                nutrition = uiState.nutrition,
                 persons = uiState.persons,
                 isAddingToList = uiState.isAddingToList,
                 onKeep = onKeep,
@@ -298,6 +314,7 @@ fun RecipeDetailScreen(
 @Composable
 private fun RecipeDetailContent(
     recipe: Recipe,
+    nutrition: NutritionFacts?,
     persons: Int,
     isAddingToList: Boolean,
     onKeep: () -> Unit,
@@ -499,6 +516,14 @@ private fun RecipeDetailContent(
                             )
                         }
                     }
+
+                    // Unter den Zutaten: was eine Portion an Kalorien und Eiweiss bringt -
+                    // von der Quelle genannt oder aus genau diesen Zutaten geschaetzt.
+                    HorizontalDivider(
+                        color = RezeptliTheme.accents.hairline,
+                        modifier = Modifier.padding(vertical = 6.dp),
+                    )
+                    NutritionNote(facts = nutrition, sourceName = recipe.sourceName)
                 }
             }
         }

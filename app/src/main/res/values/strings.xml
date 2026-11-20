@@ -25,7 +25,7 @@
     <string name="recipes_filter_tags">Tags</string>
     <string name="recipes_filter_time">Höchstens</string>
     <string name="recipes_empty_title">Noch keine Rezepte</string>
-    <string name="recipes_empty_message">Leg dein erstes Rezept an oder füge einen Text ein, den du irgendwo kopiert hast. Sobald ein paar Rezepte da sind, kannst du dich durch sie durchswipen.</string>
+    <string name="recipes_empty_message">Leg dein erstes Rezept an oder füge einen Text ein, den du irgendwo kopiert hast. Sobald ein paar Rezepte da sind, kannst du dich durch sie durchswipen.\n\nDu hast deine Sammlung als Datei gesichert? Unter «Vorlieben» liest du sie wieder ein.</string>
     <string name="recipes_empty_action_create">Erstes Rezept anlegen</string>
     <string name="recipes_no_results_title">Nichts gefunden</string>
     <string name="recipes_no_results_message">Zu dieser Suche passt kein Rezept. Andere Begriffe oder weniger Filter versuchen?</string>
@@ -248,12 +248,16 @@
         <item quantity="one">%d Minute</item>
         <item quantity="other">%d Minuten</item>
     </plurals>
+    <plurals name="kochmodus_timer_minuten_wort">
+        <item quantity="one">Minute</item>
+        <item quantity="other">Minuten</item>
+    </plurals>
     <string name="websearch_quellen_fortschritt">%1$d von %2$d Quellen durchsucht</string>
 
     <!-- Mehrspieler -->
     <string name="mehrspieler_titel">Zu zweit entscheiden</string>
     <string name="mehrspieler_einleitung">Ihr wischt beide durch denselben Stapel – zuerst eure gespeicherten Rezepte, danach auf Wunsch neue. Sobald ihr genug gemeinsam gefunden habt, ist die Runde vorbei.</string>
-    <string name="mehrspieler_datenschutz">Dafür gehen die Titel der Rezepte und eure Angaben zu Ernährung, Unverträglichkeiten und Abneigungen an unseren Pairing-Dienst – ohne Namen. Zutaten und Zubereitung bleiben auf deinem Gerät, und nach zwölf Stunden wird die Runde gelöscht.</string>
+    <string name="mehrspieler_datenschutz">Dafür gehen die Titel der Rezepte und eure Angaben zu Ernährung, Unverträglichkeiten und Abneigungen an unseren Pairing-Dienst – ohne Namen. Zutaten und Zubereitung bleiben auf deinem Gerät; nur wenn ihr beide ein Rezept mögt, das du selbst erfasst hast, gehen sie an die andere Person, damit sie es übernehmen kann. Nach zwölf Stunden wird die Runde gelöscht.</string>
     <string name="mehrspieler_einladen">Runde eröffnen</string>
     <string name="mehrspieler_oder">oder</string>
     <string name="mehrspieler_code_eingeben">Code eingeben</string>
@@ -302,12 +306,31 @@
     <!-- Untere Leiste -->
     <string name="tab_wischen">Wischen</string>
     <string name="tab_rezepte">Rezepte</string>
-    <string name="mehrspieler_uebernehmen">Übernehmen und einkaufen</string>
-    <string name="mehrspieler_uebernehmen_laeuft">Wird geholt … %1$d von %2$d</string>
-    <plurals name="mehrspieler_uebernommen">
-        <item quantity="one">Gespeichert, eine Zutat steht auf der Einkaufsliste.</item>
-        <item quantity="other">Gespeichert, %d Zutaten stehen auf der Einkaufsliste.</item>
-    </plurals>
+    <string name="mehrspieler_uebernehmen">In meine Rezepte übernehmen</string>
 
     <string name="mehrspieler_starten">Zu zweit entscheiden</string>
+
+    <!-- Kochmodus: Timer -->
+    <string name="kochmodus_timer_starten">Timer starten</string>
+    <string name="kochmodus_timer_mehr">Eine Minute mehr</string>
+    <string name="kochmodus_timer_weniger">Eine Minute weniger</string>
+    <string name="kochmodus_timer_mehr_kurz">+ 1 Min.</string>
+    <string name="kochmodus_timer_weniger_kurz">− 1 Min.</string>
+    <string name="kochmodus_timer_nochmal">Noch eine Minute</string>
+    <string name="kochmodus_timer_rest">Noch %1$d Minuten und %2$d Sekunden</string>
+    <string name="kochmodus_timer_streifen">Schritt %1$d · noch %2$s</string>
+    <string name="kochmodus_timer_streifen_um">Schritt %1$d · Zeit ist um</string>
+    <string name="kochmodus_timer_zeigen">Zum Schritt mit dem Timer</string>
+    <string name="kochmodus_timer_laeuft_titel">Der Timer läuft noch</string>
+    <string name="kochmodus_timer_laeuft_text">Wenn du den Kochmodus jetzt verlässt, wird der Timer gestoppt.</string>
+    <string name="kochmodus_timer_laeuft_beenden">Timer stoppen und beenden</string>
+    <string name="kochmodus_timer_laeuft_bleiben">Weiterkochen</string>
+    <string name="timer_meldung_laeuft">Timer läuft</string>
+    <string name="timer_meldung_um">Zeit ist um</string>
+    <string name="timer_meldung_stoppen">Stoppen</string>
+
+    <string name="timer_kanal_laeuft">Laufender Kochtimer</string>
+    <string name="timer_kanal_laeuft_beschreibung">Zeigt die Restzeit, solange ein Timer aus dem Kochmodus läuft.</string>
+    <string name="timer_kanal_um">Kochtimer abgelaufen</string>
+    <string name="timer_kanal_um_beschreibung">Meldet sich, wenn die Zeit um ist. Geklingelt wird mit dem Weckton deines Telefons.</string>
 </resources>

@@ -24,6 +24,13 @@ data class Recipe(
     val prepTimeMinutes: Int? = null,
     /** Fuer wie viele Personen die Mengen der Quelle gedacht sind; `null`, wenn sie es nicht sagt. */
     val servings: Int? = null,
+    /**
+     * Kalorien (kcal) einer Portion, wie die Quelle sie nennt - `null`, wenn sie nichts dazu sagt.
+     * Dann schaetzt die App aus den Zutaten, siehe `RecipeNutrition`.
+     */
+    val kcalPerServing: Int? = null,
+    /** Eiweiss (g) einer Portion laut Quelle - `null`, wenn sie nichts dazu sagt. */
+    val proteinPerServing: Double? = null,
     val photoUri: String? = null,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L,

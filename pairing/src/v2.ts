@@ -40,6 +40,9 @@ import {
 } from "./basis";
 import {
     BEITRAG_VERMERKEN,
+    FRIST_ABGELAUFEN,
+    FRIST_STARTEN,
+    INHALT_SPEICHERN,
     KARTE_EINFUEGEN,
     NICHTS_MEHR_DA,
     OHNE_GESPEICHERTE_WEITER,
@@ -66,6 +69,26 @@ const MAX_EIGENE = 24;
 const MAX_EIGENE_LAENGE = 24;
 const MAX_SCHLUESSEL_LAENGE = 80;
 
+/**
+ * So lange wird nach dem ersten Beitrag auf die uebrigen gewartet. Eine Minute reicht einem
+ * Telefon, das noch Rezeptseiten prueft - und ist kurz genug, dass niemand vor einem
+ * Ladebalken sitzen bleibt, weil das andere Telefon in der Tasche steckt.
+ */
+const SAMMEL_FRIST_MS = 60_000;
+
+/** Grenzen fuer den Inhalt eines selbst erfassten Rezepts. */
+const MAX_INHALT_BYTES = 32_000;
+const MAX_ZUTATEN = 80;
+const MAX_SCHRITTE = 60;
+const MAX_SCHRITT_LAENGE = 2_000;
+const MAX_ZUBEREITUNG_LAENGE = 12_000;
+const MAX_ZUTAT_LAENGE = 120;
+const MAX_EINHEIT_LAENGE = 24;
+const MAX_TAGS = 12;
+const MAX_TAG_LAENGE = 40;
+const MAX_PORTIONEN = 24;
+const MAX_MINUTEN = 24 * 60;
+
 const ARTEN = ["essen", "getraenke", "beides"];
 const QUELLEN = ["gespeichert", "neu"];
 
@@ -85,6 +108,7 @@ interface Sitzung {
     einschraenkungen: string;
     ende_grund: string | null;
     stand_nr: number;
+    beitrag_seit: number | null;
 }
 
 /** Was fuer die Runde nicht auf den Tisch darf - die Angaben aller, vereinigt. */
@@ -115,6 +139,8 @@ interface KartenZeile {
     zubereitungszeit: number | null;
     schluessel: string | null;
     von: string | null;
+    /** Nur bei Treffern: Liegt der Inhalt eines selbst erfassten Rezepts vor? */
+    hat_inhalt?: number;
 }
 
 // --------------------------------------------------------------------------- Eingaben lesen
@@ -215,7 +241,7 @@ function adresse(wert: unknown): string | null {
 async function laden(env: Env, code: string): Promise<Sitzung | null> {
     return env.DB.prepare(
         "SELECT code, gastgeber, verfaellt_am, max_teilnehmer, version, zustand, ziel, art, quelle, runde, " +
-            "einschraenkungen, ende_grund, stand_nr FROM sitzungen WHERE code = ?1",
+            "einschraenkungen, ende_grund, stand_nr, beitrag_seit FROM sitzungen WHERE code = ?1",
     )
         .bind(code)
         .first<Sitzung>();
@@ -258,7 +284,36 @@ function karteAusgeben(zeile: KartenZeile, kennung: string) {
         zubereitungszeit: zeile.zubereitungszeit,
         schluessel: zeile.schluessel,
         vonMir: zeile.von === kennung,
+        ...(zeile.hat_inhalt === undefined ? {} : { inhalt: zeile.hat_inhalt === 1 }),
     };
+}
+
+function sammelFrist(env: Env): number {
+    const eigene = Number.parseInt(env.SAMMEL_FRIST_MS ?? "", 10);
+    return Number.isFinite(eigene) && eigene > 0 ? eigene : SAMMEL_FRIST_MS;
+}
+
+/**
+ * Laesst die Runde beginnen, wenn die Frist fuer die fehlenden Beitraege um ist.
+ *
+ * Geprueft wird beim Nachfragen: Solange jemand in der Runde ist, fragt dessen Telefon alle
+ * paar Sekunden - ein eigener Wecker im Dienst waere dafuer zu viel. Die Entscheidung selbst
+ * faellt wie alle anderen in einem einzigen Zug in der Datenbank.
+ */
+async function fristPruefen(env: Env, sitzung: Sitzung): Promise<boolean> {
+    if (sitzung.zustand !== "sammeln" || sitzung.beitrag_seit === null) return false;
+    const stichzeit = jetzt() - sammelFrist(env);
+    if (sitzung.beitrag_seit > stichzeit) return false;
+
+    const code = sitzung.code;
+    await env.DB.batch([
+        env.DB.prepare(FRIST_ABGELAUFEN).bind(code, stichzeit),
+        env.DB.prepare(STAPEL_STEHT).bind(code),
+        env.DB.prepare(OHNE_GESPEICHERTE_WEITER).bind(code),
+        env.DB.prepare(NICHTS_MEHR_DA).bind(code),
+        env.DB.prepare("UPDATE sitzungen SET stand_nr = stand_nr + 1 WHERE code = ?1").bind(code),
+    ]);
+    return true;
 }
 
 /**
@@ -306,6 +361,12 @@ async function standBauen(env: Env, code: string, kennung: string, kenntRunde: n
         andereFertig: karten > 0 && anzahl > 1 && (zahlen?.andere ?? 0) >= karten * (anzahl - 1),
         trefferAnzahl: zahlen?.treffer ?? 0,
         endeGrund: sitzung.ende_grund,
+        // Wie lange noch auf fehlende Beitraege gewartet wird - als Rest, nicht als Uhrzeit:
+        // Die Uhren zweier Telefone und des Dienstes gehen nie gleich.
+        fristRestMs:
+            sitzung.zustand === "sammeln" && sitzung.beitrag_seit !== null
+                ? Math.max(0, sitzung.beitrag_seit + sammelFrist(env) - jetzt())
+                : null,
     };
 
     if (sitzung.zustand === "laeuft" && kenntRunde !== sitzung.runde) {
@@ -448,7 +509,7 @@ async function starten(sitzung: Sitzung, kennung: string, rumpf: Record<string, 
     if (sitzung.gastgeber !== kennung) return fehler("nur wer eroeffnet hat, startet", 403);
 
     const ergebnis = await env.DB.prepare(
-        "UPDATE sitzungen SET zustand = 'sammeln', runde = 0, stand_nr = stand_nr + 1 " +
+        "UPDATE sitzungen SET zustand = 'sammeln', runde = 0, beitrag_seit = NULL, stand_nr = stand_nr + 1 " +
             "WHERE code = ?1 AND zustand = 'lobby' AND (SELECT COUNT(*) FROM teilnehmer WHERE code = ?1) >= ?2",
     )
         .bind(sitzung.code, TEILNEHMER)
@@ -495,6 +556,7 @@ async function beitragen(sitzung: Sitzung, kennung: string, rumpf: Record<string
                 ),
             ),
             env.DB.prepare(BEITRAG_VERMERKEN).bind(code, kennung, runde),
+            env.DB.prepare(FRIST_STARTEN).bind(code, jetzt()),
             env.DB.prepare(STAPEL_STEHT).bind(code),
             env.DB.prepare(OHNE_GESPEICHERTE_WEITER).bind(code),
             env.DB.prepare(NICHTS_MEHR_DA).bind(code),
@@ -548,8 +610,8 @@ async function weitermachen(sitzung: Sitzung, kennung: string, rumpf: Record<str
     if (sitzung.gastgeber !== kennung) return fehler("nur wer eroeffnet hat, entscheidet das", 403);
 
     await env.DB.prepare(
-        "UPDATE sitzungen SET zustand = 'sammeln', runde = runde + 1, quelle = 'neu', stand_nr = stand_nr + 1 " +
-            "WHERE code = ?1 AND zustand = 'frage'",
+        "UPDATE sitzungen SET zustand = 'sammeln', runde = runde + 1, quelle = 'neu', beitrag_seit = NULL, " +
+            "stand_nr = stand_nr + 1 WHERE code = ?1 AND zustand = 'frage'",
     )
         .bind(sitzung.code)
         .run();
@@ -573,11 +635,120 @@ async function beenden(sitzung: Sitzung, kennung: string, rumpf: Record<string, 
     return standBauen(env, sitzung.code, kennung, ganzzahl(rumpf.kenntRunde));
 }
 
+// --------------------------------------------------------------------------- Inhalt eines Treffers
+
+interface Zutat {
+    name: string;
+    menge: number | null;
+    einheit: string | null;
+    notiz: string | null;
+}
+
+interface Inhalt {
+    zubereitung: string;
+    schritte: string[];
+    zutaten: Zutat[];
+    portionen: number | null;
+    zeit: number | null;
+    tags: string[];
+}
+
+function texte(wert: unknown, maxAnzahl: number, maxLaenge: number): string[] {
+    if (!Array.isArray(wert)) return [];
+    return wert
+        .map((eintrag) => text(eintrag, maxLaenge))
+        .filter((eintrag): eintrag is string => eintrag !== null)
+        .slice(0, maxAnzahl);
+}
+
+function zahlImBereich(wert: unknown, hoechstens: number): number | null {
+    const zahl = ganzzahl(wert);
+    return zahl !== null && zahl >= 1 && zahl <= hoechstens ? zahl : null;
+}
+
+/** Liest den Inhalt eines Rezepts - gekuerzt und nur mit den Feldern, die der Dienst kennt. */
+function inhaltLesen(wert: unknown): Inhalt | null {
+    if (typeof wert !== "object" || wert === null || Array.isArray(wert)) return null;
+    const roh = wert as Record<string, unknown>;
+
+    const zutaten: Zutat[] = [];
+    if (Array.isArray(roh.zutaten)) {
+        for (const eintrag of roh.zutaten) {
+            if (typeof eintrag !== "object" || eintrag === null) continue;
+            const zeile = eintrag as Record<string, unknown>;
+            const name = text(zeile.name, MAX_ZUTAT_LAENGE);
+            if (name === null) continue;
+            const menge = typeof zeile.menge === "number" && Number.isFinite(zeile.menge) && zeile.menge > 0 ? zeile.menge : null;
+            zutaten.push({
+                name,
+                menge,
+                einheit: text(zeile.einheit, MAX_EINHEIT_LAENGE),
+                notiz: text(zeile.notiz, MAX_ZUTAT_LAENGE),
+            });
+            if (zutaten.length >= MAX_ZUTATEN) break;
+        }
+    }
+
+    const inhalt: Inhalt = {
+        zubereitung: text(roh.zubereitung, MAX_ZUBEREITUNG_LAENGE) ?? "",
+        schritte: texte(roh.schritte, MAX_SCHRITTE, MAX_SCHRITT_LAENGE),
+        zutaten,
+        portionen: zahlImBereich(roh.portionen, MAX_PORTIONEN),
+        zeit: zahlImBereich(roh.zeit, MAX_MINUTEN),
+        tags: texte(roh.tags, MAX_TAGS, MAX_TAG_LAENGE),
+    };
+    // Ein Rezept ohne Zutaten und ohne Zubereitung waere bloss der Titel - den gibt es schon.
+    if (inhalt.zutaten.length === 0 && inhalt.zubereitung === "" && inhalt.schritte.length === 0) return null;
+    return inhalt;
+}
+
+/**
+ * Hinterlegt Zutaten und Zubereitung eines selbst erfassten Rezepts, das beide mochten.
+ *
+ * Die andere Person kann es sonst nicht uebernehmen: Es hat keine Adresse, von der sie es
+ * holen koennte. Ob es wirklich ein Treffer ist und wirklich von diesem Geraet stammt,
+ * entscheidet die Datenbank in derselben Anweisung, die es speichert.
+ */
+async function inhaltSpeichern(sitzung: Sitzung, kennung: string, rumpf: Record<string, unknown>, env: Env): Promise<Response> {
+    const rezeptId = ganzzahl(rumpf.rezeptId);
+    if (rezeptId === null) return fehler("rezeptId fehlt", 400);
+    const inhalt = inhaltLesen(rumpf.inhalt);
+    if (inhalt === null) return fehler("inhalt fehlt", 400);
+
+    const gepackt = JSON.stringify(inhalt);
+    if (new TextEncoder().encode(gepackt).length > MAX_INHALT_BYTES) return fehler("inhalt zu gross", 413);
+
+    const code = sitzung.code;
+    const [gespeichert] = await env.DB.batch([
+        env.DB.prepare(INHALT_SPEICHERN).bind(code, rezeptId, gepackt, kennung),
+        env.DB.prepare(
+            "UPDATE sitzungen SET stand_nr = stand_nr + 1 WHERE code = ?1 " +
+                "AND EXISTS (SELECT 1 FROM inhalte WHERE code = ?1 AND rezept_id = ?2)",
+        ).bind(code, rezeptId),
+    ]);
+    if ((gespeichert.meta.changes ?? 0) === 0) return fehler("kein gemeinsamer Treffer von dir", 409);
+    return antwort({ gespeichert: true });
+}
+
+/**
+ * Gibt den hinterlegten Inhalt eines Treffers heraus - an alle, die in der Runde sind.
+ *
+ * Liegt noch nichts vor, ist das kein Fehler: Das andere Telefon hat seinen Teil nur noch
+ * nicht geschickt. Die Antwort sagt dann `inhalt: null`, und die App fragt spaeter wieder.
+ */
+async function inhaltHolen(sitzung: Sitzung, rezeptId: number | null, env: Env): Promise<Response> {
+    if (rezeptId === null) return fehler("rezept fehlt", 400);
+    const zeile = await env.DB.prepare("SELECT inhalt FROM inhalte WHERE code = ?1 AND rezept_id = ?2")
+        .bind(sitzung.code, rezeptId)
+        .first<{ inhalt: string }>();
+    return antwort({ rezeptId, inhalt: zeile === null ? null : (JSON.parse(zeile.inhalt) as Inhalt) });
+}
+
 /** Loescht die Runde sofort und restlos. Nur die Person, die sie eroeffnet hat, darf das. */
 async function schliessen(sitzung: Sitzung, kennung: string, env: Env): Promise<Response> {
     if (sitzung.gastgeber !== kennung) return fehler("nur wer eroeffnet hat, darf schliessen", 403);
 
-    // Die Fremdschluessel raeumen Rezepte, Teilnehmer und Stimmen mit weg.
+    // Die Fremdschluessel raeumen Rezepte, Teilnehmer, Stimmen und hinterlegte Inhalte mit weg.
     await env.DB.prepare("DELETE FROM sitzungen WHERE code = ?1").bind(sitzung.code).run();
     return antwort({ geschlossen: true });
 }
@@ -599,15 +770,27 @@ export async function v2(request: Request, env: Env): Promise<Response | null> {
     const code = teile[1];
     const aktion = teile[2] ?? "";
 
+    if (request.method === "GET" && aktion === "inhalt") {
+        const kennung = teilnehmerId(url.searchParams.get("teilnehmer"));
+        const geladen = await ladenFuer(env, code, kennung);
+        if ("abbruch" in geladen) return geladen.abbruch;
+        const rezeptId = Number.parseInt(url.searchParams.get("rezept") ?? "", 10);
+        return inhaltHolen(geladen.sitzung, Number.isNaN(rezeptId) ? null : rezeptId, env);
+    }
+
     if (request.method === "GET" && aktion === "") {
         const kennung = teilnehmerId(url.searchParams.get("teilnehmer"));
         const geladen = await ladenFuer(env, code, kennung);
         if ("abbruch" in geladen) return geladen.abbruch;
 
+        // Ist die Frist fuer fehlende Beitraege um, beginnt die Runde jetzt - das aendert
+        // den Stand, also faellt die Abkuerzung unten weg.
+        const fristUm = await fristPruefen(env, geladen.sitzung);
+
         // Hat sich nichts getan, genuegt eine Zeile - das Nachfragen alle paar Sekunden
         // soll den Dienst nicht jedes Mal den ganzen Stand zusammensuchen lassen.
         const bekannt = Number.parseInt(url.searchParams.get("stand") ?? "", 10);
-        if (bekannt === geladen.sitzung.stand_nr) {
+        if (!fristUm && bekannt === geladen.sitzung.stand_nr) {
             return antwort({ version: FASSUNG, code, standNr: bekannt, unveraendert: true });
         }
         const kenntRunde = Number.parseInt(url.searchParams.get("runde") ?? "", 10);
@@ -639,6 +822,8 @@ export async function v2(request: Request, env: Env): Promise<Response | null> {
             return weitermachen(sitzung, ich, rumpf, env);
         case "beenden":
             return beenden(sitzung, ich, rumpf, env);
+        case "inhalt":
+            return inhaltSpeichern(sitzung, ich, rumpf, env);
         case "schliessen":
             return schliessen(sitzung, ich, env);
         default:

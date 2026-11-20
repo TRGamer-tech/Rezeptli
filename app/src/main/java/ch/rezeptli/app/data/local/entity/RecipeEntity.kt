@@ -26,6 +26,10 @@ data class RecipeEntity(
     val sourceUrl: String? = null,
     val sourceName: String? = null,
     val servings: Int? = null,
+    /** Kalorien (kcal) einer Portion, wie die Quelle sie nennt - `null`, wenn sie nichts dazu sagt. */
+    val kcalPerServing: Int? = null,
+    /** Eiweiss (g) einer Portion laut Quelle. */
+    val proteinPerServing: Double? = null,
     /**
      * Gehoert das Rezept zur Sammlung? Ein Rezept, das nur fuer den Wochenplan geholt
      * wurde, steht hier mit 0 - gespeichert, aber nicht in "Meine Rezepte".
@@ -119,6 +123,14 @@ data class RecipeWithDetails(
     val tags: List<RecipeTagEntity>,
     @Relation(parentColumn = "id", entityColumn = "recipeId")
     val steps: List<RecipeStepEntity>,
+)
+
+/** Woran ein Rezept wiedererkannt wird - ohne es ganz zu laden. */
+data class RecipeIdentity(
+    val id: Long,
+    val title: String,
+    val sourceUrl: String?,
+    val inCollection: Boolean,
 )
 
 /**

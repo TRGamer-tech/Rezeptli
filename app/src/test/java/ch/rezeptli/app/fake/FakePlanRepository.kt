@@ -49,9 +49,10 @@ class FakePlanRepository(initial: List<PlanEntry> = emptyList()) : PlanRepositor
     )
 }
 
-/** Merkt sich im Speicher, was beim Tauschen verworfen wurde. */
+/** Merkt sich im Speicher, was beim Tauschen verworfen und was gekocht wurde. */
 class FakePlanMemory : PlanMemory {
     private val keys = mutableSetOf<String>()
+    private val cookedAt = mutableMapOf<String, Long>()
 
     override suspend fun rejected(): Set<String> = keys.toSet()
 
@@ -59,7 +60,13 @@ class FakePlanMemory : PlanMemory {
         keys += key
     }
 
-    override suspend fun clear() {
+    override suspend fun clearRejected() {
         keys.clear()
+    }
+
+    override suspend fun cooked(): Map<String, Long> = cookedAt.toMap()
+
+    override suspend fun noteCooked(keys: Collection<String>, at: Long?) {
+        keys.forEach { key -> if (at == null) cookedAt.remove(key) else cookedAt[key] = at }
     }
 }
