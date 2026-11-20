@@ -183,9 +183,21 @@ jobs:
           grep -E "FAILED" /tmp/build.log | head -20 || true
 
   instrumented:
-    name: UI-Tests auf dem Emulator
+    name: UI-Tests auf dem Emulator${{ matrix.zusatz }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      # Faellt eine Android-Version durch, soll die andere trotzdem zu Ende laufen.
+      fail-fast: false
+      matrix:
+        include:
+          - api: 34
+            zusatz: ''
+          # Die App zielt auf Android 15. Dort zeichnet jede App bis unter die Systemleisten,
+          # ob sie will oder nicht - und manches verhaelt sich anders als auf Android 14:
+          # Die Tastatur etwa liess sich nur hier ueber einem Eingabefeld nachstellen.
+          - api: 35
+            zusatz: ' (Android 15)'
 
     steps:
       - name: Checkout
@@ -218,7 +230,7 @@ jobs:
       - name: Instrumentierte Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           disable-animations: true
@@ -242,7 +254,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: ui-test-reports
+          name: ui-test-reports-${{ matrix.api }}
           path: app/build/reports/androidTests/
           if-no-files-found: ignore
           retention-days: 7

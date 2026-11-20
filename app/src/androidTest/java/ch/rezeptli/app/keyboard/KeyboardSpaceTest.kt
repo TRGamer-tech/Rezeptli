@@ -50,6 +50,7 @@ import ch.rezeptli.app.presentation.plan.NameField
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListScreen
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListUiState
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -237,11 +238,17 @@ class KeyboardSpaceTest {
 
     /**
      * Die Gegenprobe - der gemeldete Fehler, nachgestellt: Ohne den eigens gemachten Platz
-     * liegt die Tastatur ueber dem Feld. Schlaegt dieser Test eines Tages fehl, macht Android
-     * den Platz inzwischen selbst, und [aboveBarsAndKeyboard] ist zu ueberdenken.
+     * liegt die Tastatur ueber dem Feld.
+     *
+     * Das gilt ab Android 15. Bis Android 14 schiebt das System in dieser Lage das ganze
+     * Fenster nach oben, bis das Feld mit dem Cursor zu sehen ist (auf dem Emulator gemessen:
+     * um genau die fehlenden Pixel) - dort ist der Fehler nicht nachzustellen, und der Test
+     * wird uebersprungen. Schlaegt er auf einer neueren Version fehl, macht Android den Platz
+     * wieder selbst, und [aboveBarsAndKeyboard] ist zu ueberdenken.
      */
     @Test
     fun ohneDenPlatzVerdecktDieTastaturDasFeld() {
+        assumeTrue("erst ab Android 15 nachzustellen", Build.VERSION.SDK_INT >= ANDROID_15)
         zeige(mitPlatz = false) { Einkaufsliste() }
 
         val feld = composeTestRule.onNode(hasSetTextAction())
@@ -275,6 +282,7 @@ class KeyboardSpaceTest {
 
     private companion object {
         val LEISTE = 80.dp
+        const val ANDROID_15 = 35
         const val FUELLZEILEN = 12
         const val WARTEN_MS = 20_000L
         const val RUHE_MS = 5_000L
