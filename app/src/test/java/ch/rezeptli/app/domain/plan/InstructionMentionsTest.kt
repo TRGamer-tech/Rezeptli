@@ -158,6 +158,19 @@ class InstructionMentionsTest {
     }
 
     @Test
+    fun `die Haxen im Text sind die Kalbshaxen aus der Zutatenliste - kein Schwein`() {
+        val ossobuco = traits(
+            "Ossobuco",
+            "Die Haxen rundum anbraten, mit Weisswein ablöschen und zugedeckt schmoren.",
+            "Kalbshaxen",
+            "Weisswein",
+        )
+
+        assertTrue(Dislike.RIND in ossobuco.dislikes)
+        assertFalse(Dislike.SCHWEIN in ossobuco.dislikes)
+    }
+
+    @Test
     fun `nach einem Gericht benannt heisst nicht, dass Fleisch drin ist`() {
         val bratlinge = traits(
             "Karotten-Couscous-Bratlinge",

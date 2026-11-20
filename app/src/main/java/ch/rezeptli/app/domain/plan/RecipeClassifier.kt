@@ -394,7 +394,10 @@ class RecipeClassifier @Inject constructor() {
                 "*ähnlichen, *farben, *farbene, *farbenen, *farbig, *farbige, *hacker, *presse, *messer, " +
                 "*klopfer, *schere, *heber, *zange, *gabel, *besteck, *brett, *hobel, *ersatz, *alternative, " +
                 "*aroma, *geschmack, =brät, =anbrät, =zunge, speckig*, herausfischen, rausfischen, auffischen, " +
-                "abfischen, herausgefischt",
+                "abfischen, herausgefischt, " +
+                // Stuecke, die es von mehreren Tieren gibt: Welches gemeint ist, sagt die Zutatenliste
+                // ("Kalbshaxen") - im Text steht dann nur noch "die Haxen".
+                "=haxe, =haxen, =haxn, =stelze, =stelzen, =ribs, =rippchen",
         )
 
         // ------------------------------------------------------------------------------
