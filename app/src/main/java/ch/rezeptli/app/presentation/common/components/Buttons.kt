@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /*
  * Die Knoepfe der App: Material-Knoepfe, die unter dem Finger nachgeben.
@@ -217,14 +219,16 @@ private fun LivelyIcon(
         if (motion.reduced) return@LaunchedEffect
         interaction.interactions.collect { event ->
             when (event) {
-                is PressInteraction.Press -> {
-                    scale.animateTo(ICON_PRESSED_SCALE, motion.snappy())
+                // Druck: duckt sich und dreht sich ein wenig weg - beides zugleich.
+                is PressInteraction.Press -> coroutineScope {
+                    launch { scale.animateTo(ICON_PRESSED_SCALE, motion.snappy()) }
+                    launch { rotation.animateTo(ICON_TWIST, motion.snappy()) }
                 }
 
-                is PressInteraction.Release, is PressInteraction.Cancel -> {
-                    rotation.snapTo(ICON_TWIST)
-                    scale.animateTo(1f, motion.bouncy())
-                    rotation.animateTo(0f, motion.bouncy())
+                // Loslassen: springt mit Schwung zurueck und schwingt nach.
+                is PressInteraction.Release, is PressInteraction.Cancel -> coroutineScope {
+                    launch { scale.animateTo(1f, motion.bouncy()) }
+                    launch { rotation.animateTo(0f, motion.bouncy()) }
                 }
             }
         }

@@ -89,11 +89,14 @@ fun SectionCard(
     title: String? = null,
     spacing: Int = 12,
     index: Int = 0,
+    entranceState: EntranceState? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
-            .entrance(index)
+            // In einer LazyColumn merkt sich [entranceState], dass die Karte schon da war -
+            // sonst kaeme sie bei jedem Zurueckscrollen erneut hereingeflogen.
+            .entrance(index, entranceState, title ?: index)
             .fillMaxWidth()
             .cardSurface(Tokens.Radius.LgShape)
             .padding(horizontal = 18.dp, vertical = 16.dp),

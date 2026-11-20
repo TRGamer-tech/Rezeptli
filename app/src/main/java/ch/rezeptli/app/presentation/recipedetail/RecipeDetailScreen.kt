@@ -66,6 +66,7 @@ import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
 import ch.rezeptli.app.presentation.common.components.entrance
 import ch.rezeptli.app.presentation.common.components.pressScale
+import ch.rezeptli.app.presentation.common.components.rememberEntranceState
 import ch.rezeptli.app.presentation.common.displayText
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
@@ -253,6 +254,7 @@ private fun RecipeDetailContent(
 ) {
     val liste = rememberLazyListState()
     val motion = RezeptliTheme.motion
+    val eintritt = rememberEntranceState()
     LazyColumn(
         modifier = modifier,
         state = liste,
@@ -285,7 +287,7 @@ private fun RecipeDetailContent(
                 text = recipe.title,
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier
-                    .entrance(0)
+                    .entrance(0, eintritt, "titel")
                     .padding(start = 20.dp, end = 20.dp, top = 18.dp),
             )
         }
@@ -293,7 +295,7 @@ private fun RecipeDetailContent(
         item(key = "meta") {
             Column(
                 modifier = Modifier
-                    .entrance(1)
+                    .entrance(1, eintritt, "meta")
                     .padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -364,6 +366,7 @@ private fun RecipeDetailContent(
                 title = stringResource(R.string.recipe_ingredients),
                 spacing = 8,
                 index = 2,
+                entranceState = eintritt,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 if (recipe.ingredients.isEmpty()) {
@@ -402,6 +405,7 @@ private fun RecipeDetailContent(
                 title = stringResource(R.string.recipe_instructions),
                 spacing = 14,
                 index = 3,
+                entranceState = eintritt,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 if (recipe.steps.isEmpty()) {
