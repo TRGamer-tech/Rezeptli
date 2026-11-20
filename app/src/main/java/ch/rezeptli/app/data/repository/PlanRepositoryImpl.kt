@@ -23,10 +23,10 @@ class PlanRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : PlanRepository {
     override fun observePlan(): Flow<List<PlanEntry>> =
-        planDao.observeRows().map { rows -> rows.map { it.toDomain() }.sortedBy { it.day.ordinal } }
+        planDao.observeRows().map { rows -> rows.map { it.toDomain() }.sortedWith(PLAN_ORDER) }
 
     override suspend fun currentPlan(): List<PlanEntry> = withContext(ioDispatcher) {
-        planDao.rows().map { it.toDomain() }.sortedBy { it.day.ordinal }
+        planDao.rows().map { it.toDomain() }.sortedWith(PLAN_ORDER)
     }
 
     override suspend fun savePlan(entries: List<PlanWrite>, basket: List<ShoppingItem>) = withContext(ioDispatcher) {
@@ -34,7 +34,11 @@ class PlanRepositoryImpl @Inject constructor(
     }
 
     override suspend fun replaceEntry(entry: PlanWrite, basket: List<ShoppingItem>) = withContext(ioDispatcher) {
-        planDao.replaceEntry(entry.day.name, entry.toEntity(), basket.map { it.toEntity() })
+        planDao.replaceEntry(entry.toEntity(), basket.map { it.toEntity() })
+    }
+
+    override suspend fun markCooked(recipeId: Long, cookedAt: Long?) = withContext(ioDispatcher) {
+        planDao.markCooked(recipeId, cookedAt)
     }
 
     private fun PlanWrite.toEntity() = PlanEntryEntity(
@@ -43,10 +47,13 @@ class PlanRepositoryImpl @Inject constructor(
         servings = servings,
         cost = cost,
         label = label.name,
+        slot = slot,
+        cookedAt = cookedAt,
     )
 
     private fun PlanEntryRow.toDomain() = PlanEntry(
         day = day,
+        slot = slot,
         recipeId = recipeId,
         title = title,
         photoUri = photoUri,
@@ -54,5 +61,11 @@ class PlanRepositoryImpl @Inject constructor(
         servings = servings,
         cost = cost,
         label = MealLabel.entries.firstOrNull { it.name == label } ?: MealLabel.ALLTAG,
+        cookedAt = cookedAt,
     )
+
+    private companion object {
+        /** Wochentag fuer Wochentag, mittags vor abends. */
+        val PLAN_ORDER = compareBy<PlanEntry>({ it.day.ordinal }, { it.slot.ordinal })
+    }
 }

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.ShoppingItem
+import ch.rezeptli.app.domain.profile.Currency
+import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.usecase.AddManualShoppingItemUseCase
 import ch.rezeptli.app.domain.usecase.ClearShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.DeleteShoppingItemUseCase
@@ -14,7 +16,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -26,6 +30,8 @@ data class ShoppingListUiState(
     val items: List<ShoppingItem> = emptyList(),
     val newItemName: String = "",
     val isClearDialogVisible: Boolean = false,
+    /** Die Waehrung des Landes aus den Vorlieben - in ihr stehen die geschaetzten Preise. */
+    val currency: Currency = Currency.CHF,
 ) {
     /** Nach Warengruppe gebuendelt, in der Reihenfolge des Ladenrundgangs. */
     val grouped: List<Pair<IngredientCategory, List<ShoppingItem>>>
@@ -59,6 +65,7 @@ class ShoppingListViewModel @Inject constructor(
     private val deleteItem: DeleteShoppingItemUseCase,
     private val addManualItem: AddManualShoppingItemUseCase,
     private val clearShoppingList: ClearShoppingListUseCase,
+    profileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ShoppingListUiState())
     val uiState: StateFlow<ShoppingListUiState> = _uiState.asStateFlow()
@@ -69,6 +76,12 @@ class ShoppingListViewModel @Inject constructor(
     init {
         observeShoppingList()
             .onEach { items -> _uiState.update { it.copy(items = items, isLoading = false) } }
+            .launchIn(viewModelScope)
+
+        profileRepository.profile
+            .map { it.market.currency }
+            .distinctUntilChanged()
+            .onEach { currency -> _uiState.update { it.copy(currency = currency) } }
             .launchIn(viewModelScope)
     }
 

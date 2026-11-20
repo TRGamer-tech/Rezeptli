@@ -35,11 +35,23 @@ interface RecipeRepository {
     /** Legt ein Rezept an oder aktualisiert es und liefert dessen ID zurueck. */
     suspend fun saveRecipe(recipe: Recipe): Long
 
-    /** Die ID des Rezepts, das von dieser Adresse importiert wurde - damit es nicht doppelt landet. */
+    /**
+     * Die ID des Rezepts, das von dieser Adresse importiert wurde - damit es nicht doppelt
+     * landet. Findet auch Rezepte, die nur fuer den Plan gespeichert sind.
+     */
     suspend fun findIdBySourceUrl(url: String): Long?
+
+    /** Die Adressen aller Rezepte der Sammlung - der Wischstapel zeigt sie nicht noch einmal. */
+    suspend fun savedSourceUrls(): Set<String>
+
+    /** Nimmt ein gespeichertes Rezept in die Sammlung auf oder heraus. */
+    suspend fun setInCollection(id: Long, inCollection: Boolean)
 
     suspend fun deleteRecipe(id: Long)
 
-    /** Haelt fest, wann ein Rezept zuletzt gekocht wurde. */
-    suspend fun markCooked(id: Long, cookedAt: Long)
+    /** Entfernt Rezepte, die nur fuer den Plan geholt wurden und dort nicht mehr stehen. */
+    suspend fun deleteUnusedPlanRecipes()
+
+    /** Haelt fest, wann ein Rezept zuletzt gekocht wurde - `null` nimmt den Vermerk zurueck. */
+    suspend fun markCooked(id: Long, cookedAt: Long?)
 }

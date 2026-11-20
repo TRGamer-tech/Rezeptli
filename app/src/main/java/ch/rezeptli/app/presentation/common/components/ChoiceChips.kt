@@ -1,23 +1,37 @@
 package ch.rezeptli.app.presentation.common.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /**
@@ -52,8 +66,13 @@ fun <T> ChoiceChipGroup(
 }
 
 /**
- * Ein Auswahl-Chip der App: gibt unter dem Finger nach, und der Haken springt beim
- * Auswaehlen auf.
+ * Ein Auswahl-Chip der App: gibt unter dem Finger nach und zeigt die Auswahl mit Farbe,
+ * Rand und einem kleinen Haken an der Ecke.
+ *
+ * Der Chip bleibt dabei gleich breit. Frueher schob ein Haken vor dem Text den Chip
+ * breiter - in einer umbrechenden Reihe rutschten dann alle folgenden Chips auf eine
+ * andere Zeile, und man tippte beim zweiten Mal daneben. Der Haken sitzt jetzt auf der
+ * Ecke, ausserhalb des Textflusses.
  */
 @Composable
 fun RezeptliFilterChip(
@@ -64,30 +83,51 @@ fun RezeptliFilterChip(
     enabled: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        enabled = enabled,
-        shape = Tokens.Radius.PillShape,
-        modifier = modifier
-            .pressScale(interaction)
-            .heightIn(min = 48.dp)
-            .semantics { role = Role.Checkbox },
-        leadingIcon = if (selected) {
-            {
-                MotionIcon(
+    val motion = RezeptliTheme.motion
+    Box(modifier = modifier.pressScale(interaction)) {
+        FilterChip(
+            selected = selected,
+            onClick = onClick,
+            label = { Text(label) },
+            enabled = enabled,
+            shape = Tokens.Radius.PillShape,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .semantics { role = Role.Checkbox },
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = enabled,
+                selected = selected,
+                selectedBorderColor = MaterialTheme.colorScheme.primary,
+                selectedBorderWidth = 2.dp,
+            ),
+            interactionSource = interaction,
+        )
+        AnimatedVisibility(
+            visible = selected,
+            enter = if (motion.reduced) fadeIn(motion.fade()) else scaleIn(motion.bouncy()) + fadeIn(motion.fade()),
+            exit = if (motion.reduced) fadeOut(motion.fade()) else scaleOut(motion.snappy()) + fadeOut(motion.fade()),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 4.dp, y = 2.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = null,
-                    motion = IconMotion.POP,
-                    playOnAppear = true,
-                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(12.dp),
                 )
             }
-        } else {
-            null
-        },
-        colors = FilterChipDefaults.filterChipColors(),
-        interactionSource = interaction,
-    )
+        }
+    }
 }

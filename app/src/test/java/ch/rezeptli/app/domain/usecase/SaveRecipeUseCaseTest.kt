@@ -3,6 +3,7 @@ package ch.rezeptli.app.domain.usecase
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.steps.InstructionSplitter
 import ch.rezeptli.app.fake.FakeRecipeRepository
 import kotlinx.coroutines.test.runTest
@@ -65,5 +66,44 @@ class SaveRecipeUseCaseTest {
         saveRecipe(Recipe(title = "Salat", tags = listOf("vegan", "Vegan", " schnell ", "")))
 
         assertEquals(listOf("vegan", "schnell"), repository.savedRecipes.single().tags)
+    }
+
+    @Test
+    fun `dasselbe Rezept aus dem Netz landet nicht doppelt in der Sammlung`() = runTest {
+        val rezept = Recipe(title = "Rösti", instructions = "Braten.", sourceUrl = "https://beispiel.ch/roesti")
+
+        val erstes = saveRecipe(rezept) as SaveRecipeResult.Saved
+        val zweites = saveRecipe(rezept) as SaveRecipeResult.Saved
+
+        // Zweimal gemocht, einmal gespeichert.
+        assertEquals(erstes.recipeId, zweites.recipeId)
+        assertEquals(1, repository.all().size)
+    }
+
+    @Test
+    fun `ein Rezept, das bisher nur im Wochenplan stand, kommt beim Speichern in die Sammlung`() = runTest {
+        val nurImPlan = Recipe(
+            title = "Plan-Curry",
+            instructions = "Kochen.",
+            sourceUrl = "https://beispiel.ch/curry",
+            inCollection = false,
+        )
+        val planId = repository.saveRecipe(nurImPlan)
+        assertTrue(repository.visible(RecipeFilter()).isEmpty())
+
+        val gespeichert = saveRecipe(nurImPlan.copy(inCollection = true)) as SaveRecipeResult.Saved
+
+        assertEquals(planId, gespeichert.recipeId)
+        assertEquals(listOf("Plan-Curry"), repository.visible(RecipeFilter()).map { it.title })
+        assertEquals(1, repository.all().size)
+    }
+
+    @Test
+    fun `selbst erfasste Rezepte mit demselben Titel bleiben zwei Rezepte`() = runTest {
+        saveRecipe(Recipe(title = "Kartoffelsalat", instructions = "Nach Oma."))
+        saveRecipe(Recipe(title = "Kartoffelsalat", instructions = "Nach Tante."))
+
+        // Ohne Adresse gibt es nichts, woran sich "dasselbe" festmachen liesse.
+        assertEquals(2, repository.all().size)
     }
 }

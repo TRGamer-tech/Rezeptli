@@ -6,7 +6,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +48,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -91,6 +95,10 @@ fun rememberSwipeCardStackState(): SwipeCardStackState = remember { SwipeCardSta
  * federt die naechste nach vorne. Waehrend des Wischens faerbt sich der Rand gruen oder
  * rot, und ein Stempel "Ja"/"Nein" waechst mit der Geste - die Entscheidung ist sichtbar,
  * bevor man loslaesst.
+ *
+ * Mit [onInfo] laesst sich die oberste Karte antippen: Dann zeigt der Aufrufer, woher das
+ * Rezept kommt und was hineingehoert. Ein kleines Info-Zeichen in der Ecke verraet, dass
+ * das geht.
  */
 @Composable
 fun SwipeCardStack(
@@ -98,6 +106,7 @@ fun SwipeCardStack(
     onSwiped: (RecipeSummary, Boolean) -> Unit,
     modifier: Modifier = Modifier,
     state: SwipeCardStackState = rememberSwipeCardStackState(),
+    onInfo: ((RecipeSummary) -> Unit)? = null,
 ) {
     // Nur die obersten Karten zeichnen. Wer den ganzen Stapel hereingibt, bekam
     // sonst jede Karte gezeichnet - bei dreissig Karten ein Faecher aus dreissig
@@ -117,6 +126,7 @@ fun SwipeCardStack(
                         card = card,
                         state = state,
                         onSwiped = { liked -> onSwiped(card, liked) },
+                        onInfo = onInfo?.let { zeigen -> { zeigen(card) } },
                     )
                 } else {
                     BackgroundCard(card = card, indexFromTop = indexFromTop)
@@ -132,6 +142,7 @@ private fun TopSwipeCard(
     state: SwipeCardStackState,
     onSwiped: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onInfo: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val motion = RezeptliTheme.motion
@@ -145,7 +156,9 @@ private fun TopSwipeCard(
 
     val likeLabel = stringResource(R.string.swipe_yes)
     val dislikeLabel = stringResource(R.string.swipe_no)
+    val infoLabel = stringResource(R.string.karte_mehr)
     val cardDescription = stringResource(R.string.swipe_card_description, card.title)
+    val tap = remember { MutableInteractionSource() }
 
     /**
      * Schickt die Karte weg: Sie fliegt zur Seite hinaus - oder blendet bei reduzierter
@@ -197,7 +210,21 @@ private fun TopSwipeCard(
                 scaleX = lift.value
                 scaleY = lift.value
                 alpha = fade.value
-            }.pointerInput(card.id) {
+            }.then(
+                // Ein Tipp ohne Bewegung zeigt mehr zum Rezept; sobald sich der Finger
+                // bewegt, uebernimmt die Wischgeste. Ohne Welle - die Karte ist ein Foto.
+                if (onInfo == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(
+                        interactionSource = tap,
+                        indication = null,
+                        onClickLabel = infoLabel,
+                        role = Role.Button,
+                        onClick = onInfo,
+                    )
+                },
+            ).pointerInput(card.id) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
                         scope.launch {
@@ -232,6 +259,7 @@ private fun TopSwipeCard(
                 )
             },
         decisionProgress = progress,
+        showsInfo = onInfo != null,
     )
 }
 
@@ -281,6 +309,7 @@ private fun SwipeCardContent(
     decisionProgress: Float,
     modifier: Modifier = Modifier,
     isInteractive: Boolean = true,
+    showsInfo: Boolean = false,
 ) {
     val accents = RezeptliTheme.accents
     val ringColor = when {
@@ -347,6 +376,22 @@ private fun SwipeCardContent(
                     card.tags.take(MAX_VISIBLE_TAGS).forEach { tag -> PhotoTag(text = tag) }
                 }
             }
+        }
+
+        // Das Info-Zeichen sagt nur: Hier gibt es mehr. Antippen laesst sich die ganze Karte.
+        if (showsInfo && decisionProgress == 0f) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(14.dp)
+                    .clip(Tokens.Radius.CircleShape)
+                    .background(accents.photoShade.copy(alpha = 0.45f))
+                    .padding(8.dp)
+                    .size(22.dp),
+            )
         }
 
         if (isInteractive && decisionProgress != 0f) {

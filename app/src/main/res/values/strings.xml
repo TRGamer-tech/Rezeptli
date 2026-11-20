@@ -10,10 +10,8 @@
     <!-- Allgemein -->
     <string name="action_save">Speichern</string>
     <string name="action_cancel">Abbrechen</string>
-    <string name="action_delete">Löschen</string>
     <string name="action_edit">Bearbeiten</string>
     <string name="action_back">Zurück</string>
-    <string name="action_undo">Rückgängig</string>
 
     <!-- Rezeptliste -->
     <string name="recipes_title">Deine Rezepte</string>
@@ -29,7 +27,6 @@
     <string name="recipes_empty_title">Noch keine Rezepte</string>
     <string name="recipes_empty_message">Leg dein erstes Rezept an oder füge einen Text ein, den du irgendwo kopiert hast. Sobald ein paar Rezepte da sind, kannst du dich durch sie durchswipen.</string>
     <string name="recipes_empty_action_create">Erstes Rezept anlegen</string>
-    <string name="recipes_empty_action_import">Rezept einfügen</string>
     <string name="recipes_no_results_title">Nichts gefunden</string>
     <string name="recipes_no_results_message">Zu dieser Suche passt kein Rezept. Andere Begriffe oder weniger Filter versuchen?</string>
     <string name="recipes_swipe_needs_recipes">Für den Swipe-Modus brauchst du mindestens ein Rezept.</string>
@@ -41,10 +38,7 @@
     <string name="recipe_no_instructions">Für dieses Rezept ist keine Zubereitung erfasst.</string>
     <string name="recipe_prep_time">%1$d Min.</string>
     <string name="recipe_prep_time_long">Zubereitungszeit: %1$d Minuten</string>
-    <string name="recipe_mark_cooked">Heute gekocht</string>
-    <string name="recipe_marked_cooked">Notiert – gekocht am heutigen Tag.</string>
-    <string name="recipe_delete_title">Rezept löschen?</string>
-    <string name="recipe_delete_message">"%1$s" wird endgültig gelöscht. Das lässt sich nicht rückgängig machen.</string>
+    <string name="recipe_marked_cooked">Als heute gekocht vermerkt.</string>
     <string name="recipe_not_found">Dieses Rezept gibt es nicht mehr.</string>
     <string name="recipe_photo_description">Foto von %1$s</string>
     <string name="recipe_photo_placeholder">Kein Foto vorhanden</string>
@@ -80,7 +74,6 @@
     <!-- Import -->
     <string name="import_title">Rezept einfügen</string>
     <string name="import_intro">Füge hier den kopierten Rezepttext ein – zum Beispiel aus einem Google Doc oder einer Notiz. Rezeptli macht daraus einen Vorschlag, den du vor dem Speichern anpassen kannst.</string>
-    <string name="import_input_hint">Rezepttext einfügen</string>
     <string name="import_analyse">Text auswerten</string>
     <string name="import_clear">Text löschen</string>
     <string name="import_result_title">Das haben wir erkannt</string>
@@ -183,8 +176,6 @@
     <string name="import_url_hint">Rezepttext einfügen – oder einen Link zu einem Rezept</string>
     <string name="import_loading_web">Rezept wird geladen…</string>
     <string name="import_analyse_url">Rezept laden</string>
-    <string name="import_source">Quelle: %1$s</string>
-    <string name="import_open_source">Original ansehen</string>
     <string name="error_no_connection">Keine Verbindung. Prüf dein Internet und versuch es nochmal.</string>
     <string name="error_rejected">Diese Seite lässt sich nicht automatisch auslesen – sie weist die Anfrage ab. Kopier stattdessen den Rezepttext und füg ihn hier ein.</string>
     <string name="error_disallowed">Diese Seite möchte nicht, dass Programme sie abrufen – das steht so in ihrer robots.txt. Kopier den Rezepttext und füg ihn hier ein.</string>
@@ -193,30 +184,11 @@
     <string name="error_unknown">Das hat nicht geklappt. Versuch es später nochmal.</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_schritt">Schritt %1$d von %2$d</string>
-    <string name="onboarding_ueberspringen">Überspringen</string>
-    <string name="onboarding_weiter">Weiter</string>
-    <string name="onboarding_zurueck">Zurück</string>
-    <string name="onboarding_fertig">Los geht\'s</string>
 
-    <string name="onboarding_willkommen_titel">Willkommen bei Rezeptli</string>
-    <string name="onboarding_willkommen_text">Vier kurze Fragen, dann kannst du loslegen. Du kannst alles überspringen und später in den Einstellungen ändern.</string>
     <string name="onboarding_vorname">Vorname</string>
-    <string name="onboarding_vorname_hinweis">Nur für die Begrüssung. Bleibt auf deinem Gerät.</string>
     <string name="onboarding_land_frage">Wo kochst du?</string>
-    <string name="onboarding_land_hinweis">Rezepte aus deiner Gegend erscheinen weiter oben.</string>
 
     <string name="onboarding_kuechen_titel">Was isst du gern?</string>
-    <string name="onboarding_kuechen_text">Wähle so viel du magst – oder nichts. Das verschiebt nur die Reihenfolge der Vorschläge, nie was du findest.</string>
-
-    <string name="onboarding_ernaehrung_titel">Ernährst du dich besonders?</string>
-    <string name="onboarding_ernaehrung_text">Passende Rezepte rücken nach oben.</string>
-    <string name="onboarding_unvertraeglichkeiten_frage">Verträgst du etwas nicht?</string>
-    <string name="onboarding_unvertraeglichkeiten_hinweis">Wichtig: Rezeptli kann nicht prüfen, ob ein Rezept wirklich frei davon ist – Spuren und Fertigprodukte sieht die App nicht. Verlass dich auf die Zutatenliste, nicht auf uns.</string>
-
-    <string name="onboarding_haushalt_titel">Für wie viele kochst du?</string>
-    <string name="onboarding_haushalt_text">Später kann Rezeptli damit Mengen umrechnen.</string>
-    <string name="onboarding_haushalt_label">Personen</string>
 
     <!-- Länder -->
     <string name="land_schweiz">Schweiz</string>
@@ -252,30 +224,23 @@
     <string name="unvertraeglichkeit_meeresfruechte">Meeresfrüchte</string>
 
     <!-- Einstellungen -->
-    <string name="einstellungen_titel">Einstellungen</string>
-    <string name="einstellungen_oeffnen">Einstellungen öffnen</string>
     <string name="einstellungen_profil">Dein Profil</string>
-    <string name="einstellungen_profil_text">Diese Angaben bleiben auf deinem Gerät und beeinflussen nur die Reihenfolge der Vorschläge.</string>
+    <string name="einstellungen_profil_text">Freiwillig. Dein Name steht nur in der Begrüssung und bleibt auf deinem Gerät.</string>
     <string name="einstellungen_zuruecksetzen">Angaben zurücksetzen</string>
     <string name="einstellungen_zuruecksetzen_frage">Alle Angaben löschen?</string>
-    <string name="einstellungen_zuruecksetzen_text">Vorname, Land und Vorlieben werden gelöscht. Deine Rezepte bleiben unberührt.</string>
-    <string name="einstellungen_gespeichert">Gespeichert</string>
+    <string name="einstellungen_zuruecksetzen_text">Name, Land und alle Vorlieben werden gelöscht. Deine Rezepte und die Gerichte in deinem Plan bleiben; Mengen und Preise des Plans gelten danach wieder für zwei Personen in der Schweiz.</string>
 
     <!-- Begrüssung -->
     <string name="begruessung_mit_name">Hallo %1$s</string>
-    <string name="begruessung_ohne_name">Was kochst du heute?</string>
 
     <!-- Kochmodus -->
     <string name="kochmodus_starten">Kochmodus starten</string>
-    <string name="kochmodus_titel">Kochmodus</string>
     <string name="kochmodus_schritt">Schritt %1$d von %2$d</string>
     <string name="kochmodus_weiter">Weiter</string>
     <string name="kochmodus_zurueck">Vorheriger Schritt</string>
-    <string name="kochmodus_naechster">Nächster Schritt</string>
     <string name="kochmodus_beenden">Kochmodus beenden</string>
     <string name="kochmodus_fertig">Fertig gekocht</string>
     <string name="kochmodus_zutaten_fuer_schritt">Dafür brauchst du</string>
-    <string name="kochmodus_timer_starten">Timer starten</string>
     <string name="kochmodus_timer_stoppen">Timer stoppen</string>
     <string name="kochmodus_timer_abgelaufen">Zeit ist um</string>
     <string name="kochmodus_keine_schritte">Für dieses Rezept ist keine Zubereitung hinterlegt.</string>
@@ -287,31 +252,24 @@
 
     <!-- Mehrspieler -->
     <string name="mehrspieler_titel">Zu zweit entscheiden</string>
-    <string name="mehrspieler_starten">Zu zweit entscheiden</string>
-    <string name="mehrspieler_anzahl_hinweis">Dein Vorschlag kommt aus demselben Verzeichnis wie der Wischstapel. Die andere Person bringt ihren eigenen mit – der Dienst mischt beide zusammen.</string>
-    <string name="mehrspieler_weiter">Weiter</string>
-    <string name="mehrspieler_einleitung">Ihr wischt beide durch dieselben Rezepte. Am Schluss seht ihr, worauf ihr beide Lust habt – nicht, was die andere Person aussortiert hat.</string>
-    <string name="mehrspieler_datenschutz">Dafür gehen die Titel deiner Rezepte an unseren Pairing-Dienst. Zutaten und Zubereitung bleiben auf deinem Gerät, und nach zwölf Stunden wird die Runde gelöscht.</string>
-    <string name="mehrspieler_einladen">Jemanden einladen</string>
+    <string name="mehrspieler_einleitung">Ihr wischt beide durch denselben Stapel – zuerst eure gespeicherten Rezepte, danach auf Wunsch neue. Sobald ihr genug gemeinsam gefunden habt, ist die Runde vorbei.</string>
+    <string name="mehrspieler_datenschutz">Dafür gehen die Titel der Rezepte und eure Angaben zu Ernährung, Unverträglichkeiten und Abneigungen an unseren Pairing-Dienst – ohne Namen. Zutaten und Zubereitung bleiben auf deinem Gerät, und nach zwölf Stunden wird die Runde gelöscht.</string>
+    <string name="mehrspieler_einladen">Runde eröffnen</string>
     <string name="mehrspieler_oder">oder</string>
     <string name="mehrspieler_code_eingeben">Code eingeben</string>
     <string name="mehrspieler_beitreten">Beitreten</string>
     <string name="mehrspieler_code_zeigen">Zeig diesen Code der anderen Person oder schick ihn ihr.</string>
     <string name="mehrspieler_teilen">Teilen</string>
     <string name="mehrspieler_teilen_text">Lass uns zusammen entscheiden, was wir kochen! Mein Rezeptli-Code: %1$s</string>
-    <string name="mehrspieler_schon_loswischen">Schon loswischen</string>
-    <string name="mehrspieler_warte_person_titel">Warte auf die andere Person</string>
-    <string name="mehrspieler_warte_person_text">Du kannst schon anfangen – sobald sie beitritt, läuft es zusammen weiter.</string>
     <string name="mehrspieler_warten_titel">Du bist durch</string>
-    <string name="mehrspieler_warten_text">Sobald die andere Person fertig ist, seht ihr eure gemeinsamen Treffer.</string>
+    <string name="mehrspieler_warten_text">Dein Gegenüber wischt noch. Sobald ihr genug gemeinsam gefunden habt oder der Stapel durch ist, geht es hier weiter.</string>
     <string name="mehrspieler_treffer_titel">Darauf habt ihr beide Lust</string>
     <string name="mehrspieler_keine_treffer_titel">Diesmal keine Übereinstimmung</string>
-    <string name="mehrspieler_keine_treffer_text">Kein Rezept, das euch beiden gefallen hat. Neue Runde?</string>
+    <string name="mehrspieler_keine_treffer_text">Kein Rezept, das euch beiden gefallen hat.</string>
     <string name="mehrspieler_fehler_verbindung">Keine Verbindung. Ohne Internet geht das gemeinsame Wischen leider nicht.</string>
-    <string name="mehrspieler_fehler_code">Diesen Code kennen wir nicht. Vertippt?</string>
+    <string name="mehrspieler_fehler_code">Diese Runde gibt es nicht (mehr). Vertippt?</string>
     <string name="mehrspieler_fehler_abgelaufen">Diese Runde ist abgelaufen. Macht einfach eine neue auf.</string>
-    <string name="mehrspieler_fehler_voll">Bei dieser Runde sind schon genug Leute dabei.</string>
-    <string name="mehrspieler_fehler_keine_rezepte">Gerade lässt sich kein Vorschlag aus dem Verzeichnis ziehen. Prüf deine Verbindung und versuch\'s gleich nochmal.</string>
+    <string name="mehrspieler_fehler_voll">Bei dieser Runde sind schon zwei dabei, oder sie läuft bereits.</string>
     <string name="mehrspieler_fehler_unbekannt">Das hat nicht geklappt. Versuch es gleich nochmal.</string>
     <string name="action_ok">OK</string>
 
@@ -340,17 +298,16 @@
         <item quantity="one">Ein Rezept gefunden</item>
         <item quantity="other">%d Rezepte gefunden</item>
     </plurals>
-    <string name="stapel_gespeichert">%1$d Rezepte gespeichert</string>
 
     <!-- Untere Leiste -->
     <string name="tab_wischen">Wischen</string>
-    <string name="tab_suchen">Suchen</string>
     <string name="tab_rezepte">Rezepte</string>
-    <string name="tab_einkauf">Einkauf</string>
     <string name="mehrspieler_uebernehmen">Übernehmen und einkaufen</string>
     <string name="mehrspieler_uebernehmen_laeuft">Wird geholt … %1$d von %2$d</string>
     <plurals name="mehrspieler_uebernommen">
         <item quantity="one">Gespeichert, eine Zutat steht auf der Einkaufsliste.</item>
         <item quantity="other">Gespeichert, %d Zutaten stehen auf der Einkaufsliste.</item>
     </plurals>
+
+    <string name="mehrspieler_starten">Zu zweit entscheiden</string>
 </resources>

@@ -24,6 +24,10 @@ sealed interface SaveRecipeResult {
  * Speichert ein Rezept nach einer Validierung und raeumt dabei leere Eingaben auf:
  * Zutaten ohne Namen, doppelte Tags und ueberfluessige Leerzeichen verschwinden,
  * bevor etwas in die Datenbank geschrieben wird.
+ *
+ * Ein Rezept aus dem Web, das es schon gibt, wird nicht ein zweites Mal angelegt: Stand
+ * es bisher nur im Wochenplan, kommt es in die Sammlung; war es schon dort, bleibt alles,
+ * wie es ist. Vorher landete dasselbe Rezept doppelt in der Liste, wenn man es zweimal mochte.
  */
 class SaveRecipeUseCase @Inject constructor(
     private val repository: RecipeRepository,
@@ -38,6 +42,14 @@ class SaveRecipeUseCase @Inject constructor(
             }
         }
         if (errors.isNotEmpty()) return SaveRecipeResult.Invalid(errors)
+
+        if (recipe.id == 0L) {
+            val existing = recipe.sourceUrl?.let { repository.findIdBySourceUrl(it) }
+            if (existing != null) {
+                repository.setInCollection(existing, inCollection = true)
+                return SaveRecipeResult.Saved(existing)
+            }
+        }
 
         val cleaned = recipe.copy(
             title = recipe.title.trim(),

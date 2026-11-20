@@ -10,11 +10,14 @@ import ch.rezeptli.app.BuildConfig
 import ch.rezeptli.app.di.IoDispatcher
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.PairingResult
-import ch.rezeptli.app.domain.multiplayer.SharedRecipe
-import ch.rezeptli.app.domain.multiplayer.SharedSession
-import ch.rezeptli.app.domain.multiplayer.SharedSessionState
+import ch.rezeptli.app.domain.multiplayer.RoundOffer
+import ch.rezeptli.app.domain.multiplayer.RoundSource
+import ch.rezeptli.app.domain.multiplayer.RoundState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
+import ch.rezeptli.app.domain.plan.CourseChoice
+import ch.rezeptli.app.domain.plan.DietaryFilter
 import ch.rezeptli.app.domain.repository.PairingRepository
+import ch.rezeptli.app.domain.repository.PairingRepository.Companion.NO_ROUND
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
@@ -49,42 +52,68 @@ class PairingRepositoryImpl @Inject constructor(
 ) : PairingRepository {
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun createSession(recipes: List<SharedRecipe>): PairingResult<SharedSession> {
-        if (recipes.isEmpty()) return PairingResult.Failure(PairingError.NO_RECIPES)
+    override suspend fun createRound(restrictions: DietaryFilter): PairingResult<RoundState> =
+        post("$BASE_URL/sitzung", PairingApi.createBody(participantId(), restrictions), PairingApi::stateFrom)
 
-        val body = PairingApi.createBody(participantId(), recipes)
-        // Der Dienst bestaetigt beim Eroeffnen nur die Anzahl. Die Rezepte selbst
-        // stehen schon hier - sie muessen nicht zurueckkommen.
-        return post("$BASE_URL/sitzung", body) { PairingApi.sessionFrom(it, fallback = recipes) }
-    }
-
-    override suspend fun joinSession(
+    override suspend fun joinRound(
         code: String,
-        recipes: List<SharedRecipe>,
-    ): PairingResult<SharedSession> {
+        restrictions: DietaryFilter,
+        knownRound: Int,
+    ): PairingResult<RoundState> {
         val cleaned = code.normalizeCode()
         if (cleaned.isEmpty()) return PairingResult.Failure(PairingError.UNKNOWN_CODE)
 
-        val body = PairingApi.joinBody(participantId(), recipes)
-        return post("$BASE_URL/sitzung/$cleaned/beitreten", body) { PairingApi.sessionFrom(it) }
+        val body = PairingApi.joinBody(participantId(), restrictions, knownRound)
+        return post("$BASE_URL/sitzung/$cleaned/beitreten", body, PairingApi::stateFrom)
     }
 
-    override suspend fun sendVotes(
+    override suspend fun configureRound(
         code: String,
-        votes: List<SharedVote>,
-        finished: Boolean,
-    ): PairingResult<Unit> {
-        val body = PairingApi.votesBody(participantId(), votes, finished)
-        return post("$BASE_URL/sitzung/${code.normalizeCode()}/stimmen", body) { }
+        target: Int,
+        course: CourseChoice,
+        source: RoundSource,
+    ): PairingResult<RoundState> {
+        val body = PairingApi.settingsBody(participantId(), target, course, source)
+        return post("${roundUrl(code)}/einstellungen", body, PairingApi::stateFrom)
     }
 
-    override suspend fun sessionState(code: String): PairingResult<SharedSessionState> =
-        get("$BASE_URL/sitzung/${code.normalizeCode()}") { PairingApi.stateFrom(it) }
+    override suspend fun startRound(code: String): PairingResult<RoundState> =
+        post("${roundUrl(code)}/start", PairingApi.plainBody(participantId(), NO_ROUND), PairingApi::stateFrom)
 
-    override suspend fun closeSession(code: String): PairingResult<Unit> {
-        val body = PairingApi.joinBody(participantId())
-        return post("$BASE_URL/sitzung/${code.normalizeCode()}/schliessen", body) { }
+    override suspend fun contribute(
+        code: String,
+        round: Int,
+        offers: List<RoundOffer>,
+        knownRound: Int,
+    ): PairingResult<RoundState> {
+        val body = PairingApi.contributionBody(participantId(), round, offers, knownRound)
+        return post("${roundUrl(code)}/beitrag", body, PairingApi::stateFrom)
     }
+
+    override suspend fun sendVotes(code: String, votes: List<SharedVote>, knownRound: Int): PairingResult<RoundState> =
+        post(
+            "${roundUrl(code)}/stimmen",
+            PairingApi.votesBody(participantId(), votes, knownRound),
+            PairingApi::stateFrom,
+        )
+
+    override suspend fun continueRound(code: String, knownRound: Int): PairingResult<RoundState> =
+        post("${roundUrl(code)}/weiter", PairingApi.plainBody(participantId(), knownRound), PairingApi::stateFrom)
+
+    override suspend fun endRound(code: String): PairingResult<RoundState> =
+        post("${roundUrl(code)}/beenden", PairingApi.plainBody(participantId(), NO_ROUND), PairingApi::stateFrom)
+
+    override suspend fun closeRound(code: String): PairingResult<Unit> =
+        post("${roundUrl(code)}/schliessen", PairingApi.plainBody(participantId(), NO_ROUND)) { }
+
+    override suspend fun roundState(code: String, revision: Int?, knownRound: Int): PairingResult<RoundState?> {
+        // Die Kennung gehoert in die Adresse: Den Stand bekommt nur, wer zur Runde gehoert.
+        val url = "${roundUrl(code)}?teilnehmer=${participantId()}&runde=$knownRound" +
+            (revision?.let { "&stand=$it" } ?: "")
+        return get(url) { body -> if (PairingApi.isUnchanged(body)) null else PairingApi.stateFrom(body) }
+    }
+
+    private fun roundUrl(code: String): String = "$BASE_URL/sitzung/${code.normalizeCode()}"
 
     /**
      * Die Kennung dieses Geraets - beim ersten Bedarf erzeugt und danach behalten.
@@ -164,7 +193,8 @@ class PairingRepositoryImpl @Inject constructor(
         filter { it.isLetterOrDigit() }.uppercase()
 
     private companion object {
-        val BASE_URL = BuildConfig.PAIRING_URL.trimEnd('/')
+        /** Die Runde spricht Fassung 2 des Dienstes - Lobby, gemeinsames Ziel, Stimmen waehrend des Wischens. */
+        val BASE_URL = BuildConfig.PAIRING_URL.trimEnd('/') + "/v2"
         val JSON_TYPE = "application/json; charset=utf-8".toMediaType()
         val PARTICIPANT_KEY = stringPreferencesKey("teilnehmer_kennung")
         const val PARTICIPANT_BYTES = 16

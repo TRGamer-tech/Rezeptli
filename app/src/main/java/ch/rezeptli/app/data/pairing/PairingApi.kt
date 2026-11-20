@@ -1,69 +1,83 @@
 package ch.rezeptli.app.data.pairing
 
 import ch.rezeptli.app.domain.multiplayer.PairingError
+import ch.rezeptli.app.domain.multiplayer.RoundEnd
+import ch.rezeptli.app.domain.multiplayer.RoundOffer
+import ch.rezeptli.app.domain.multiplayer.RoundPhase
+import ch.rezeptli.app.domain.multiplayer.RoundSource
+import ch.rezeptli.app.domain.multiplayer.RoundState
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
-import ch.rezeptli.app.domain.multiplayer.SharedSession
-import ch.rezeptli.app.domain.multiplayer.SharedSessionState
 import ch.rezeptli.app.domain.multiplayer.SharedVote
+import ch.rezeptli.app.domain.plan.CourseChoice
+import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Dislike
+import ch.rezeptli.app.domain.profile.Intolerance
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
  * Uebersetzt zwischen dem Pairing-Dienst und den Modellen der App.
  *
- * Bewusst von Hand statt mit erzeugtem Code: Es sind vier kleine Nachrichten, und so
+ * Bewusst von Hand statt mit erzeugtem Code: Es sind wenige kleine Nachrichten, und so
  * bleibt sichtbar, was tatsaechlich ueber die Leitung geht - bei einem Dienst, der
- * Rezepttitel sieht, ist das keine Kleinigkeit.
+ * Rezepttitel und Angaben zur Ernaehrung sieht, ist das keine Kleinigkeit.
+ *
+ * Gelesen wird nachsichtig: Ein unbekanntes Feld oder ein unbekannter Wert (die andere
+ * Person hat vielleicht schon eine neuere App) bringt nichts zum Absturz, sondern faellt
+ * auf eine vernuenftige Vorgabe zurueck.
  */
 internal object PairingApi {
-    fun createBody(participantId: String, recipes: List<SharedRecipe>): JsonObject = buildJsonObject {
-        put("gastgeber", participantId)
-        put("rezepte", recipesJsonArray(recipes))
-    }
+    // --------------------------------------------------------------------- was die App sendet
 
-    /**
-     * [recipes] sind eigene Vorschlaege, die der Dienst in den Topf der Runde mischt -
-     * leer, wenn nur ueber die des Gastgebers abgestimmt werden soll.
-     */
-    fun joinBody(participantId: String, recipes: List<SharedRecipe> = emptyList()): JsonObject = buildJsonObject {
+    fun createBody(participantId: String, restrictions: DietaryFilter): JsonObject = buildJsonObject {
         put("teilnehmer", participantId)
-        if (recipes.isNotEmpty()) put("rezepte", recipesJsonArray(recipes))
+        put("einschraenkungen", restrictionsJson(restrictions))
     }
 
-    private fun recipesJsonArray(recipes: List<SharedRecipe>): JsonArray = buildJsonArray {
-        recipes.forEach { recipe ->
-            add(
-                buildJsonObject {
-                    put("rezeptId", recipe.recipeId)
-                    put("titel", recipe.title)
-                    recipe.sourceUrl?.let { put("quelleUrl", it) }
-                    recipe.imageUrl?.let { put("bildUrl", it) }
-                    recipe.prepTimeMinutes?.let { put("zubereitungszeit", it) }
-                },
-            )
-        }
+    fun joinBody(participantId: String, restrictions: DietaryFilter, knownRound: Int): JsonObject = buildJsonObject {
+        put("teilnehmer", participantId)
+        put("einschraenkungen", restrictionsJson(restrictions))
+        put("kenntRunde", knownRound)
     }
 
-    fun votesBody(participantId: String, votes: List<SharedVote>, finished: Boolean): JsonObject =
+    fun settingsBody(participantId: String, target: Int, course: CourseChoice, source: RoundSource): JsonObject =
         buildJsonObject {
             put("teilnehmer", participantId)
-            put("fertig", finished)
+            put("ziel", target)
+            put("art", course.wire)
+            put("quelle", source.wire)
+        }
+
+    /** Fuer alles, was nur sagt "ich bin's": starten, weitermachen, aufhoeren, loeschen. */
+    fun plainBody(participantId: String, knownRound: Int): JsonObject = buildJsonObject {
+        put("teilnehmer", participantId)
+        put("kenntRunde", knownRound)
+    }
+
+    fun contributionBody(participantId: String, round: Int, offers: List<RoundOffer>, knownRound: Int): JsonObject =
+        buildJsonObject {
+            put("teilnehmer", participantId)
+            put("runde", round)
+            put("kenntRunde", knownRound)
             put(
-                "stimmen",
+                "rezepte",
                 buildJsonArray {
-                    votes.forEach { vote ->
+                    offers.forEach { offer ->
                         add(
                             buildJsonObject {
-                                put("rezeptId", vote.recipeId)
-                                put("mag", vote.liked)
+                                put("schluessel", offer.key)
+                                put("titel", offer.title)
+                                offer.sourceUrl?.let { put("quelleUrl", it) }
+                                offer.imageUrl?.let { put("bildUrl", it) }
+                                offer.prepTimeMinutes?.let { put("zubereitungszeit", it) }
                             },
                         )
                     }
@@ -71,57 +85,148 @@ internal object PairingApi {
             )
         }
 
-    /**
-     * Liest die Antwort auf "Runde eroeffnen" oder "beitreten".
-     *
-     * Die beiden Antworten sehen im Feld `rezepte` verschieden aus: Beim Beitreten
-     * steht dort die Liste, beim Eroeffnen nur deren Anzahl - der Gastgeber hat die
-     * Rezepte ja gerade selbst geschickt. Wer das Feld blind als Liste liest, bekommt
-     * beim Eroeffnen eine Ausnahme, und die Einladung scheitert mit einer nichts
-     * sagenden Fehlermeldung. Deshalb [fallback]: was der Gastgeber gesendet hat.
-     */
-    fun sessionFrom(body: JsonObject, fallback: List<SharedRecipe> = emptyList()): SharedSession =
-        SharedSession(
-            code = body["code"]?.jsonPrimitive?.content.orEmpty(),
-            expiresAt = body["verfaelltAm"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
-            recipes = (body["rezepte"] as? JsonArray)
-                ?.mapNotNull { (it as? JsonObject)?.toSharedRecipe() }
-                ?: fallback,
+    fun votesBody(participantId: String, votes: List<SharedVote>, knownRound: Int): JsonObject = buildJsonObject {
+        put("teilnehmer", participantId)
+        put("kenntRunde", knownRound)
+        put(
+            "stimmen",
+            buildJsonArray {
+                votes.forEach { vote ->
+                    add(
+                        buildJsonObject {
+                            put("rezeptId", vote.recipeId)
+                            // `null` heisst: Entscheidung zurueckgenommen.
+                            put("mag", vote.liked?.let { JsonPrimitive(it) } ?: JsonNull)
+                        },
+                    )
+                }
+            },
         )
+    }
 
-    fun stateFrom(body: JsonObject): SharedSessionState = SharedSessionState(
-        code = body["code"]?.jsonPrimitive?.content.orEmpty(),
-        participants = body["teilnehmer"]?.jsonPrimitive?.intOrZero() ?: 0,
-        finished = body["fertig"]?.jsonPrimitive?.intOrZero() ?: 0,
-        allFinished = body["alleFertig"]?.jsonPrimitive?.content == "true",
-        matches = body["treffer"]?.jsonArray?.mapNotNull { it.jsonObject.toSharedRecipe() }.orEmpty(),
-        expiresAt = body["verfaelltAm"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
-        pool = body["rezepte"]?.jsonArray?.mapNotNull { it.jsonObject.toSharedRecipe() }.orEmpty(),
+    /**
+     * Was nicht auf den Tisch darf, in der Form des Dienstes.
+     *
+     * Die drei Listen bleiben getrennt, weil sie Verschiedenes bedeuten: Eine Ernaehrungsform
+     * ist eine Bedingung ("nur vegan"), Unvertraeglichkeiten und Abneigungen sind Ausschluesse.
+     */
+    private fun restrictionsJson(filter: DietaryFilter): JsonObject = buildJsonObject {
+        put("ernaehrung", buildJsonArray { filter.diets.forEach { add(it.name) } })
+        put("unvertraeglich", buildJsonArray { filter.intolerances.forEach { add(it.name) } })
+        put("ohne", buildJsonArray { filter.dislikes.forEach { add(it.name) } })
+        put("eigene", buildJsonArray { filter.customDislikes.forEach { add(it) } })
+    }
+
+    // --------------------------------------------------------------------- was der Dienst antwortet
+
+    /** Hat sich seit dem bekannten Stand nichts getan? Dann schickt der Dienst nur diese Auskunft. */
+    fun isUnchanged(body: JsonObject): Boolean = body.bool("unveraendert")
+
+    fun stateFrom(body: JsonObject): RoundState = RoundState(
+        code = body.string("code").orEmpty(),
+        expiresAt = body.long("verfaelltAm") ?: 0L,
+        revision = body.int("standNr") ?: 0,
+        phase = phaseFrom(body.string("zustand")),
+        isHost = body.bool("gastgeber"),
+        participants = body.int("teilnehmer") ?: 1,
+        target = (body.int("ziel") ?: RoundState.DEFAULT_TARGET).coerceIn(1, RoundState.MAX_TARGET),
+        course = CourseChoice.entries.firstOrNull { it.wire == body.string("art") } ?: CourseChoice.ESSEN,
+        source = RoundSource.entries.firstOrNull { it.wire == body.string("quelle") } ?: RoundSource.GESPEICHERT,
+        round = body.int("runde") ?: 0,
+        restrictions = restrictionsFrom(body["einschraenkungen"] as? JsonObject),
+        hasContributed = body.bool("beigetragen"),
+        waitingFor = body.int("wartetAuf") ?: 0,
+        cardCount = body.int("karten") ?: 0,
+        decidedCount = body.int("entschieden") ?: 0,
+        othersDone = body.bool("andereFertig"),
+        matchCount = body.int("trefferAnzahl") ?: 0,
+        end = endFrom(body.string("endeGrund")),
+        matches = (body["treffer"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.toSharedRecipe() },
+        stack = (body["stapel"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.toSharedRecipe() },
+        votes = (body["stimmen"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.toVote() },
     )
 
     /** Die Antwortcodes des Dienstes, uebersetzt in etwas, das die App erklaeren kann. */
     fun errorFor(statusCode: Int): PairingError = when (statusCode) {
-        404 -> PairingError.UNKNOWN_CODE
+        // 403: Dieses Geraet gehoert nicht (mehr) zur Runde - fuer die Person dasselbe wie "gibt es nicht".
+        403, 404 -> PairingError.UNKNOWN_CODE
         409 -> PairingError.FULL
         410 -> PairingError.EXPIRED
-        400, 413 -> PairingError.NO_RECIPES
+        426 -> PairingError.OUTDATED
         else -> PairingError.UNKNOWN
     }
 
-    private fun JsonObject.toSharedRecipe(): SharedRecipe? {
-        val id = this["rezeptId"]?.jsonPrimitive?.content?.toLongOrNull() ?: return null
-        val title = this["titel"]?.jsonPrimitive?.content ?: return null
-        return SharedRecipe(
-            recipeId = id,
-            title = title,
-            sourceUrl = this["quelleUrl"]?.jsonPrimitive?.contentOrNull(),
-            imageUrl = this["bildUrl"]?.jsonPrimitive?.contentOrNull(),
-            prepTimeMinutes = this["zubereitungszeit"]?.jsonPrimitive?.content?.toIntOrNull(),
+    private fun phaseFrom(value: String?): RoundPhase = when (value) {
+        "lobby" -> RoundPhase.LOBBY
+        "sammeln" -> RoundPhase.SAMMELN
+        "laeuft" -> RoundPhase.LAEUFT
+        "frage" -> RoundPhase.FRAGE
+        "beendet" -> RoundPhase.BEENDET
+        // Ein Zustand, den diese App nicht kennt: lieber warten als raten.
+        else -> RoundPhase.SAMMELN
+    }
+
+    private fun endFrom(value: String?): RoundEnd? = when (value) {
+        "ziel" -> RoundEnd.ZIEL
+        "leer" -> RoundEnd.LEER
+        "gastgeber" -> RoundEnd.GASTGEBER
+        "verlassen" -> RoundEnd.VERLASSEN
+        else -> null
+    }
+
+    private fun restrictionsFrom(body: JsonObject?): DietaryFilter {
+        if (body == null) return DietaryFilter()
+        return DietaryFilter(
+            diets = body.names("ernaehrung").mapNotNullTo(linkedSetOf(), Diet::fromName),
+            intolerances = body.names("unvertraeglich").mapNotNullTo(linkedSetOf(), Intolerance::fromName),
+            dislikes = body.names("ohne").mapNotNullTo(linkedSetOf(), Dislike::fromName),
+            customDislikes = body.names("eigene"),
         )
     }
 
-    private fun JsonPrimitive.intOrZero(): Int = content.toIntOrNull() ?: 0
+    private fun JsonObject.toSharedRecipe(): SharedRecipe? {
+        val id = long("rezeptId") ?: return null
+        val title = string("titel") ?: return null
+        return SharedRecipe(
+            recipeId = id,
+            title = title,
+            sourceUrl = string("quelleUrl"),
+            imageUrl = string("bildUrl"),
+            prepTimeMinutes = int("zubereitungszeit"),
+            key = string("schluessel").orEmpty(),
+            isMine = bool("vonMir"),
+        )
+    }
+
+    private fun JsonObject.toVote(): SharedVote? {
+        val id = long("rezeptId") ?: return null
+        return SharedVote(recipeId = id, liked = bool("mag"))
+    }
+
+    private val CourseChoice.wire: String
+        get() = when (this) {
+            CourseChoice.ESSEN -> "essen"
+            CourseChoice.GETRAENKE -> "getraenke"
+            CourseChoice.BEIDES -> "beides"
+        }
+
+    private val RoundSource.wire: String
+        get() = when (this) {
+            RoundSource.GESPEICHERT -> "gespeichert"
+            RoundSource.NEU -> "neu"
+        }
 
     /** JSON kennt `null` als Wort - das ist kein Inhalt. */
-    private fun JsonPrimitive.contentOrNull(): String? = content.takeIf { it != "null" && it.isNotBlank() }
+    private fun JsonElement?.primitive(): JsonPrimitive? = (this as? JsonPrimitive)?.takeUnless { it is JsonNull }
+
+    private fun JsonObject.string(name: String): String? = this[name].primitive()?.content?.takeIf { it.isNotBlank() }
+
+    private fun JsonObject.int(name: String): Int? = this[name].primitive()?.content?.toIntOrNull()
+
+    private fun JsonObject.long(name: String): Long? = this[name].primitive()?.content?.toLongOrNull()
+
+    private fun JsonObject.bool(name: String): Boolean = this[name].primitive()?.content == "true"
+
+    private fun JsonObject.names(name: String): List<String> =
+        (this[name] as? JsonArray)?.mapNotNull { it.primitive()?.content?.takeIf(String::isNotBlank) }.orEmpty()
 }

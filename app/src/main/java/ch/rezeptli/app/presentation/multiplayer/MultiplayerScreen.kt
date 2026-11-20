@@ -2,6 +2,7 @@ package ch.rezeptli.app.presentation.multiplayer
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -27,11 +28,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -40,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,13 +65,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.multiplayer.PairingError
+import ch.rezeptli.app.domain.multiplayer.RoundEnd
+import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
+import ch.rezeptli.app.domain.plan.CourseChoice
+import ch.rezeptli.app.domain.plan.DietaryFilter
 import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
-import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
 import ch.rezeptli.app.presentation.common.components.ConfettiBurst
 import ch.rezeptli.app.presentation.common.components.CookingPot
 import ch.rezeptli.app.presentation.common.components.IconMotion
@@ -77,6 +87,7 @@ import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
 import ch.rezeptli.app.presentation.common.components.entrance
+import ch.rezeptli.app.presentation.common.components.popOnChange
 import ch.rezeptli.app.presentation.common.components.rememberEntranceState
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.shareText
@@ -85,17 +96,49 @@ import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 import ch.rezeptli.app.presentation.common.theme.highlightRing
 import ch.rezeptli.app.presentation.deck.TARGET_OPTIONS
+import ch.rezeptli.app.presentation.plan.DietPicker
+import ch.rezeptli.app.presentation.plan.DislikePicker
+import ch.rezeptli.app.presentation.plan.IntolerancePicker
+import ch.rezeptli.app.presentation.swipe.RecipeInfoSheet
 import ch.rezeptli.app.presentation.swipe.SwipeCardStack
 import ch.rezeptli.app.presentation.swipe.SwipeDecisionButtons
 import ch.rezeptli.app.presentation.swipe.rememberSwipeCardStackState
 
+/** Was die Oberflaeche an den Bildschirm weiterreicht - gebuendelt, damit die Liste lesbar bleibt. */
+data class MultiplayerActions(
+    val onBack: () -> Unit = {},
+    val onHost: () -> Unit = {},
+    val onCodeInputChange: (String) -> Unit = {},
+    val onJoin: () -> Unit = {},
+    val onResume: () -> Unit = {},
+    val onOwnMainDiet: (Diet?) -> Unit = {},
+    val onOwnDietToggle: (Diet) -> Unit = {},
+    val onOwnIntoleranceToggle: (Intolerance) -> Unit = {},
+    val onOwnDislikeToggle: (Dislike) -> Unit = {},
+    val onOwnCustomDislikeAdd: (String) -> Unit = {},
+    val onOwnCustomDislikeRemove: (String) -> Unit = {},
+    val onTargetChange: (Int) -> Unit = {},
+    val onCourseChange: (CourseChoice) -> Unit = {},
+    val onSourceChange: (RoundSource) -> Unit = {},
+    val onStart: () -> Unit = {},
+    val onSwiped: (Long, Boolean) -> Unit = { _, _ -> },
+    val onUndo: () -> Unit = {},
+    val onInfo: (Long) -> Unit = {},
+    val onInfoDismiss: () -> Unit = {},
+    val onContinue: () -> Unit = {},
+    val onStop: () -> Unit = {},
+    val onKeep: () -> Unit = {},
+    val onAddToPlan: () -> Unit = {},
+    val onNewRound: () -> Unit = {},
+    val onDismissError: () -> Unit = {},
+)
+
 /**
  * Gemeinsam entscheiden: eine Person eroeffnet, die andere tritt mit dem Code bei.
  *
- * Beide bringen einen eigenen Vorschlag aus dem Verzeichnis mit; der Dienst mischt
- * beide zu einem gemeinsamen Topf. Die Treffer erscheinen erst, wenn beide fertig
- * sind - sonst koennte man am Zwischenstand ablesen, was die andere Person gewischt
- * hat, und das ist beim gemeinsamen Aussuchen der halbe Reiz.
+ * Der Code steht zuerst. Dann legt fest, wer eroeffnet hat, wie viele Gerichte gesucht
+ * werden - die eingeladene Person sieht es mit. Beide wischen denselben Stapel; sobald
+ * genug gemeinsame Treffer da sind, ist Schluss.
  */
 @Composable
 fun MultiplayerRoute(
@@ -104,7 +147,7 @@ fun MultiplayerRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var verlassenFragen by remember { mutableStateOf(false) }
-    val laeuft = uiState.step in LAUFENDE_SCHRITTE
+    val laeuft = uiState.isInRound
 
     // Mitten in einer Runde fuehrt "Zurueck" nicht einfach hinaus - ein versehentlicher
     // Wisch vom Rand haette sonst die ganze Runde gekostet.
@@ -120,8 +163,11 @@ fun MultiplayerRoute(
             },
             onEnd = {
                 verlassenFragen = false
+                // Aus der Lobby gibt es nichts zu zeigen - dann geht es gleich hinaus. Sonst
+                // bleibt man fuer die Treffer, die bis hierhin gefunden wurden.
+                val nichtsZuZeigen = uiState.step == MultiplayerStep.LOBBY
                 viewModel.onEndRound()
-                onBack()
+                if (nichtsZuZeigen) onBack()
             },
             onDismiss = { verlassenFragen = false },
         )
@@ -129,26 +175,40 @@ fun MultiplayerRoute(
 
     MultiplayerScreen(
         uiState = uiState,
-        onBack = {
-            if (laeuft) {
-                verlassenFragen = true
-            } else {
-                viewModel.onLeave()
-                onBack()
-            }
-        },
-        onTargetChange = viewModel::onTargetChange,
-        onContinueFromTarget = viewModel::onContinueFromTarget,
-        onHost = viewModel::onHost,
-        onCodeInputChange = viewModel::onCodeInputChange,
-        onJoin = viewModel::onJoin,
-        onResume = viewModel::onResume,
-        onFilterDietToggle = viewModel::onFilterDietToggle,
-        onFilterIntoleranceToggle = viewModel::onFilterIntoleranceToggle,
-        onSwiped = viewModel::onSwiped,
-        onDismissError = viewModel::onDismissError,
-        onKeep = viewModel::onKeepMatches,
-        onAddToPlan = viewModel::onAddToPlan,
+        actions = MultiplayerActions(
+            onBack = {
+                if (laeuft) {
+                    verlassenFragen = true
+                } else {
+                    viewModel.onLeave()
+                    onBack()
+                }
+            },
+            onHost = viewModel::onHost,
+            onCodeInputChange = viewModel::onCodeInputChange,
+            onJoin = viewModel::onJoin,
+            onResume = viewModel::onResume,
+            onOwnMainDiet = viewModel::onOwnMainDiet,
+            onOwnDietToggle = viewModel::onOwnDietToggle,
+            onOwnIntoleranceToggle = viewModel::onOwnIntoleranceToggle,
+            onOwnDislikeToggle = viewModel::onOwnDislikeToggle,
+            onOwnCustomDislikeAdd = viewModel::onOwnCustomDislikeAdd,
+            onOwnCustomDislikeRemove = viewModel::onOwnCustomDislikeRemove,
+            onTargetChange = viewModel::onTargetChange,
+            onCourseChange = viewModel::onCourseChange,
+            onSourceChange = viewModel::onSourceChange,
+            onStart = viewModel::onStart,
+            onSwiped = viewModel::onSwiped,
+            onUndo = viewModel::onUndo,
+            onInfo = viewModel::onInfoRequest,
+            onInfoDismiss = viewModel::onInfoDismiss,
+            onContinue = viewModel::onContinue,
+            onStop = viewModel::onEndRound,
+            onKeep = viewModel::onKeepMatches,
+            onAddToPlan = viewModel::onAddToPlan,
+            onNewRound = viewModel::onNewRound,
+            onDismissError = viewModel::onDismissError,
+        ),
     )
 }
 
@@ -156,26 +216,17 @@ fun MultiplayerRoute(
 @Composable
 fun MultiplayerScreen(
     uiState: MultiplayerUiState,
-    onBack: () -> Unit,
-    onTargetChange: (Int) -> Unit,
-    onContinueFromTarget: () -> Unit,
-    onHost: () -> Unit,
-    onCodeInputChange: (String) -> Unit,
-    onJoin: () -> Unit,
-    onSwiped: (Long, Boolean) -> Unit,
-    onDismissError: () -> Unit,
-    onKeep: () -> Unit = {},
-    onAddToPlan: () -> Unit = {},
-    onResume: () -> Unit = {},
-    onFilterDietToggle: (Diet) -> Unit = {},
-    onFilterIntoleranceToggle: (Intolerance) -> Unit = {},
+    actions: MultiplayerActions,
 ) {
     val motion = RezeptliTheme.motion
+
+    uiState.info?.let { info -> RecipeInfoSheet(info = info, onDismiss = actions.onInfoDismiss) }
+
     Scaffold(
         topBar = {
             RezeptliTopBar(
                 title = stringResource(R.string.mehrspieler_titel),
-                onBack = onBack,
+                onBack = actions.onBack,
             )
         },
     ) { padding ->
@@ -184,15 +235,23 @@ fun MultiplayerScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             uiState.error?.let { error ->
-                ErrorNote(error = error, onDismiss = onDismissError)
+                ErrorNote(error = error, onDismiss = actions.onDismissError)
             }
 
-            val fortsetzbar = uiState.resumableCode
-            if (fortsetzbar != null && uiState.step in listOf(MultiplayerStep.ANZAHL, MultiplayerStep.START)) {
-                ResumeCard(code = fortsetzbar, isBusy = uiState.isBusy, onResume = onResume)
+            // Fehlt nur das Netz, laeuft die Runde weiter - das soll man wissen, statt zu raetseln.
+            AnimatedVisibility(visible = uiState.isOffline && uiState.step != MultiplayerStep.START) {
+                Text(
+                    text = stringResource(R.string.zuzweit_offline),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .cardSurface(Tokens.Radius.MdShape)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
             }
 
             // Jeder Schritt kommt mit einer kleinen Bewegung herein: Einladen, Warten,
@@ -207,116 +266,230 @@ fun MultiplayerScreen(
                 label = "zuzweit",
             ) { step ->
                 when (step) {
-                    MultiplayerStep.ANZAHL -> TargetStep(
-                        uiState = uiState,
-                        onTargetChange = onTargetChange,
-                        onContinue = onContinueFromTarget,
-                        onFilterDietToggle = onFilterDietToggle,
-                        onFilterIntoleranceToggle = onFilterIntoleranceToggle,
-                    )
+                    MultiplayerStep.START -> StartStep(uiState = uiState, actions = actions)
 
-                    MultiplayerStep.START -> StartStep(
-                        uiState = uiState,
-                        onHost = onHost,
-                        onCodeInputChange = onCodeInputChange,
-                        onJoin = onJoin,
-                    )
+                    MultiplayerStep.LOBBY -> if (uiState.isHost) {
+                        HostLobby(uiState = uiState, actions = actions)
+                    } else {
+                        GuestLobby(uiState = uiState)
+                    }
 
-                    MultiplayerStep.WARTET_AUF_PERSON -> WaitingForPartner(code = uiState.code)
+                    MultiplayerStep.SAMMELN -> CollectingStep(uiState = uiState)
 
-                    MultiplayerStep.WISCHEN -> SwipingStep(uiState = uiState, onSwiped = onSwiped)
+                    MultiplayerStep.WISCHEN -> SwipingStep(uiState = uiState, actions = actions)
 
-                    MultiplayerStep.WARTET_AUF_ENTSCHEIDUNGEN -> WaitingNote(
-                        title = stringResource(R.string.mehrspieler_warten_titel),
-                        message = stringResource(R.string.mehrspieler_warten_text),
-                    )
+                    MultiplayerStep.WARTET -> WaitingStep(uiState = uiState, onUndo = actions.onUndo)
 
-                    MultiplayerStep.TREFFER -> MatchesStep(
-                        uiState = uiState,
-                        onKeep = onKeep,
-                        onAddToPlan = onAddToPlan,
-                    )
+                    MultiplayerStep.FRAGE -> QuestionStep(uiState = uiState, actions = actions)
+
+                    MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, actions = actions)
                 }
             }
         }
     }
 }
 
-/** Wie viele Gerichte soll der eigene Vorschlag zur gemeinsamen Runde beitragen? */
-@OptIn(ExperimentalLayoutApi::class)
+// ------------------------------------------------------------------------- Anfang
+
 @Composable
-private fun TargetStep(
-    uiState: MultiplayerUiState,
-    onTargetChange: (Int) -> Unit,
-    onContinue: () -> Unit,
-    onFilterDietToggle: (Diet) -> Unit,
-    onFilterIntoleranceToggle: (Intolerance) -> Unit,
-) {
+private fun StartStep(uiState: MultiplayerUiState, actions: MultiplayerActions) {
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionCard(title = stringResource(R.string.stapel_anzahl_frage), index = 0) {
-            Text(
-                stringResource(R.string.mehrspieler_anzahl_hinweis),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                TARGET_OPTIONS.forEach { anzahl ->
-                    RezeptliFilterChip(
-                        selected = uiState.target == anzahl,
-                        onClick = { onTargetChange(anzahl) },
-                        label = pluralStringResource(R.plurals.stapel_gerichte, anzahl, anzahl),
-                    )
-                }
-            }
+        uiState.resumableCode?.let { code ->
+            ResumeCard(code = code, isBusy = uiState.isBusy, onResume = actions.onResume)
         }
 
-        // Was in dieser Runde nicht auf den Tisch darf. Vorbelegt aus den Vorlieben, fuer
-        // die Runde aenderbar - etwa wenn die andere Person eine Allergie hat.
-        SectionCard(title = stringResource(R.string.zuzweit_filter_titel), index = 1) {
+        Text(
+            stringResource(R.string.mehrspieler_einleitung),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.entrance(0),
+        )
+
+        if (uiState.selectionCount > 0) {
             Text(
-                stringResource(R.string.zuzweit_filter_text),
+                pluralStringResource(
+                    R.plurals.zuzweit_auswahl_kommt_mit,
+                    uiState.selectionCount,
+                    uiState.selectionCount,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.primary,
             )
-            ChoiceChipGroup(
-                options = listOf(Diet.VEGETARISCH, Diet.VEGAN, Diet.PESCETARISCH),
-                selected = uiState.filter.diets,
-                label = { it.label() },
-                onToggle = onFilterDietToggle,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ChoiceChipGroup(
-                options = Intolerance.entries,
-                selected = uiState.filter.intolerances,
-                label = { it.label() },
-                onToggle = onFilterIntoleranceToggle,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (uiState.filter.isActive) {
-                Text(
-                    stringResource(R.string.zuzweit_filter_hinweis),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
+
+        OwnRestrictions(uiState = uiState, actions = actions)
 
         BouncyButton(
-            onClick = onContinue,
+            onClick = actions.onHost,
+            enabled = !uiState.isBusy,
             modifier = Modifier
                 .entrance(2)
                 .fillMaxWidth()
                 .heightIn(min = 52.dp),
         ) {
-            Text(stringResource(R.string.mehrspieler_weiter))
+            MotionIcon(
+                imageVector = Icons.Filled.Share,
+                contentDescription = null,
+                motion = IconMotion.WIGGLE,
+                playOnAppear = true,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(stringResource(R.string.mehrspieler_einladen), modifier = Modifier.padding(start = 8.dp))
+        }
+
+        Text(
+            stringResource(R.string.mehrspieler_oder),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .entrance(3)
+                .fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+
+        OutlinedTextField(
+            value = uiState.codeInput,
+            onValueChange = actions.onCodeInputChange,
+            label = { Text(stringResource(R.string.mehrspieler_code_eingeben)) },
+            singleLine = true,
+            shape = MaterialTheme.shapes.medium,
+            textStyle = MaterialTheme.typography.titleLarge.copy(letterSpacing = 4.sp),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                imeAction = ImeAction.Done,
+            ),
+            modifier = Modifier
+                .entrance(4)
+                .fillMaxWidth(),
+        )
+        BouncyOutlinedButton(
+            onClick = actions.onJoin,
+            enabled = uiState.codeInput.isNotBlank() && !uiState.isBusy,
+            modifier = Modifier
+                .entrance(5)
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+        ) {
+            Text(stringResource(R.string.mehrspieler_beitreten))
+        }
+
+        if (uiState.isBusy) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CookingPot(size = 56.dp)
+            }
+        }
+
+        // Ehrlich sagen, was passiert - hier verlassen Rezepttitel und Angaben zur
+        // Ernaehrung das Geraet.
+        Text(
+            stringResource(R.string.mehrspieler_datenschutz),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .entrance(6)
+                .padding(bottom = 16.dp),
+        )
+    }
+}
+
+/**
+ * Was man selbst in die Runde mitbringt.
+ *
+ * Zusammengeklappt steht da nur, was gilt - die meisten aendern nichts, die Vorlieben
+ * passen schon. Aufgeklappt sind es drei getrennte Gruppen mit je einem Satz dazu, was sie
+ * bedeuten: Frueher standen "Vegan" und "Nuesse" unter derselben Frage "Was darf nicht auf
+ * den Tisch?" - das eine hiess aber "nur vegan", das andere "keine Nuesse".
+ */
+@Composable
+private fun OwnRestrictions(uiState: MultiplayerUiState, actions: MultiplayerActions) {
+    var offen by rememberSaveable { mutableStateOf(false) }
+
+    SectionCard(title = stringResource(R.string.zuzweit_eigene_titel), index = 1) {
+        Text(
+            stringResource(R.string.zuzweit_eigene_text),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (!offen) {
+            RestrictionSummary(filter = uiState.ownRestrictions)
+        } else {
+            RestrictionGroup(R.string.zuzweit_gruppe_ernaehrung, R.string.zuzweit_gruppe_ernaehrung_text) {
+                DietPicker(
+                    profile = uiState.own,
+                    onMainDiet = actions.onOwnMainDiet,
+                    onToggleDiet = actions.onOwnDietToggle,
+                )
+            }
+            RestrictionGroup(R.string.zuzweit_gruppe_unvertraeglich, R.string.zuzweit_gruppe_unvertraeglich_text) {
+                IntolerancePicker(
+                    selected = uiState.own.intolerances,
+                    onToggle = actions.onOwnIntoleranceToggle,
+                )
+            }
+            RestrictionGroup(R.string.zuzweit_gruppe_abneigungen, R.string.zuzweit_gruppe_abneigungen_text) {
+                DislikePicker(
+                    selected = uiState.own.dislikes,
+                    custom = uiState.own.customDislikes,
+                    onToggle = actions.onOwnDislikeToggle,
+                    onAddCustom = actions.onOwnCustomDislikeAdd,
+                    onRemoveCustom = actions.onOwnCustomDislikeRemove,
+                )
+            }
+        }
+
+        BouncyTextButton(onClick = { offen = !offen }) {
+            Text(stringResource(if (offen) R.string.zuzweit_eigene_fertig else R.string.zuzweit_eigene_anpassen))
         }
     }
+}
+
+@Composable
+private fun RestrictionGroup(titleRes: Int, textRes: Int, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+        Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium)
+        Text(
+            stringResource(textRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        content()
+    }
+}
+
+/**
+ * Was gilt, in hoechstens drei Zeilen - jede sagt dazu, ob sie eine Bedingung oder ein
+ * Ausschluss ist.
+ */
+@Composable
+private fun RestrictionSummary(filter: DietaryFilter, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (!filter.isActive) {
+            Text(stringResource(R.string.zuzweit_keine_angaben), style = MaterialTheme.typography.bodyMedium)
+            return@Column
+        }
+
+        val ernaehrung = filter.diets.map { it.label() }
+        val unvertraeglich = filter.intolerances.map { it.label() }
+        val abneigungen = filter.dislikes.map { it.label() } + filter.customDislikes
+
+        if (ernaehrung.isNotEmpty()) {
+            SummaryLine(stringResource(R.string.zuzweit_zeile_ernaehrung, ernaehrung.joinToString(", ")))
+        }
+        if (unvertraeglich.isNotEmpty()) {
+            SummaryLine(stringResource(R.string.zuzweit_zeile_unvertraeglich, unvertraeglich.joinToString(", ")))
+        }
+        if (abneigungen.isNotEmpty()) {
+            SummaryLine(stringResource(R.string.zuzweit_zeile_abneigungen, abneigungen.joinToString(", ")))
+        }
+    }
+}
+
+@Composable
+private fun SummaryLine(text: String) {
+    Text(text = text, style = MaterialTheme.typography.bodyMedium)
 }
 
 /** Eine unterbrochene Runde - ein Tipp, und es geht mit demselben Stapel weiter. */
@@ -376,102 +549,204 @@ private fun LeaveDialog(code: String, onPause: () -> Unit, onEnd: () -> Unit, on
     )
 }
 
-/** Schritte, in denen eine Runde laeuft - hier fragt "Zurueck" erst nach. */
-private val LAUFENDE_SCHRITTE = setOf(
-    MultiplayerStep.WARTET_AUF_PERSON,
-    MultiplayerStep.WISCHEN,
-    MultiplayerStep.WARTET_AUF_ENTSCHEIDUNGEN,
-)
+// ------------------------------------------------------------------------- Lobby
 
+/**
+ * Die Lobby der Person, die eroeffnet hat: oben der Code, darunter, was gesucht wird.
+ *
+ * Der Code steht schon, waehrend noch gewaehlt wird - so kann die andere Person beitreten
+ * und zusehen, statt auf eine fertige Runde zu warten.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StartStep(
-    uiState: MultiplayerUiState,
-    onHost: () -> Unit,
-    onCodeInputChange: (String) -> Unit,
-    onJoin: () -> Unit,
-) {
+private fun HostLobby(uiState: MultiplayerUiState, actions: MultiplayerActions) {
     Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            stringResource(R.string.mehrspieler_einleitung),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.entrance(0),
-        )
-        // Ehrlich sagen, was passiert - hier verlassen zum ersten Mal Rezepttitel
-        // das Geraet.
-        Text(
-            stringResource(R.string.mehrspieler_datenschutz),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.entrance(1),
-        )
+        CodeCard(code = uiState.code)
+        PartnerStatus(isHere = !uiState.isAlone)
+
+        SectionCard(title = stringResource(R.string.zuzweit_lobby_anzahl), index = 1) {
+            Text(
+                stringResource(R.string.zuzweit_lobby_anzahl_text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TARGET_OPTIONS.forEach { anzahl ->
+                    RezeptliFilterChip(
+                        selected = uiState.target == anzahl,
+                        onClick = { actions.onTargetChange(anzahl) },
+                        label = pluralStringResource(R.plurals.stapel_gerichte, anzahl, anzahl),
+                    )
+                }
+            }
+        }
+
+        SectionCard(title = stringResource(R.string.zuzweit_lobby_art), index = 2) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                CourseChoice.entries.forEach { art ->
+                    RezeptliFilterChip(
+                        selected = uiState.course == art,
+                        onClick = { actions.onCourseChange(art) },
+                        label = stringResource(art.labelRes()),
+                    )
+                }
+            }
+        }
+
+        SectionCard(title = stringResource(R.string.zuzweit_lobby_quelle), index = 3) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                RoundSource.entries.forEach { quelle ->
+                    RezeptliFilterChip(
+                        selected = uiState.source == quelle,
+                        onClick = { actions.onSourceChange(quelle) },
+                        label = stringResource(quelle.labelRes()),
+                    )
+                }
+            }
+            if (uiState.source == RoundSource.GESPEICHERT) {
+                Text(
+                    stringResource(R.string.zuzweit_quelle_hinweis),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        SharedRestrictions(filter = uiState.restrictions, index = 4)
 
         BouncyButton(
-            onClick = onHost,
-            enabled = !uiState.isBusy,
+            onClick = actions.onStart,
+            enabled = !uiState.isAlone && !uiState.isBusy,
             modifier = Modifier
-                .entrance(2)
                 .fillMaxWidth()
-                .heightIn(min = 52.dp),
+                .heightIn(min = 56.dp),
         ) {
+            Text(stringResource(R.string.stapel_losgehts), style = MaterialTheme.typography.titleMedium)
             MotionIcon(
-                imageVector = Icons.Filled.Share,
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
-                motion = IconMotion.WIGGLE,
-                playOnAppear = true,
-                modifier = Modifier.size(20.dp),
+                motion = IconMotion.SLIDE,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(20.dp),
             )
-            Text(stringResource(R.string.mehrspieler_einladen), modifier = Modifier.padding(start = 8.dp))
         }
+        if (uiState.isAlone) {
+            Text(
+                stringResource(R.string.zuzweit_lobby_start_allein),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+            )
+        }
+    }
+}
 
-        Text(
-            stringResource(R.string.mehrspieler_oder),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .entrance(3)
-                .fillMaxWidth(),
-            textAlign = TextAlign.Center,
+/**
+ * Die Lobby der eingeladenen Person: Sie sieht, was festgelegt wird, kann es aber nicht
+ * aendern - die Anzahl bestimmt, wer eroeffnet hat.
+ */
+@Composable
+private fun GuestLobby(uiState: MultiplayerUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        WaitingNote(
+            title = stringResource(R.string.zuzweit_gast_titel),
+            message = stringResource(R.string.zuzweit_gast_text),
         )
 
-        OutlinedTextField(
-            value = uiState.codeInput,
-            onValueChange = onCodeInputChange,
-            label = { Text(stringResource(R.string.mehrspieler_code_eingeben)) },
-            singleLine = true,
-            shape = MaterialTheme.shapes.medium,
-            textStyle = MaterialTheme.typography.titleLarge.copy(letterSpacing = 4.sp),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Characters,
-                imeAction = ImeAction.Done,
-            ),
-            modifier = Modifier
-                .entrance(4)
-                .fillMaxWidth(),
-        )
-        BouncyOutlinedButton(
-            onClick = onJoin,
-            enabled = uiState.codeInput.isNotBlank() && !uiState.isBusy,
-            modifier = Modifier
-                .entrance(5)
-                .fillMaxWidth()
-                .heightIn(min = 52.dp),
-        ) {
-            Text(stringResource(R.string.mehrspieler_beitreten))
+        SectionCard(title = stringResource(R.string.zuzweit_gast_gesucht), index = 1) {
+            // Die Zahl springt kurz, wenn sie sich aendert - man sieht, dass gerade gewaehlt wird.
+            Text(
+                text = pluralStringResource(R.plurals.stapel_gerichte, uiState.target, uiState.target) +
+                    " · " + stringResource(uiState.course.labelRes()),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.popOnChange(uiState.target to uiState.course),
+            )
+            Text(
+                text = stringResource(
+                    if (uiState.source == RoundSource.GESPEICHERT) {
+                        R.string.zuzweit_gast_quelle_gespeichert
+                    } else {
+                        R.string.zuzweit_gast_quelle_neu
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
-        if (uiState.isBusy) {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CookingPot(size = 56.dp)
-            }
+        SharedRestrictions(filter = uiState.restrictions, index = 2)
+    }
+}
+
+/** Was fuer beide gilt - die vereinigten Angaben, damit niemand ueberrascht wird, was fehlt. */
+@Composable
+private fun SharedRestrictions(filter: DietaryFilter, index: Int) {
+    SectionCard(title = stringResource(R.string.zuzweit_gilt_titel), index = index) {
+        RestrictionSummary(filter = filter)
+        if (filter.isActive) {
+            Text(
+                stringResource(R.string.zuzweit_pruef_hinweis),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun WaitingForPartner(code: String) {
+private fun PartnerStatus(isHere: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .cardSurface(Tokens.Radius.MdShape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (isHere) {
+            MotionIcon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                motion = IconMotion.POP,
+                playOnAppear = true,
+                tint = RezeptliTheme.accents.swipeYes,
+                modifier = Modifier.size(22.dp),
+            )
+        } else {
+            CookingPot(size = 28.dp)
+        }
+        Text(
+            text = stringResource(if (isHere) R.string.zuzweit_lobby_da else R.string.zuzweit_lobby_wartet),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+    }
+}
+
+@Composable
+private fun CodeCard(code: String) {
     val context = LocalContext.current
     val shareMessage = stringResource(R.string.mehrspieler_teilen_text, code)
     val motion = RezeptliTheme.motion
@@ -491,10 +766,8 @@ private fun WaitingForPartner(code: String) {
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -510,7 +783,7 @@ private fun WaitingForPartner(code: String) {
             text = code,
             style = MaterialTheme.typography.displayMedium.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 46.sp,
+                fontSize = 42.sp,
                 letterSpacing = 8.sp,
             ),
             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -523,7 +796,7 @@ private fun WaitingForPartner(code: String) {
                 .highlightRing(Tokens.Radius.XlShape, intensity = 0.4f)
                 .clip(Tokens.Radius.XlShape)
                 .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(vertical = 26.dp),
+                .padding(vertical = 20.dp),
             textAlign = TextAlign.Center,
         )
 
@@ -531,7 +804,7 @@ private fun WaitingForPartner(code: String) {
             onClick = { context.shareText(shareMessage) },
             modifier = Modifier
                 .entrance(2)
-                .heightIn(min = 52.dp),
+                .heightIn(min = 48.dp),
         ) {
             MotionIcon(
                 imageVector = Icons.Filled.Share,
@@ -544,45 +817,60 @@ private fun WaitingForPartner(code: String) {
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
-
-        WaitingNote(
-            title = stringResource(R.string.mehrspieler_warte_person_titel),
-            message = stringResource(R.string.mehrspieler_warte_person_text),
-        )
     }
 }
 
+private fun CourseChoice.labelRes(): Int = when (this) {
+    CourseChoice.ESSEN -> R.string.stapel_art_essen
+    CourseChoice.GETRAENKE -> R.string.stapel_art_getraenke
+    CourseChoice.BEIDES -> R.string.stapel_art_beides
+}
+
+private fun RoundSource.labelRes(): Int = when (this) {
+    RoundSource.GESPEICHERT -> R.string.zuzweit_quelle_gespeichert
+    RoundSource.NEU -> R.string.zuzweit_quelle_neu
+}
+
+// ------------------------------------------------------------------------- Sammeln und Wischen
+
 @Composable
-private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -> Unit) {
+private fun CollectingStep(uiState: MultiplayerUiState) {
+    WaitingNote(
+        title = stringResource(R.string.zuzweit_sammeln_titel),
+        message = stringResource(
+            when {
+                uiState.hasContributed -> R.string.zuzweit_sammeln_wartet
+                uiState.source == RoundSource.GESPEICHERT -> R.string.zuzweit_sammeln_gespeichert
+                else -> R.string.zuzweit_sammeln_neu
+            },
+        ),
+    )
+}
+
+@Composable
+private fun SwipingStep(uiState: MultiplayerUiState, actions: MultiplayerActions) {
     val stapel = rememberSwipeCardStackState()
+    val offen = uiState.remainingCards
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = uiState.progressLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            RezeptliProgressBar(
-                progress = if (uiState.pool.isEmpty()) 0f else uiState.decidedCount.toFloat() / uiState.pool.size,
-                modifier = Modifier.weight(1f),
-                height = 8.dp,
-            )
-        }
+        RoundProgress(uiState = uiState, open = offen.size)
+
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            // Bei aktivem Filter erscheint eine Karte erst nach ihrer Pruefung.
-            if (uiState.remainingCards.isEmpty()) {
+            if (offen.isEmpty()) {
                 RezeptliLoader()
             }
             SwipeCardStack(
-                cards = uiState.remainingCards,
-                onSwiped = { card, liked -> onSwiped(card.id, liked) },
+                cards = offen,
+                onSwiped = { card, liked -> actions.onSwiped(card.id, liked) },
                 state = stapel,
+                onInfo = { card -> actions.onInfo(card.id) },
             )
         }
         SwipeDecisionButtons(
             onNo = { stapel.swipe(false) },
             onYes = { stapel.swipe(true) },
-            enabled = uiState.remainingCards.isNotEmpty(),
+            enabled = offen.isNotEmpty(),
+            onUndo = actions.onUndo,
+            canUndo = uiState.canUndo,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp),
@@ -590,95 +878,288 @@ private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -
     }
 }
 
+/** Wie weit die Runde ist: gemeinsame Treffer gegen das Ziel, und wie viele Karten noch offen sind. */
 @Composable
-private fun MatchesStep(uiState: MultiplayerUiState, onKeep: () -> Unit, onAddToPlan: () -> Unit) {
-    if (uiState.matches.isEmpty()) {
+private fun RoundProgress(uiState: MultiplayerUiState, open: Int) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Das Herz springt, sobald ein gemeinsamer Treffer dazukommt.
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = RezeptliTheme.accents.tomato,
+                modifier = Modifier
+                    .size(18.dp)
+                    .popOnChange(uiState.matchCount),
+            )
+            Text(
+                text = stringResource(R.string.zuzweit_fortschritt, uiState.matchCount, uiState.target),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = pluralStringResource(R.plurals.zuzweit_karten_offen, open, open),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        RezeptliProgressBar(progress = uiState.progress, color = RezeptliTheme.accents.tomato)
+    }
+}
+
+/** Selbst durch - die andere Person wischt noch. Ein Versehen laesst sich auch hier zuruecknehmen. */
+@Composable
+private fun WaitingStep(uiState: MultiplayerUiState, onUndo: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        RoundProgress(uiState = uiState, open = 0)
         WaitingNote(
-            title = stringResource(R.string.mehrspieler_keine_treffer_titel),
-            message = stringResource(R.string.mehrspieler_keine_treffer_text),
-            busy = false,
+            title = stringResource(R.string.mehrspieler_warten_titel),
+            message = stringResource(R.string.mehrspieler_warten_text),
         )
+        if (uiState.canUndo) {
+            BouncyTextButton(onClick = onUndo, modifier = Modifier.fillMaxWidth()) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Undo,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(stringResource(R.string.wischen_zuruecknehmen), modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------------- Frage und Ende
+
+/**
+ * Der Stapel ist durch, das Ziel nicht erreicht.
+ *
+ * Wer eroeffnet hat, entscheidet: mit neuen Rezepten weitermachen oder aufhoeren und
+ * behalten, was gefunden wurde. Die andere Person sieht dieselben Treffer und wartet.
+ */
+@Composable
+private fun QuestionStep(uiState: MultiplayerUiState, actions: MultiplayerActions) {
+    val eintritt = rememberEntranceState()
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
+    ) {
+        item(key = "kopf") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.zuzweit_frage_titel), style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    text = stringResource(
+                        if (uiState.source == RoundSource.GESPEICHERT) {
+                            R.string.zuzweit_frage_gespeichert
+                        } else {
+                            R.string.zuzweit_frage_neu
+                        },
+                        uiState.matchCount,
+                        uiState.target,
+                    ),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        }
+
+        if (uiState.matches.isNotEmpty()) {
+            item(key = "bisher") {
+                Text(
+                    stringResource(R.string.zuzweit_bisher),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            itemsIndexed(uiState.matches, key = { _, match -> match.recipeId }) { index, match ->
+                MatchRow(match = match, modifier = Modifier.entrance(index, eintritt, match.recipeId))
+            }
+        }
+
+        item(key = "entscheidung") {
+            if (uiState.isHost) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    BouncyButton(
+                        onClick = actions.onContinue,
+                        enabled = !uiState.isBusy,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp),
+                    ) { Text(stringResource(R.string.zuzweit_frage_weiter)) }
+
+                    BouncyOutlinedButton(
+                        onClick = actions.onStop,
+                        enabled = !uiState.isBusy,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (uiState.matches.isEmpty()) {
+                                    R.string.zuzweit_frage_aufhoeren_leer
+                                } else {
+                                    R.string.zuzweit_frage_aufhoeren
+                                },
+                            ),
+                        )
+                    }
+                }
+            } else {
+                WaitingNote(
+                    title = stringResource(R.string.zuzweit_frage_titel),
+                    message = stringResource(R.string.zuzweit_frage_gast),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MatchesStep(uiState: MultiplayerUiState, actions: MultiplayerActions) {
+    val grund = uiState.end?.let { ende -> stringResource(ende.messageRes(uiState.isHost)) }
+
+    if (uiState.matches.isEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            WaitingNote(
+                title = stringResource(R.string.mehrspieler_keine_treffer_titel),
+                message = listOfNotNull(
+                    grund.takeIf { uiState.end != RoundEnd.ZIEL },
+                    stringResource(R.string.mehrspieler_keine_treffer_text),
+                ).joinToString(" "),
+                busy = false,
+            )
+            BouncyButton(
+                onClick = actions.onNewRound,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) { Text(stringResource(R.string.zuzweit_neue_runde)) }
+        }
         return
     }
 
     val eintritt = rememberEntranceState()
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                stringResource(R.string.mehrspieler_treffer_titel),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.entrance(0),
-            )
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(vertical = 4.dp),
-                modifier = Modifier.weight(1f, fill = false),
-            ) {
-                itemsIndexed(uiState.matches, key = { _, match -> match.recipeId }) { index, match ->
-                    MatchRow(
-                        match = match,
-                        modifier = Modifier.entrance(index + 1, eintritt, match.recipeId),
-                    )
-                }
-            }
-
-            // Der Hauptweg: die Treffer auf freie Tage des Wochenplans legen.
-            val geplant = uiState.plannedMeals
-            if (geplant == null) {
-                BouncyButton(
-                    onClick = onAddToPlan,
-                    enabled = !uiState.isPlanning,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 52.dp),
-                ) { Text(stringResource(R.string.zuzweit_in_plan)) }
-            } else {
-                Text(
-                    text = if (geplant > 0) {
-                        stringResource(R.string.zuzweit_in_plan_ergebnis, geplant)
-                    } else {
-                        stringResource(R.string.zuzweit_in_plan_nichts)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Bis hierhin waren die Treffer nur Titel. Ein Griff bringt sie in die
-            // Sammlung und ihre Zutaten auf die Einkaufsliste.
-            val fertig = uiState.addedItems
-            if (fertig == null) {
-                BouncyOutlinedButton(
-                    onClick = onKeep,
-                    enabled = !uiState.isKeeping,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 52.dp),
-                ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 16.dp),
+        ) {
+            item(key = "kopf") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.entrance(0)) {
                     Text(
-                        if (uiState.isKeeping) {
-                            stringResource(
-                                R.string.mehrspieler_uebernehmen_laeuft,
-                                uiState.keptRecipes,
-                                uiState.matches.size,
-                            )
-                        } else {
-                            stringResource(R.string.mehrspieler_uebernehmen)
-                        },
+                        stringResource(R.string.mehrspieler_treffer_titel),
+                        style = MaterialTheme.typography.headlineMedium,
                     )
+                    if (grund != null) {
+                        Text(
+                            grund,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            } else {
-                Text(
-                    text = pluralStringResource(R.plurals.mehrspieler_uebernommen, fertig, fertig),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+
+            itemsIndexed(uiState.matches, key = { _, match -> match.recipeId }) { index, match ->
+                MatchRow(
+                    match = match,
+                    modifier = Modifier.entrance(index + 1, eintritt, match.recipeId),
                 )
+            }
+
+            item(key = "aktionen") {
+                MatchActions(uiState = uiState, actions = actions)
             }
         }
 
         // Ihr habt euch gefunden - Konfetti.
         ConfettiBurst(trigger = uiState.matches.size, modifier = Modifier.fillMaxSize())
     }
+}
+
+/** Was sich mit den Treffern anfangen laesst: in den Plan, in die Sammlung, eine neue Runde. */
+@Composable
+private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerActions) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+        // Der Hauptweg: die Treffer auf freie Plaetze des Wochenplans legen.
+        val geplant = uiState.plannedMeals
+        if (geplant == null) {
+            BouncyButton(
+                onClick = actions.onAddToPlan,
+                enabled = !uiState.isPlanning,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) { Text(stringResource(R.string.zuzweit_in_plan)) }
+        } else {
+            ResultNote(
+                if (geplant > 0) {
+                    stringResource(R.string.zuzweit_in_plan_ergebnis, geplant)
+                } else {
+                    stringResource(R.string.zuzweit_in_plan_nichts)
+                },
+            )
+        }
+
+        // Bis hierhin waren die Treffer nur Titel. Ein Griff bringt sie in die
+        // Sammlung und ihre Zutaten auf die Einkaufsliste.
+        val fertig = uiState.addedItems
+        if (fertig == null) {
+            BouncyOutlinedButton(
+                onClick = actions.onKeep,
+                enabled = !uiState.isKeeping,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) {
+                Text(
+                    if (uiState.isKeeping) {
+                        stringResource(
+                            R.string.mehrspieler_uebernehmen_laeuft,
+                            uiState.keptRecipes,
+                            uiState.matches.size,
+                        )
+                    } else {
+                        stringResource(R.string.mehrspieler_uebernehmen)
+                    },
+                )
+            }
+        } else {
+            ResultNote(pluralStringResource(R.plurals.mehrspieler_uebernommen, fertig, fertig))
+            if (uiState.notImportable > 0) {
+                ResultNote(
+                    pluralStringResource(R.plurals.zuzweit_nicht_holbar, uiState.notImportable, uiState.notImportable),
+                )
+            }
+        }
+
+        BouncyTextButton(
+            onClick = actions.onNewRound,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+        ) { Text(stringResource(R.string.zuzweit_neue_runde)) }
+    }
+}
+
+@Composable
+private fun ResultNote(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Warum die Runde zu Ende ist - aus der Sicht der Person, die es liest. */
+private fun RoundEnd.messageRes(isHost: Boolean): Int = when (this) {
+    RoundEnd.ZIEL -> R.string.zuzweit_ende_ziel
+    RoundEnd.LEER -> R.string.zuzweit_ende_leer
+    RoundEnd.GASTGEBER -> if (isHost) R.string.zuzweit_ende_ich else R.string.zuzweit_ende_gegenueber
+    RoundEnd.VERLASSEN -> if (isHost) R.string.zuzweit_ende_gegenueber else R.string.zuzweit_ende_ich
 }
 
 /** Ein gemeinsamer Treffer: Foto, Titel, Herz. */
@@ -717,7 +1198,7 @@ private fun MatchRow(match: SharedRecipe, modifier: Modifier = Modifier) {
     }
 }
 
-/** Warten auf die andere Person - mit dem brodelnden Topf statt eines Kreisels. */
+/** Warten - mit dem brodelnden Topf statt eines Kreisels. */
 @Composable
 private fun WaitingNote(title: String, message: String, busy: Boolean = true) {
     Column(
@@ -766,7 +1247,7 @@ private fun PairingError.messageRes(): Int = when (this) {
     PairingError.UNKNOWN_CODE -> R.string.mehrspieler_fehler_code
     PairingError.EXPIRED -> R.string.mehrspieler_fehler_abgelaufen
     PairingError.FULL -> R.string.mehrspieler_fehler_voll
-    PairingError.NO_RECIPES -> R.string.mehrspieler_fehler_keine_rezepte
+    PairingError.OUTDATED -> R.string.mehrspieler_fehler_veraltet
     PairingError.UNKNOWN -> R.string.mehrspieler_fehler_unbekannt
 }
 

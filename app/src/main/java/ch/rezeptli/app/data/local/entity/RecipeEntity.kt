@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Relation
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.Weekday
 
 @Entity(tableName = "recipes")
@@ -25,6 +26,12 @@ data class RecipeEntity(
     val sourceUrl: String? = null,
     val sourceName: String? = null,
     val servings: Int? = null,
+    /**
+     * Gehoert das Rezept zur Sammlung? Ein Rezept, das nur fuer den Wochenplan geholt
+     * wurde, steht hier mit 0 - gespeichert, aber nicht in "Meine Rezepte".
+     */
+    @ColumnInfo(defaultValue = "1")
+    val inCollection: Boolean = true,
 )
 
 @Entity(
@@ -159,9 +166,10 @@ data class ShoppingItemEntity(
 /**
  * Eine Mahlzeit im Wochenplan.
  *
- * Pro Tag genau eine - der Plan kennt kein Mittag- und Abendessen. Das Rezept liegt als
- * gewoehnliches gespeichertes Rezept in der Sammlung; der Plan verweist nur darauf und
- * merkt sich, fuer wie viele gekocht wird und was die Mahlzeit anteilig kostet.
+ * Pro Tag und Tageszeit genau eine: Mittag- und Abendessen. Das Rezept ist ein
+ * gespeichertes Rezept, das nicht zur Sammlung gehoeren muss; der Plan verweist nur
+ * darauf und merkt sich, fuer wie viele gekocht wird, was die Mahlzeit anteilig kostet
+ * und ob sie schon gekocht ist.
  */
 @Entity(
     tableName = "plan_entries",
@@ -173,7 +181,7 @@ data class ShoppingItemEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("recipeId"), Index(value = ["day"], unique = true)],
+    indices = [Index("recipeId"), Index(value = ["day", "slot"], unique = true)],
 )
 data class PlanEntryEntity(
     @PrimaryKey(autoGenerate = true)
@@ -183,15 +191,21 @@ data class PlanEntryEntity(
     val servings: Int,
     val cost: Double,
     val label: String,
+    /** Plaene von vor der Einfuehrung des Mittagessens waren Abendessen. */
+    @ColumnInfo(defaultValue = "ABEND")
+    val slot: MealSlot = MealSlot.ABEND,
+    val cookedAt: Long? = null,
 )
 
 /** Ein Planeintrag zusammen mit dem, was die Karte zeigt. */
 data class PlanEntryRow(
     val day: Weekday,
+    val slot: MealSlot,
     val recipeId: Long,
     val servings: Int,
     val cost: Double,
     val label: String,
+    val cookedAt: Long?,
     val title: String,
     val photoUri: String?,
     val prepTimeMinutes: Int?,

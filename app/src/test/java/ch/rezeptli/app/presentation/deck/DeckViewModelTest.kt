@@ -2,12 +2,17 @@ package ch.rezeptli.app.presentation.deck
 
 import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.domain.deck.DeckTitles
+import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
+import ch.rezeptli.app.domain.plan.CourseChoice
+import ch.rezeptli.app.domain.plan.ReadRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.RecipeClassifier
 import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.ranking.SourceOrigin
@@ -25,13 +30,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
 /**
- * Deckt die beiden Verhaltensregeln ab, die auf dem Geraet nicht offensichtlich waren:
- * Karten ohne Bild werden nie gezeigt, und eine Runde ohne Ziel endet nur auf Wunsch.
+ * Das Wischen allein: was gezeigt wird (nur Neues, nur Passendes, nur mit Bild), wann die
+ * Runde endet, und dass sich eine Entscheidung zuruecknehmen und eine Karte ansehen laesst.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeckViewModelTest {
@@ -39,101 +45,93 @@ class DeckViewModelTest {
     @RegisterExtension
     val mainDispatcher = MainDispatcherExtension()
 
-    private val mitBild = DeckEntry(
-        url = "https://a.example/mit-bild",
-        title = "Hat ein Bild",
-        imageUrl = "https://a.example/bild.jpg",
-        sourceId = "a",
-        sourceName = "A",
-    )
-    private val ohneBildAberNachladbar = DeckEntry(
-        url = "https://a.example/ohne-bild-nachladbar",
-        title = "Bild kommt nach",
-        sourceId = "a",
-        sourceName = "A",
-    )
-    private val ohneBildUndUnrettbar = DeckEntry(
-        url = "https://a.example/ohne-bild-nie",
-        title = "Kein Bild zu holen",
-        sourceId = "a",
-        sourceName = "A",
+    private val herkunft = mapOf("a" to SourceOrigin("a", Country.SCHWEIZ))
+
+    private fun karte(titel: String, mitBild: Boolean = true): DeckEntry {
+        val name = titel.lowercase().replace(' ', '-')
+        return DeckEntry(
+            url = "https://a.example/$name",
+            title = titel,
+            imageUrl = if (mitBild) "https://a.example/$name.jpg" else null,
+            sourceId = "a",
+            sourceName = "Quelle A",
+        )
+    }
+
+    private fun pool(vararg karten: DeckEntry) = DeckPool(
+        entriesBySource = mapOf("a" to karten.toList()),
+        origins = herkunft,
     )
 
-    private val pool = DeckPool(
-        entriesBySource = mapOf(
-            "a" to listOf(mitBild, ohneBildAberNachladbar, ohneBildUndUnrettbar),
-        ),
-        origins = mapOf("a" to SourceOrigin("a", Country.SCHWEIZ)),
+    private fun seite(karte: DeckEntry, vararg zutaten: String) = karte.url to WebRecipe(
+        title = karte.title,
+        ingredientLines = zutaten.toList(),
+        instructions = "Geheime Zubereitung, die auf einer Karte nichts verloren hat.",
+        imageUrl = karte.imageUrl,
+        totalMinutes = 35,
+        servings = "4",
+        sourceUrl = karte.url,
+        sourceName = "Quelle A",
     )
+
+    private val mitBild = karte("Hat ein Bild")
+    private val ohneBildAberNachladbar = karte("Bild kommt nach", mitBild = false)
+    private val ohneBildUndUnrettbar = karte("Kein Bild zu holen", mitBild = false)
+    private val dreiKarten = pool(mitBild, ohneBildAberNachladbar, ohneBildUndUnrettbar)
+
+    /** Ein Vorrat, der fuer eine lange Runde reicht. */
+    private val vieleKarten = pool(*(1..60).map { karte("Gericht $it") }.toTypedArray())
 
     private fun createViewModel(
-        webRepository: FakeWebRecipeRepository = FakeWebRecipeRepository(pool = pool).apply {
+        webRepository: FakeWebRecipeRepository = FakeWebRecipeRepository(pool = dreiKarten).apply {
             cardImagesByUrl = mapOf(ohneBildAberNachladbar.url to "https://a.example/nachgeladen.jpg")
         },
         recipeRepository: FakeRecipeRepository = FakeRecipeRepository(),
         profile: UserProfile = UserProfile(country = Country.SCHWEIZ),
-    ) = DeckViewModel(
-        buildDeck = BuildSwipeDeckUseCase(
+    ): DeckViewModel {
+        val readCard = ReadRecipeCardUseCase(webRepository, IngredientTextParser(), RecipeClassifier())
+        return DeckViewModel(
+            buildDeck = BuildSwipeDeckUseCase(
+                webRepository = webRepository,
+                profileRepository = FakeUserProfileRepository(profile),
+                builder = CuratedDeckBuilder(),
+                titles = DeckTitles(RecipeClassifier()),
+                dispatcher = mainDispatcher.testDispatcher,
+            ),
+            selectionHolder = SharedSelectionHolder(),
             webRepository = webRepository,
+            loadWebRecipe = LoadWebRecipeUseCase(
+                webRepository,
+                IngredientTextParser(),
+                InstructionSplitter(),
+                NoTranslation,
+            ),
+            saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
             profileRepository = FakeUserProfileRepository(profile),
-            builder = CuratedDeckBuilder(),
-        ),
-        selectionHolder = SharedSelectionHolder(),
-        webRepository = webRepository,
-        loadWebRecipe = LoadWebRecipeUseCase(
-            webRepository,
-            IngredientTextParser(),
-            InstructionSplitter(),
-            NoTranslation,
-        ),
-        saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
-        profileRepository = FakeUserProfileRepository(profile),
-        checkCard = CheckRecipeCardUseCase(webRepository, IngredientTextParser(), RecipeClassifier()),
-    )
+            recipeRepository = recipeRepository,
+            checkCard = CheckRecipeCardUseCase(readCard),
+            readCard = readCard,
+        )
+    }
+
+    private fun DeckViewModel.sichtbareTitel() = uiState.value.remainingCards.map { it.title }
+
+    private fun DeckViewModel.wischen(titel: String, liked: Boolean) {
+        onSwiped(uiState.value.cards.first { it.title == titel }, liked)
+    }
+
+    // ------------------------------------------------------------------ was gezeigt wird
 
     @Test
     fun `mit Allergie in den Vorlieben erscheinen nur gepruefte, passende Karten`() = runTest {
-        val mitNuessen = DeckEntry(
-            url = "https://a.example/nusstorte",
-            title = "Nusstorte",
-            imageUrl = "https://a.example/nuss.jpg",
-            sourceId = "a",
-            sourceName = "A",
-        )
-        val ohneNuesse = DeckEntry(
-            url = "https://a.example/roesti",
-            title = "Rösti",
-            imageUrl = "https://a.example/roesti.jpg",
-            sourceId = "a",
-            sourceName = "A",
-        )
-        val unlesbar = DeckEntry(
-            url = "https://a.example/kaputt",
-            title = "Unlesbar",
-            imageUrl = "https://a.example/kaputt.jpg",
-            sourceId = "a",
-            sourceName = "A",
-        )
+        val mitNuessen = karte("Linzer Schnitten")
+        val ohneNuesse = karte("Rösti")
+        val unlesbar = karte("Unlesbar")
         val web = FakeWebRecipeRepository(
-            pool = DeckPool(
-                entriesBySource = mapOf("a" to listOf(mitNuessen, ohneNuesse, unlesbar)),
-                origins = mapOf("a" to SourceOrigin("a", Country.SCHWEIZ)),
-            ),
+            pool = pool(mitNuessen, ohneNuesse, unlesbar),
             recipeByUrl = mapOf(
-                mitNuessen.url to WebRecipe(
-                    title = "Nusstorte",
-                    ingredientLines = listOf("200 g Haselnüsse", "100 g Zucker"),
-                    instructions = "Backen.",
-                    sourceUrl = mitNuessen.url,
-                    sourceName = "A",
-                ),
-                ohneNuesse.url to WebRecipe(
-                    title = "Rösti",
-                    ingredientLines = listOf("800 g Kartoffeln", "1 EL Bratbutter"),
-                    instructions = "Braten.",
-                    sourceUrl = ohneNuesse.url,
-                    sourceName = "A",
-                ),
+                seite(mitNuessen, "200 g Haselnüsse", "100 g Zucker"),
+                seite(ohneNuesse, "800 g Kartoffeln", "1 EL Bratbutter"),
             ),
         )
         val viewModel = createViewModel(
@@ -142,10 +140,83 @@ class DeckViewModelTest {
         )
 
         viewModel.onStart()
-        val titel = viewModel.uiState.value.remainingCards
-            .map { it.title }
 
-        assertEquals(listOf("Rösti"), titel)
+        // Die Nuesse stehen nur in den Zutaten, nicht im Titel - und was sich nicht pruefen
+        // laesst, wird im Zweifel nicht gezeigt.
+        assertEquals(listOf("Rösti"), viewModel.sichtbareTitel())
+    }
+
+    @Test
+    fun `was jemand nicht mag, erscheint nicht - ob es im Titel steht oder nur in den Zutaten`() = runTest {
+        val offensichtlich = karte("Lachsfilet mit Dill")
+        val versteckt = karte("Sommerliche Gemüsepfanne")
+        val harmlos = karte("Kartoffelgratin")
+        val web = FakeWebRecipeRepository(
+            pool = pool(offensichtlich, versteckt, harmlos),
+            recipeByUrl = mapOf(
+                seite(offensichtlich, "400 g Lachsfilet", "1 Bund Dill"),
+                seite(versteckt, "2 Zucchetti", "6 Sardellenfilets"),
+                seite(harmlos, "800 g Kartoffeln", "2 dl Rahm"),
+            ),
+        )
+        val viewModel = createViewModel(
+            webRepository = web,
+            profile = UserProfile(country = Country.SCHWEIZ, dislikes = setOf(Dislike.FISCH)),
+        )
+
+        viewModel.onStart()
+
+        assertEquals(listOf("Kartoffelgratin"), viewModel.sichtbareTitel())
+    }
+
+    @Test
+    fun `gespeicherte Rezepte tauchen beim Entdecken nicht noch einmal auf`() = runTest {
+        val schonDa = karte("Schon gespeichert")
+        val neu = karte("Noch unbekannt")
+        val nurImPlan = karte("Nur im Wochenplan")
+        val sammlung = FakeRecipeRepository(
+            listOf(
+                // Gespeichert unter einer leicht anderen Adresse - es ist trotzdem dasselbe Rezept.
+                Recipe(id = 1L, title = "Schon gespeichert", sourceUrl = "http://www.a.example/schon-gespeichert/"),
+                Recipe(id = 2L, title = "Nur im Wochenplan", sourceUrl = nurImPlan.url, inCollection = false),
+                Recipe(id = 3L, title = "Selbst erfasst"),
+            ),
+        )
+        val viewModel = createViewModel(
+            webRepository = FakeWebRecipeRepository(pool = pool(schonDa, neu, nurImPlan)),
+            recipeRepository = sammlung,
+        )
+
+        viewModel.onStart()
+
+        // Was nur fuer den Plan geholt wurde, hat man sich nicht ausgesucht - das darf man noch entdecken.
+        assertEquals(setOf("Noch unbekannt", "Nur im Wochenplan"), viewModel.sichtbareTitel().toSet())
+    }
+
+    @Test
+    fun `die Auswahl vor der Runde bestimmt, ob Essen, Getraenke oder beides kommt`() = runTest {
+        val web = FakeWebRecipeRepository(
+            pool = pool(karte("Kartoffelgratin"), karte("Erdbeer-Smoothie"), karte("Mojito"), karte("Linsensuppe")),
+        )
+
+        val essen = createViewModel(webRepository = web)
+        essen.onStart()
+        assertEquals(setOf("Kartoffelgratin", "Linsensuppe"), essen.sichtbareTitel().toSet())
+
+        val getraenke = createViewModel(webRepository = web)
+        getraenke.onCourseChange(CourseChoice.GETRAENKE)
+        getraenke.onStart()
+        assertEquals(setOf("Erdbeer-Smoothie", "Mojito"), getraenke.sichtbareTitel().toSet())
+
+        val beides = createViewModel(webRepository = web)
+        beides.onCourseChange(CourseChoice.BEIDES)
+        beides.onStart()
+        assertEquals(4, beides.sichtbareTitel().size)
+    }
+
+    @Test
+    fun `ohne eigene Wahl wird nach Essen gesucht`() {
+        assertEquals(CourseChoice.ESSEN, createViewModel().uiState.value.course)
     }
 
     @Test
@@ -165,17 +236,37 @@ class DeckViewModelTest {
         )
     }
 
-    @Test
-    fun `endlose Runde endet nicht von selbst`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.onTargetChange(null)
+    // ------------------------------------------------------------------ wann die Runde endet
 
+    @Test
+    fun `endlose Runde endet nicht von selbst, solange es Karten gibt`() = runTest {
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = vieleKarten))
+        viewModel.onTargetChange(null)
         viewModel.onStart()
-        val karten = viewModel.uiState.value.cards
-            .toList()
-        karten.forEach { eintrag -> viewModel.onSwiped(eintrag, liked = true) }
+
+        repeat(12) {
+            val oberste = viewModel.uiState.value.cards
+                .first()
+            viewModel.onSwiped(oberste, liked = true)
+        }
 
         assertEquals(DeckStep.WISCHEN, viewModel.uiState.value.step, "Ohne Ziel darf nichts automatisch beenden")
+        assertEquals(12, viewModel.uiState.value.foundCount)
+    }
+
+    @Test
+    fun `ist der Vorrat aufgebraucht, endet die Runde ehrlich statt ewig zu laden`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onTargetChange(null)
+        viewModel.onStart()
+
+        viewModel.wischen("Hat ein Bild", liked = true)
+        viewModel.wischen("Bild kommt nach", liked = false)
+
+        val state = viewModel.uiState.value
+        assertEquals(DeckStep.FERTIG, state.step)
+        assertTrue(state.exhausted)
+        assertEquals(listOf("Hat ein Bild"), state.liked.map { it.title })
     }
 
     @Test
@@ -187,18 +278,229 @@ class DeckViewModelTest {
         viewModel.onFinishEarly()
 
         assertEquals(DeckStep.FERTIG, viewModel.uiState.value.step)
+        assertFalse(viewModel.uiState.value.exhausted)
     }
 
     @Test
-    fun `Runde mit Ziel endet weiterhin von selbst`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.onTargetChange(1)
+    fun `Runde mit Ziel endet von selbst, sobald es erreicht ist`() = runTest {
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = vieleKarten))
+        viewModel.onTargetChange(2)
         viewModel.onStart()
 
-        val ersteSichtbare = viewModel.uiState.value.cards
-            .first { it.imageUrl != null }
-        viewModel.onSwiped(ersteSichtbare, liked = true)
+        viewModel.onSwiped(
+            viewModel.uiState.value.cards
+                .first(),
+            liked = true,
+        )
+        assertEquals(DeckStep.WISCHEN, viewModel.uiState.value.step)
+        viewModel.onSwiped(
+            viewModel.uiState.value.cards
+                .first(),
+            liked = false,
+        )
+        viewModel.onSwiped(
+            viewModel.uiState.value.cards
+                .first(),
+            liked = true,
+        )
 
         assertEquals(DeckStep.FERTIG, viewModel.uiState.value.step)
+        assertEquals(2, viewModel.uiState.value.foundCount)
+    }
+
+    @Test
+    fun `ohne Verzeichnis heisst es kein Netz - mit Verzeichnis, aber ohne Passendes, heisst es genau das`() = runTest {
+        val ohneNetz = createViewModel(webRepository = FakeWebRecipeRepository(pool = DeckPool()))
+        ohneNetz.onStart()
+        assertTrue(ohneNetz.uiState.value.loadFailed)
+        assertFalse(ohneNetz.uiState.value.nothingFits)
+        assertEquals(DeckStep.ANZAHL, ohneNetz.uiState.value.step)
+
+        // Nur Essen im Verzeichnis, gesucht sind Getraenke: Das ist kein Verbindungsproblem.
+        val nichtsPassendes =
+            createViewModel(webRepository = FakeWebRecipeRepository(pool = pool(karte("Kartoffelgratin"))))
+        nichtsPassendes.onCourseChange(CourseChoice.GETRAENKE)
+        nichtsPassendes.onStart()
+        assertFalse(nichtsPassendes.uiState.value.loadFailed)
+        assertTrue(nichtsPassendes.uiState.value.nothingFits)
+        assertEquals(DeckStep.ANZAHL, nichtsPassendes.uiState.value.step)
+    }
+
+    // ------------------------------------------------------------------ zuruecknehmen
+
+    @Test
+    fun `die letzte Entscheidung laesst sich zuruecknehmen - die Karte liegt wieder oben`() = runTest {
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = vieleKarten))
+        viewModel.onStart()
+        val erste = viewModel.uiState.value.cards
+            .first()
+        assertFalse(viewModel.uiState.value.canUndo)
+
+        viewModel.onSwiped(erste, liked = true)
+        assertEquals(
+            listOf(erste.title),
+            viewModel.uiState.value.liked
+                .map { it.title },
+        )
+        assertTrue(viewModel.uiState.value.canUndo)
+
+        viewModel.onUndo()
+
+        val state = viewModel.uiState.value
+        assertEquals(erste.title, state.remainingCards.first().title)
+        assertTrue(state.liked.isEmpty(), "Ein zurueckgenommenes Ja ist kein Ja mehr")
+        assertFalse(state.canUndo)
+    }
+
+    @Test
+    fun `zuruecknehmen geht Schritt fuer Schritt weiter zurueck`() = runTest {
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = vieleKarten))
+        viewModel.onTargetChange(null)
+        viewModel.onStart()
+        val (eins, zwei, drei) = viewModel.uiState.value.cards
+
+        viewModel.onSwiped(eins, liked = true)
+        viewModel.onSwiped(zwei, liked = false)
+        viewModel.onSwiped(drei, liked = true)
+
+        viewModel.onUndo()
+        assertEquals(
+            drei.title,
+            viewModel.uiState.value.remainingCards
+                .first()
+                .title,
+        )
+        assertEquals(
+            listOf(eins.title),
+            viewModel.uiState.value.liked
+                .map { it.title },
+        )
+
+        viewModel.onUndo()
+        assertEquals(
+            zwei.title,
+            viewModel.uiState.value.remainingCards
+                .first()
+                .title,
+        )
+
+        viewModel.onUndo()
+        assertEquals(
+            eins.title,
+            viewModel.uiState.value.remainingCards
+                .first()
+                .title,
+        )
+        assertTrue(
+            viewModel.uiState.value.liked
+                .isEmpty(),
+        )
+        assertFalse(viewModel.uiState.value.canUndo)
+
+        // Mehr gibt es nicht zurueckzunehmen - ein weiterer Tipp aendert nichts.
+        viewModel.onUndo()
+        assertEquals(
+            eins.title,
+            viewModel.uiState.value.remainingCards
+                .first()
+                .title,
+        )
+    }
+
+    @Test
+    fun `eine neue Runde beginnt ohne Vorgeschichte`() = runTest {
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = vieleKarten))
+        viewModel.onStart()
+        viewModel.onSwiped(
+            viewModel.uiState.value.cards
+                .first(),
+            liked = false,
+        )
+
+        viewModel.onRestart()
+        viewModel.onStart()
+
+        assertFalse(viewModel.uiState.value.canUndo)
+        assertTrue(
+            viewModel.uiState.value.liked
+                .isEmpty(),
+        )
+    }
+
+    // ------------------------------------------------------------------ mehr zur Karte
+
+    @Test
+    fun `antippen zeigt Quelle, Adresse und Zutaten - aber keine Zubereitung`() = runTest {
+        val gratin = karte("Kartoffelgratin")
+        val web = FakeWebRecipeRepository(
+            pool = pool(gratin),
+            recipeByUrl = mapOf(seite(gratin, "800 g Kartoffeln", "2 dl Rahm", "1 Knoblauchzehe")),
+        )
+        val viewModel = createViewModel(webRepository = web)
+        viewModel.onStart()
+
+        viewModel.onInfoRequest(
+            viewModel.uiState.value.remainingCards
+                .first()
+                .id,
+        )
+
+        val info = viewModel.uiState.value.info!!
+        assertEquals("Kartoffelgratin", info.title)
+        assertEquals("Quelle A", info.sourceName)
+        assertEquals(gratin.url, info.sourceUrl)
+        assertEquals(listOf("800 g Kartoffeln", "2 dl Rahm", "1 Knoblauchzehe"), info.lines)
+        assertEquals(35, info.minutes)
+        assertEquals("4", info.servings)
+        assertFalse(info.isLoading)
+        assertFalse(info.failed)
+        // Die Zubereitung gehoert zum gespeicherten Rezept, nicht auf eine Karte: Sie kommt
+        // im Blatt an keiner Stelle vor.
+        assertFalse(info.toString().contains("Geheime Zubereitung"))
+
+        viewModel.onInfoDismiss()
+        assertNull(viewModel.uiState.value.info)
+    }
+
+    @Test
+    fun `laesst sich die Rezeptseite nicht lesen, sagt das Blatt das - Titel und Adresse bleiben`() = runTest {
+        val gratin = karte("Kartoffelgratin")
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = pool(gratin)))
+        viewModel.onStart()
+
+        viewModel.onInfoRequest(
+            viewModel.uiState.value.remainingCards
+                .first()
+                .id,
+        )
+
+        val info = viewModel.uiState.value.info!!
+        assertTrue(info.failed)
+        assertFalse(info.isLoading)
+        assertEquals("Kartoffelgratin", info.title)
+        assertEquals(gratin.url, info.sourceUrl)
+        assertTrue(info.lines.isEmpty())
+    }
+
+    @Test
+    fun `das Ansehen einer Karte entscheidet nichts`() = runTest {
+        val viewModel = createViewModel(webRepository = FakeWebRecipeRepository(pool = vieleKarten))
+        viewModel.onStart()
+        val vorher = viewModel.uiState.value.remainingCards
+            .map { it.id }
+
+        viewModel.onInfoRequest(vorher.first())
+        viewModel.onInfoDismiss()
+
+        assertEquals(
+            vorher,
+            viewModel.uiState.value.remainingCards
+                .map { it.id },
+        )
+        assertTrue(
+            viewModel.uiState.value.liked
+                .isEmpty(),
+        )
+        assertFalse(viewModel.uiState.value.canUndo)
     }
 }

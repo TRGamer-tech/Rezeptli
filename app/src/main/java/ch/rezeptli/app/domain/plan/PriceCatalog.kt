@@ -4,7 +4,6 @@ import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientNameNormalizer
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.ShoppingItem
-import ch.rezeptli.app.domain.profile.StoreChain
 import ch.rezeptli.app.domain.shopping.UnitConverter
 import ch.rezeptli.app.domain.shopping.UnitConverter.dimension
 import ch.rezeptli.app.domain.shopping.UnitDimension
@@ -36,13 +35,17 @@ data class PackChoice(
  * Richtpreise und Packungsgroessen.
  *
  * Das sind Schaetzwerte fuer die Schweiz (Stand 2026, Niveau Migros/Coop), keine Live-Preise:
- * Die App fragt kein Geschaeft ab. [StoreChain.priceFactor] verschiebt das Niveau je Laden.
- * Die Oberflaeche zeigt alle Summen deshalb mit "ca.".
+ * Die App fragt kein Geschaeft ab. Ein Faktor verschiebt das Niveau je Land und Laden -
+ * siehe `UserProfile.priceFactor`. Die Oberflaeche zeigt alle Summen deshalb mit "ca.".
  */
 object PriceCatalog {
-    /** Rechnet eine Zutat in die Packungen um, die man dafuer kaufen muss. */
-    fun choose(item: ShoppingItem, store: StoreChain?): PackChoice {
-        val factor = store?.priceFactor ?: 1.0
+    /**
+     * Rechnet eine Zutat in die Packungen um, die man dafuer kaufen muss.
+     *
+     * [factor] ist der Aufschlag auf die Schweizer Richtpreise: Preisniveau des Landes mal
+     * Niveau des Hauptladens.
+     */
+    fun choose(item: ShoppingItem, factor: Double = 1.0): PackChoice {
         val key = IngredientNameNormalizer.normalize(item.name)
         val words = key.split(' ')
         val rule = RULES.firstOrNull { rule -> rule.keywords.any { keyword -> words.any { matches(it, keyword) } } }
@@ -68,8 +71,8 @@ object PriceCatalog {
      *
      * Ganze Packungen zaehlen erst im Wocheneinkauf; eine einzelne Mahlzeit bezahlt nur, was sie isst.
      */
-    fun fractionalCost(item: ShoppingItem, store: StoreChain?): Double {
-        val choice = choose(item, store)
+    fun fractionalCost(item: ShoppingItem, factor: Double = 1.0): Double {
+        val choice = choose(item, factor)
         val key = IngredientNameNormalizer.normalize(item.name).split(' ')
         val spec = RULES.firstOrNull { rule -> rule.keywords.any { k -> key.any { matches(it, k) } } }?.pack
             ?: defaultPack(item.category, item.unit.dimension)

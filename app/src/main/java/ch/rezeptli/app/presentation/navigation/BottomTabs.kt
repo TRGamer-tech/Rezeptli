@@ -4,11 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.MaterialTheme
@@ -29,15 +27,16 @@ import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
 
 /**
- * Die fünf Orte, die immer erreichbar sind.
+ * Die vier Orte, die immer erreichbar sind.
  *
  * Der Plan steht vorn: Die App beantwortet die Frage "was koche ich diese Woche". Wischen
- * ist der Weg zu neuen Ideen - allein oder zu zweit -, Rezepte die eigene Sammlung,
- * Vorlieben und Einstellungen die zwei Orte zum Nachjustieren.
+ * ist der Weg zu neuen Ideen - allein oder zu zweit -, Rezepte die eigene Sammlung, und
+ * unter Vorlieben steht alles, was die App ueber einen weiss. Einen eigenen Tab
+ * "Einstellungen" gibt es nicht mehr: Das Wort brach in der Leiste um, und was dort stand,
+ * waren ohnehin Vorlieben.
  *
  * Jedes Symbol hat seine eigene kleine Bewegung, wenn man den Tab waehlt: Der Kalender
- * blaettert um, die Karten wackeln, das Buch huepft, die Regler schieben, das Zahnrad
- * dreht sich.
+ * blaettert um, die Karten wackeln, das Buch huepft, die Regler schieben.
  */
 enum class TabZiel(
     val route: String,
@@ -67,13 +66,6 @@ enum class TabZiel(
         Icons.Filled.Tune,
         IconMotion.SLIDE,
         R.string.tab_vorlieben,
-    ),
-    EINSTELLUNGEN(
-        Destinations.SETTINGS,
-        Icons.Outlined.Settings,
-        Icons.Filled.Settings,
-        IconMotion.SPIN,
-        R.string.tab_einstellungen,
     ),
 }
 
@@ -114,7 +106,15 @@ fun RezeptliBottomBar(navController: NavHostController, modifier: Modifier = Mod
                         trigger = if (ausgewaehlt) true else null,
                     )
                 },
-                label = { Text(stringResource(ziel.labelRes), style = MaterialTheme.typography.labelMedium) },
+                label = {
+                    // Eine Zeile, immer: Ein umbrechendes Etikett schiebt die ganze Leiste hoeher.
+                    Text(
+                        text = stringResource(ziel.labelRes),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedTextColor = MaterialTheme.colorScheme.onSurface,

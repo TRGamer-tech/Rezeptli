@@ -38,7 +38,7 @@ import ch.rezeptli.app.domain.steps.InstructionSplitter
         RecipeStepEntity::class,
         PlanEntryEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -179,8 +179,33 @@ abstract class RezeptliDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Version 6 trennt den Wochenplan von der Sammlung und kennt zwei Mahlzeiten pro Tag.
+         *
+         * Rezepte bekommen die Angabe, ob sie zur Sammlung gehoeren. Alle bestehenden
+         * gehoeren dazu - auch die, die ein frueherer Plan ungefragt hineingelegt hat: Die
+         * App kann sie nicht von bewusst gespeicherten unterscheiden und loescht deshalb
+         * nichts auf Verdacht.
+         *
+         * Planeintraege bekommen eine Tageszeit und den Vermerk "gekocht". Bestehende
+         * Eintraege waren Abendessen. Der eindeutige Index gilt neu fuer Tag und Tageszeit
+         * zusammen, sonst liesse sich kein Mittagessen neben das Abendessen legen.
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `recipes` ADD COLUMN `inCollection` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `plan_entries` ADD COLUMN `slot` TEXT NOT NULL DEFAULT 'ABEND'")
+                db.execSQL("ALTER TABLE `plan_entries` ADD COLUMN `cookedAt` INTEGER")
+                db.execSQL("DROP INDEX IF EXISTS `index_plan_entries_day`")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_plan_entries_day_slot` " +
+                        "ON `plan_entries` (`day`, `slot`)",
+                )
+            }
+        }
+
         /** Alle Migrationen in aufsteigender Reihenfolge. */
         val MIGRATIONS: Array<Migration> =
-            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
     }
 }

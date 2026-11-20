@@ -39,7 +39,6 @@ object Destinations {
     const val RESULTS = "results/{$ARG_SESSION_ID}"
     const val SHOPPING_LIST = "shopping"
     const val ONBOARDING = "onboarding"
-    const val SETTINGS = "einstellungen"
     const val COOKING = "kochen/{$ARG_RECIPE_ID}"
     const val MULTIPLAYER = "zuzweit"
 

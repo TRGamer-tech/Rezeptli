@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -62,6 +61,8 @@ fun SwipeRoute(
         snackbarHostState = snackbarHostState,
         onSwiped = { recipe, liked -> viewModel.onSwipe(recipe.id, liked) },
         onUndo = viewModel::onUndo,
+        onInfo = viewModel::onInfoRequest,
+        onInfoDismiss = viewModel::onInfoDismiss,
         onShowResults = viewModel::onShowResults,
         onExitRequest = viewModel::onExitRequest,
         onExitDismiss = viewModel::onExitDismiss,
@@ -76,6 +77,8 @@ fun SwipeScreen(
     snackbarHostState: SnackbarHostState,
     onSwiped: (RecipeSummary, Boolean) -> Unit,
     onUndo: () -> Unit,
+    onInfo: (Long) -> Unit,
+    onInfoDismiss: () -> Unit,
     onShowResults: () -> Unit,
     onExitRequest: () -> Unit,
     onExitDismiss: () -> Unit,
@@ -83,6 +86,8 @@ fun SwipeScreen(
     modifier: Modifier = Modifier,
 ) {
     val cardStackState = rememberSwipeCardStackState()
+
+    uiState.info?.let { info -> RecipeInfoSheet(info = info, onDismiss = onInfoDismiss) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -95,14 +100,6 @@ fun SwipeScreen(
                         Icon(
                             imageVector = Icons.Filled.Close,
                             contentDescription = stringResource(R.string.swipe_finish),
-                        )
-                    }
-                },
-                actions = {
-                    BouncyIconButton(onClick = onUndo, enabled = uiState.canUndo) {
-                        Icon(
-                            imageVector = Icons.Filled.Undo,
-                            contentDescription = stringResource(R.string.action_undo),
                         )
                     }
                 },
@@ -127,6 +124,9 @@ fun SwipeScreen(
                     ),
                     primaryActionLabel = stringResource(R.string.swipe_show_results),
                     onPrimaryAction = onShowResults,
+                    // Auch die letzte Karte kann ein Versehen gewesen sein.
+                    secondaryActionLabel = stringResource(R.string.wischen_zuruecknehmen).takeIf { uiState.canUndo },
+                    onSecondaryAction = onUndo.takeIf { uiState.canUndo },
                     modifier = Modifier.fillMaxSize(),
                 )
 
@@ -143,14 +143,18 @@ fun SwipeScreen(
                         cards = uiState.cards,
                         onSwiped = onSwiped,
                         state = cardStackState,
+                        onInfo = { recipe -> onInfo(recipe.id) },
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 20.dp, vertical = 8.dp),
                     )
 
+                    // Der Rueckweg sitzt zwischen Nein und Ja - dort, wo der Daumen ohnehin ist.
                     SwipeDecisionButtons(
                         onNo = { cardStackState.swipe(false) },
                         onYes = { cardStackState.swipe(true) },
+                        onUndo = onUndo,
+                        canUndo = uiState.canUndo,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 32.dp, vertical = 20.dp),

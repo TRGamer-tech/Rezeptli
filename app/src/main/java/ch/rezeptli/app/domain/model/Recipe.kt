@@ -31,6 +31,14 @@ data class Recipe(
     /** Herkunft eines importierten Rezepts. Eigene Rezepte haben keine. */
     val sourceUrl: String? = null,
     val sourceName: String? = null,
+    /**
+     * Gehoert das Rezept zur Sammlung ("Meine Rezepte")?
+     *
+     * Ein Rezept, das nur fuer den Wochenplan geholt wurde, ist gespeichert, aber nicht in
+     * der Sammlung - es taucht weder in der Liste noch beim Wischen auf, bis jemand es
+     * ausdruecklich behaelt.
+     */
+    val inCollection: Boolean = true,
 )
 
 /**
@@ -75,9 +83,11 @@ data class RecipeFilter(
     val query: String = "",
     val tags: Set<String> = emptySet(),
     val maxPrepTimeMinutes: Int? = null,
+    /** `true` zeigt nur schon Gekochtes, `false` nur noch nie Gekochtes, `null` beides. */
+    val cooked: Boolean? = null,
 ) {
     val isActive: Boolean
-        get() = query.isNotBlank() || tags.isNotEmpty() || maxPrepTimeMinutes != null
+        get() = query.isNotBlank() || tags.isNotEmpty() || maxPrepTimeMinutes != null || cooked != null
 
     companion object {
         val NONE = RecipeFilter()

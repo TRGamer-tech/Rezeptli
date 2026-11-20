@@ -54,6 +54,7 @@ import ch.rezeptli.app.domain.model.AmountFormatter
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.ShoppingItem
+import ch.rezeptli.app.domain.profile.Currency
 import ch.rezeptli.app.presentation.common.components.BouncyFilledIconButton
 import ch.rezeptli.app.presentation.common.components.BouncyIconButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
@@ -64,7 +65,7 @@ import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.popOnChange
-import ch.rezeptli.app.presentation.common.formatChf
+import ch.rezeptli.app.presentation.common.formatMoney
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.shareText
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
@@ -238,7 +239,7 @@ fun ShoppingListScreen(
                                     Text(
                                         text = stringResource(
                                             R.string.einkauf_gesamt,
-                                            formatChf(uiState.estimatedTotal),
+                                            formatMoney(uiState.estimatedTotal, uiState.currency),
                                         ),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -256,6 +257,7 @@ fun ShoppingListScreen(
                             // Abgehaktes rutscht ans Ende der Gruppe - es gleitet dorthin, statt zu springen.
                             ShoppingItemRow(
                                 item = item,
+                                currency = uiState.currency,
                                 onCheckedChange = { checked -> onCheckedChange(item, checked) },
                                 onDelete = { onDelete(item) },
                                 modifier = if (motion.reduced) Modifier else Modifier.animateItem(),
@@ -319,6 +321,7 @@ private fun CategoryHeader(category: IngredientCategory, modifier: Modifier = Mo
 @Composable
 private fun ShoppingItemRow(
     item: ShoppingItem,
+    currency: Currency,
     onCheckedChange: (Boolean) -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -388,7 +391,7 @@ private fun ShoppingItemRow(
                 )
                 item.price?.let { price ->
                     Text(
-                        text = "CHF " + formatChf(price),
+                        text = formatMoney(price, currency),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
