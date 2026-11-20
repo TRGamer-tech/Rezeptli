@@ -65,4 +65,32 @@ Eine Exportdatei ist fremde Eingabe, auch wenn sie meist die eigene ist:
 - Die Datei ist nicht verschlüsselt. Wer sie hat, kann die Rezepte lesen. Das steht so in
   der Datenschutzerklärung.
 - Der Export ist kein Abbild des Telefons. Für "alles genau so wie vorher" bräuchte es auch
-  Plan und Vorlieben – das steht unter "Geplant".
+  den Wochenplan – das steht unter "Geplant".
+
+## Nachtrag: Vorlieben und Nährwerte in der Datei
+
+Gewünscht war, dass auch die Vorlieben mitgehen. Die Datei bekam dafür ein Feld, keine neue
+Version: `vorlieben` neben `rezepte`, mit denselben deutschen Feldnamen wie die Seite in der
+App (Ernährung, Unverträglichkeiten, Abneigungen, Personen, Kochtage, Läden, Budget …) und
+dem gewählten Aussehen. Eine ältere App überliest das Feld und bekommt die Rezepte.
+
+Drei Entscheidungen dazu:
+
+- **Hinaus mit Schalter, an als Vorgabe.** Die Vorlieben enthalten Persönliches – den
+  Vornamen und was jemand nicht verträgt. Wer umzieht, will sie mitnehmen; wer seine Rezepte
+  jemandem gibt, vielleicht nicht. Der Schalter steht direkt über "Exportieren".
+- **Herein nur nach Rückfrage.** Rezepte kommen dazu, Vorlieben würden ersetzen. Stammt die
+  Datei von jemand anderem, verlöre man die eigene Unverträglichkeit, ohne es zu merken –
+  und die schliesst Rezepte aus. Darum fragt die App, und wer den Dialog wegtippt, behält
+  die eigenen. Gleichen die Vorlieben der Datei den eigenen, wird nicht gefragt.
+- **Dieselben Grenzen wie beim Antippen.** Was die Datei behauptet, läuft durch dieselben
+  Regeln wie die Bedienung: höchstens eine Ernährungsform, höchstens drei Läden und nur aus
+  dem gewählten Land, höchstens drei Stimmungen, eigene Stichworte geprüft und begrenzt.
+  Ob die Einrichtung schon gelaufen ist, reist nicht mit – das ist Sache des Telefons.
+
+Eine Datei darf jetzt auch nur Vorlieben enthalten: Wer ausschliesslich mit dem Wochenplan
+kocht, hat vielleicht nie ein Rezept in die Sammlung gelegt.
+
+Ausserdem stehen bei jedem Rezept, sofern die Quelle sie nennt, `kcalProPortion` und
+`eiweissProPortion`. Geschätzte Werte werden nicht geschrieben – die rechnet die App nach
+dem Einlesen neu (siehe ADR 0013).

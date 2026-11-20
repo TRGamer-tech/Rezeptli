@@ -41,10 +41,15 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
   eine Person nicht isst, gilt für beide. Sobald genug gemeinsame Treffer da sind, ist
   Schluss; sie lassen sich in die eigene Sammlung, in den Wochenplan und auf die
   Einkaufsliste übernehmen – auch ein Rezept, das die andere Person selbst erfasst hat.
-  Schickt ein Telefon seine Karten nicht, geht es nach einer Minute ohne es weiter.
+  Doppelt angelegt wird dabei nichts. Mit *Woche überschreiben* ersetzen die Treffer den
+  bisherigen Plan; für jedes Gericht wählt man den Tag. Schickt ein Telefon seine Karten
+  nicht, geht es nach einer Minute ohne es weiter.
 - **Wischen allein** – Kartenstapel aus dem Rezeptverzeichnis: nur Neues (nichts, was
   schon gespeichert ist), wahlweise Essen, Getränke oder beides. Ein Tipp auf die Karte
   zeigt Quelle und Zutaten, die letzte Entscheidung lässt sich zurücknehmen.
+- **Kalorien und Eiweiss** – unter jeder Zutatenliste, im Rezept wie beim Antippen einer
+  Wischkarte: pro Portion in kcal und Gramm. Nennt die Rezeptseite die Werte, gelten ihre;
+  sonst schätzt die App aus den Zutaten und schreibt „ca.“ und „geschätzt“ dazu.
 - **Rezepte verwalten** – anlegen, bearbeiten, löschen; mit Zutaten, Zubereitung, Foto,
   Tags und Zubereitungszeit; Text-Import per Copy-Paste mit regelbasiertem Parser. In der
   Liste nach links wischen entfernt, nach rechts vermerkt „gekocht“ (beides mit
@@ -57,9 +62,10 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
   um, klingelt es mit dem Weckton des Telefons und vibriert – auch bei gesperrtem
   Bildschirm oder wenn gerade eine andere App offen ist. Wer fertig gekocht hat, hat das
   Rezept als gekocht vermerkt – auch im Wochenplan.
-- **Sichern und umziehen** – die ganze Sammlung samt eigenen Fotos als eine Datei
-  exportieren und auf einem anderen Telefon wieder einlesen. Die Datei ist ein
-  gewöhnliches ZIP mit lesbarem JSON; doppelt angelegt wird beim Einlesen nichts.
+- **Sichern und umziehen** – die ganze Sammlung samt eigenen Fotos und, wenn gewünscht,
+  die Vorlieben als eine Datei exportieren und auf einem anderen Telefon wieder einlesen.
+  Die Datei ist ein gewöhnliches ZIP mit lesbarem JSON; doppelt angelegt wird beim
+  Einlesen nichts, und fremde Vorlieben ersetzen die eigenen nur nach Rückfrage.
 - **Aussehen nach Wahl** – wie das Gerät, hell, dunkel oder (ab Android 12) in den Farben
   des Hintergrundbilds
 
@@ -69,6 +75,11 @@ Für Deutschland, Österreich, Frankreich und Italien werden sie mit einem grobe
 Preisniveau des Landes in Euro umgerechnet – eine Grössenordnung, kein Kassenzettel.
 Auch die Einstufung eines Rezepts (vegetarisch, enthält Gluten, braucht den Ofen …) ist
 eine Heuristik aus den Zutaten – bei Allergien gilt die Zutatenliste der Quelle.
+
+**Zu den Nährwerten:** Geschätzte Kalorien und Eiweiss stammen aus einer Tabelle üblicher
+Richtwerte in der App, gerechnet aus der Zutatenliste – eine Grössenordnung für den Alltag,
+keine Grundlage für eine Diät oder eine Therapie. Erkennt die App zu wenig von einem
+Rezept, zeigt sie lieber keine Zahl.
 
 ### Screenshots
 
@@ -190,8 +201,8 @@ ist aber darauf vorbereitet:
 - **Vorrats-Abgleich** – "das habe ich zuhause" mit den Zutaten abgleichen
 - **Mehrere Timer** – im Kochmodus läuft heute einer aufs Mal; wer Reis und Sauce
   gleichzeitig im Auge behalten will, stellt den zweiten noch am Herd
-- **Wochenplan und Vorlieben im Export** – die Exportdatei enthält die Sammlung, nicht den
-  Stand der laufenden Woche
+- **Wochenplan im Export** – die Exportdatei enthält die Sammlung und die Vorlieben, nicht
+  den Stand der laufenden Woche
 
 ## Lizenz
 
