@@ -144,7 +144,7 @@ jobs:
 
           pruefe "/" 'id="rezeptli-seite"' "die Startseite"
           pruefe "/Datenschutz.html" 'id="rezeptli-datenschutz"' "der Datenschutztext"
-          pruefe "/css/style.css" '--purple' "das Stylesheet"
+          pruefe "/css/style.css" '--herb' "das Stylesheet"
           pruefe "/js/main.js" 'ScrollTrigger' "das Animationsskript"
           pruefe "/vendor/gsap.min.js" 'GreenSock' "GSAP"
           pruefe "/vendor/ScrollTrigger.min.js" 'ScrollTrigger' "ScrollTrigger"

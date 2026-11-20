@@ -5,12 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Datenschutz – Rezeptli</title>
 <meta name="description" content="Welche Daten Rezeptli speichert und wohin sie gehen: fast nichts, und nur auf dein Zutun.">
-<meta name="theme-color" content="#1a1a1a">
+<meta name="theme-color" content="#FBF6EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1E18" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="img/topf.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/fraunces-latin-full-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body id="rezeptli-datenschutz">
 <header class="top">
-  <a class="brand" href="./"><i>R</i>Rezeptli</a>
+  <a class="brand" href="./" aria-label="Rezeptli, zur Startseite">
+    <svg class="pot" viewBox="0 0 100 100" aria-hidden="true">
+      <path class="steam s1" d="M37 33 C34 28 40 23 37 18"/><path class="steam s2" d="M50 33 C47 28 53 23 50 18"/><path class="steam s3" d="M63 33 C60 28 66 23 63 18"/>
+      <rect class="body" x="12" y="56" width="12" height="9" rx="4.5"/><rect class="body" x="76" y="56" width="12" height="9" rx="4.5"/>
+      <path class="body" d="M23 51 H77 A3 3 0 0 1 80 54 V70 A14 14 0 0 1 66 84 H34 A14 14 0 0 1 20 70 V54 A3 3 0 0 1 23 51 Z"/>
+      <path class="heart" d="M50 71.7 C42 66.4 46.6 59.5 50 64.4 C53.4 59.5 58 66.4 50 71.7 Z"/>
+      <g class="lid"><rect class="body" x="16" y="42" width="68" height="8" rx="4"/><circle class="body" cx="50" cy="37.5" r="4.5"/></g>
+    </svg>
+    <span>Rezeptli</span>
+  </a>
   <nav class="nav" aria-label="Hauptnavigation"><a class="btn small ghost" href="./">Zurück</a></nav>
 </header>
 <main class="wrap legal">
