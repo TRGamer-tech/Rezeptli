@@ -91,8 +91,8 @@ class ObserveRoundUseCase @Inject constructor(
  * still ueberspringen, was die andere Person ausgeschlossen hat, und "kein Fisch" der einen
  * gilt wirklich fuer beide.
  *
- * Zuerst kommen die eigenen gespeicherten Rezepte - deren Zutaten kennt das Geraet, die
- * Pruefung ist also verlaesslich und braucht kein Netz. Danach neue aus dem Verzeichnis,
+ * Zuerst kommen die eigenen gespeicherten Rezepte, und zwar alle - deren Zutaten kennt das
+ * Geraet, die Pruefung ist also verlaesslich und braucht kein Netz. Danach neue aus dem Verzeichnis,
  * genau wie beim Wischen allein: am Titel vorsortiert und, sobald Ernaehrung,
  * Unvertraeglichkeiten oder Abneigungen im Spiel sind, an der Rezeptseite geprueft.
  *
@@ -120,11 +120,17 @@ class BuildRoundContributionUseCase @Inject constructor(
         return (chosen + rest).distinctBy { it.key }.take(MAX_OFFERS)
     }
 
-    /** Die eigene Sammlung, in zufaelliger Reihenfolge - soweit sie zu den Angaben beider passt. */
+    /**
+     * Die ganze eigene Sammlung, in zufaelliger Reihenfolge - soweit sie zu den Angaben beider passt.
+     *
+     * Ganz heisst ganz: Frueher steuerte ein Telefon hoechstens sechzig gespeicherte Rezepte bei.
+     * Wer mit den gespeicherten Rezepten beginnt, will aber aus allem waehlen, was beide haben -
+     * erst danach kommen neue. Die Grenze ist nur noch die des Dienstes.
+     */
     private suspend fun saved(rules: CardRules): List<RoundOffer> = withContext(dispatcher) {
         val offers = mutableListOf<RoundOffer>()
-        for (id in recipeRepository.getFilteredRecipeIds(RecipeFilter()).take(SAVED_SCAN)) {
-            if (offers.size >= MAX_SAVED) break
+        for (id in recipeRepository.getFilteredRecipeIds(RecipeFilter())) {
+            if (offers.size >= MAX_OFFERS) break
             val recipe = recipeRepository.getRecipe(id) ?: continue
             if (rules.allows(classifier.classify(recipe))) offers += recipe.toOffer()
         }
@@ -253,14 +259,11 @@ class BuildRoundContributionUseCase @Inject constructor(
     )
 
     private companion object {
-        /** Gleicher Wert wie MAX_BEITRAG im Pairing-Dienst. */
-        const val MAX_OFFERS = 80
-
-        /** So viele gespeicherte Rezepte steuert eine Person hoechstens bei. */
-        const val MAX_SAVED = 60
-
-        /** So viele Rezepte der Sammlung werden dafuer hoechstens angeschaut. */
-        const val SAVED_SCAN = 300
+        /**
+         * So viele Karten nimmt der Pairing-Dienst von einer Person an (dort MAX_BEITRAG) - genug
+         * fuer jede Sammlung, durch die sich an einem Abend wischen laesst.
+         */
+        const val MAX_OFFERS = 500
 
         /** Es wird mehr gezogen als gebraucht: Karten ohne Bild fallen heraus. */
         const val DRAW_FACTOR = 2

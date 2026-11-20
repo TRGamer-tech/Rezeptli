@@ -226,7 +226,7 @@
     <string name="zuzweit_lobby_quelle">Womit fangt ihr an?</string>
     <string name="zuzweit_quelle_gespeichert">Eure gespeicherten Rezepte</string>
     <string name="zuzweit_quelle_neu">Neue Rezepte</string>
-    <string name="zuzweit_quelle_hinweis">Sind eure gespeicherten Rezepte durch, entscheidest du, ob es mit neuen weitergeht.</string>
+    <string name="zuzweit_quelle_hinweis">In den Stapel kommen alle gespeicherten Rezepte von euch beiden, die für beide passen. Sind sie durch, entscheidest du, ob es mit neuen weitergeht.</string>
     <string name="zuzweit_gilt_titel">Das gilt für euch beide</string>
     <string name="zuzweit_lobby_start_allein">Sobald dein Gegenüber da ist, kann es losgehen.</string>
     <string name="zuzweit_gast_titel">Du bist dabei</string>
@@ -235,7 +235,7 @@
     <string name="zuzweit_gast_quelle_gespeichert">Zuerst aus euren gespeicherten Rezepten</string>
     <string name="zuzweit_gast_quelle_neu">Aus neuen Rezepten</string>
     <string name="zuzweit_sammeln_titel">Der Stapel wird gemischt</string>
-    <string name="zuzweit_sammeln_gespeichert">Deine gespeicherten Rezepte, die für euch beide passen, kommen in den Stapel.</string>
+    <string name="zuzweit_sammeln_gespeichert">Alle deine gespeicherten Rezepte, die für euch beide passen, kommen in den Stapel.</string>
     <string name="zuzweit_sammeln_neu">Neue Rezepte werden ausgesucht und geprüft. Das kann einen Moment dauern.</string>
     <string name="zuzweit_sammeln_wartet">Deine Karten sind dabei. Es fehlen noch die deines Gegenübers.</string>
     <string name="zuzweit_fortschritt">%1$d von %2$d gemeinsam gefunden</string>

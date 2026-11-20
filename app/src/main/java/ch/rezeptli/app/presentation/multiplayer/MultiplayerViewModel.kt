@@ -55,6 +55,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -354,10 +355,18 @@ class MultiplayerViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val profile = profileRepository.profile.first()
             val runde = activeRounds.load()?.takeUnless { it.isExpired(System.currentTimeMillis()) }
             if (runde == null) activeRounds.clear()
-            _uiState.update { it.copy(own = profile, resumableCode = runde?.code) }
+            _uiState.update { it.copy(resumableCode = runde?.code) }
+        }
+        // Die Vorlieben werden mitgelesen, nicht nur einmal geholt: Dieser Bildschirm bleibt
+        // liegen, wenn man zum Tab "Vorlieben" wechselt. Wer dort "keine Pilze" antippt und
+        // zurueckkommt, eroeffnete die naechste Runde sonst mit dem alten Stand - und das
+        // Gegenueber erfuhr von den Pilzen nichts.
+        viewModelScope.launch {
+            profileRepository.profile.distinctUntilChanged().collect { profile ->
+                _uiState.update { it.copy(own = profile) }
+            }
         }
     }
 
@@ -564,7 +573,10 @@ class MultiplayerViewModel @Inject constructor(
     private fun flush() {
         if (isSending || pending.isEmpty()) return
         val code = _uiState.value.code
-        val sendung = pending.toList()
+        // In Portionen: Der Dienst liest je Anfrage nur eine begrenzte Zahl Stimmen. Seit die
+        // ganze Sammlung im Stapel liegt, kann nach einem Funkloch mehr als das anstehen - und
+        // was ueber der Grenze lag, waere als "gesendet" aus der Warteschlange gefallen.
+        val sendung = pending.take(VOTES_PER_REQUEST)
         val besuch = visit
 
         isSending = true
@@ -1293,6 +1305,9 @@ class MultiplayerViewModel @Inject constructor(
 
     private companion object {
         const val MAX_CODE_LENGTH = 8
+
+        /** So viele Stimmen gehen in einer Anfrage mit - der Dienst nimmt hoechstens 200 an. */
+        const val VOTES_PER_REQUEST = 100
         const val MILLIS = 1_000L
 
         /** So oft wird versucht, den Inhalt eigener Treffer zu hinterlegen - mit wachsender Pause. */

@@ -58,6 +58,9 @@ class FakePairingRepository(
     /** Alles, was die App an Stimmen geschickt hat - in der Reihenfolge des Eintreffens. */
     val receivedVotes = mutableListOf<SharedVote>()
 
+    /** Wie viele Stimmen jede einzelne Anfrage mitbrachte. */
+    val voteRequests = mutableListOf<Int>()
+
     /** Was die App je Runde beigesteuert hat. */
     val myContributions = mutableMapOf<Int, List<RoundOffer>>()
 
@@ -244,10 +247,13 @@ class FakePairingRepository(
 
     override suspend fun sendVotes(code: String, votes: List<SharedVote>, knownRound: Int): PairingResult<RoundState> =
         answer(knownRound) {
-            receivedVotes += votes
+            // Wie der echte Dienst: Was ueber der Grenze liegt, wird nicht gelesen.
+            val gelesen = votes.take(MAX_VOTES_PER_REQUEST)
+            voteRequests += votes.size
+            receivedVotes += gelesen
             if (phase == RoundPhase.LAEUFT) {
                 val offen = stack.mapTo(HashSet()) { it.recipeId }
-                votes.filter { it.recipeId in offen }.forEach { vote ->
+                gelesen.filter { it.recipeId in offen }.forEach { vote ->
                     when (val liked = vote.liked) {
                         null -> myVotes.remove(vote.recipeId)
                         else -> {
@@ -428,6 +434,9 @@ class FakePairingRepository(
         const val EXPIRY = 9_999_999_999_999L
         const val PARTICIPANT = "test-teilnehmer"
         const val DEADLINE_MS = 60_000L
+
+        /** Gleicher Wert wie MAX_STIMMEN_JE_ANFRAGE im Pairing-Dienst. */
+        const val MAX_VOTES_PER_REQUEST = 200
         private const val NO_STACK = Int.MIN_VALUE
     }
 }

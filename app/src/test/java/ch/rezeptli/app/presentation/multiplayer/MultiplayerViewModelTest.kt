@@ -451,6 +451,25 @@ class MultiplayerViewModelTest {
     }
 
     @Test
+    fun `Vorlieben, die sich bei offenem Bildschirm aendern, gelten fuer die naechste Runde`() = runTest {
+        // Gemeldet: Pilzgerichte trotz "keine Pilze". Dieser Bildschirm bleibt liegen, wenn man
+        // zum Tab "Vorlieben" wechselt - und eroeffnete danach mit dem Stand von vorher.
+        val profil = FakeUserProfileRepository(UserProfile(dislikes = setOf(Dislike.FISCH)))
+        mitViewModel(createViewModel(profileRepository = profil)) { viewModel ->
+            assertEquals(setOf(Dislike.FISCH), viewModel.state.ownRestrictions.dislikes)
+
+            profil.update { it.copy(dislikes = it.dislikes + Dislike.PILZE, customDislikes = listOf("Rosinen")) }
+
+            assertEquals(setOf(Dislike.FISCH, Dislike.PILZE), viewModel.state.ownRestrictions.dislikes)
+
+            viewModel.onHost()
+
+            assertEquals(setOf(Dislike.FISCH, Dislike.PILZE), pairing.restrictions.dislikes)
+            assertEquals(listOf("Rosinen"), pairing.restrictions.customDislikes)
+        }
+    }
+
+    @Test
     fun `nur Getraenke heisst - der eigene Beitrag besteht nur aus Getraenken`() = runTest {
         mitViewModel { viewModel ->
             lobbyAlsGastgeber(viewModel)
@@ -869,6 +888,34 @@ class MultiplayerViewModelTest {
 
             assertEquals(listOf(SharedVote(erste.id, true), SharedVote(zweite.id, false)), pairing.receivedVotes)
             assertFalse(viewModel.state.isOffline)
+        }
+    }
+
+    @Test
+    fun `nach einem langen Funkloch kommen alle Entscheidungen an - auch mehr, als in eine Anfrage passen`() = runTest {
+        // Seit die ganze Sammlung im Stapel liegt, kann er hunderte Karten haben. Der Dienst
+        // liest je Anfrage hoechstens 200 Stimmen; was darueber lag, ging frueher verloren.
+        val grosseSammlung = (1..260).map { nummer ->
+            RoundOffer(key = "t:gericht-$nummer", title = "Gericht $nummer")
+        }
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 3, ihreKarten = grosseSammlung.toTypedArray())
+            val karten = viewModel.state.remainingCards
+            assertTrue(karten.size >= 260, "der Stapel enthaelt die ganze Sammlung")
+
+            pairing.failWith = PairingError.NO_CONNECTION
+            karten.take(250).forEach { viewModel.onSwiped(it.id, liked = false) }
+            assertTrue(pairing.receivedVotes.isEmpty())
+
+            pairing.failWith = null
+            nachfragen()
+
+            assertEquals(250, pairing.receivedVotes.size)
+            assertEquals(karten.take(250).map { it.id }, pairing.receivedVotes.map { it.recipeId })
+            assertTrue(
+                pairing.voteRequests.all { it <= FakePairingRepository.MAX_VOTES_PER_REQUEST },
+                "keine Anfrage bringt mehr mit, als der Dienst liest: ${pairing.voteRequests}",
+            )
         }
     }
 
