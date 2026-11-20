@@ -72,9 +72,29 @@ export const BEITRAG_VERMERKEN =
     "UPDATE teilnehmer SET beitrag_runde = ?3 WHERE code = ?1 AND teilnehmer_id = ?2 AND beitrag_runde < ?3 " +
     "AND EXISTS (SELECT 1 FROM sitzungen z WHERE z.code = ?1 AND z.zustand = 'sammeln' AND z.runde = ?3)";
 
+/**
+ * Der erste Beitrag einer Sammelphase startet die Frist fuer alle, die noch fehlen.
+ * ?1 code, ?2 zeitpunkt
+ */
+export const FRIST_STARTEN =
+    "UPDATE sitzungen SET beitrag_seit = ?2 WHERE code = ?1 AND zustand = 'sammeln' AND beitrag_seit IS NULL " +
+    "AND EXISTS (SELECT 1 FROM teilnehmer t WHERE t.code = sitzungen.code AND t.beitrag_runde >= sitzungen.runde)";
+
+/**
+ * Die Frist ist um: Wer bis jetzt nichts beigesteuert hat, steuert zu dieser Runde nichts
+ * mehr bei. Danach greifen dieselben Entscheidungen wie sonst - der Stapel steht aus dem,
+ * was vorliegt.
+ *
+ * ?1 code, ?2 stichzeit (jetzt minus Frist)
+ */
+export const FRIST_ABGELAUFEN =
+    "UPDATE teilnehmer SET beitrag_runde = (SELECT z.runde FROM sitzungen z WHERE z.code = ?1) " +
+    "WHERE code = ?1 AND EXISTS (SELECT 1 FROM sitzungen z WHERE z.code = ?1 AND z.zustand = 'sammeln' " +
+    "AND z.beitrag_seit IS NOT NULL AND z.beitrag_seit <= ?2 AND teilnehmer.beitrag_runde < z.runde)";
+
 /** Alle haben beigetragen, und es gibt Karten: Es wird gewischt. ?1 code */
 export const STAPEL_STEHT =
-    "UPDATE sitzungen SET zustand = 'laeuft', stand_nr = stand_nr + 1 " +
+    "UPDATE sitzungen SET zustand = 'laeuft', beitrag_seit = NULL, stand_nr = stand_nr + 1 " +
     "WHERE code = ?1 AND zustand = 'sammeln' AND " +
     ALLE_BEIGETRAGEN +
     " AND " +
@@ -85,7 +105,7 @@ export const STAPEL_STEHT =
  * es ohne Rueckfrage mit neuen Rezepten weiter - es gibt ja nichts, wozwischen zu waehlen waere.
  */
 export const OHNE_GESPEICHERTE_WEITER =
-    "UPDATE sitzungen SET runde = runde + 1, quelle = 'neu', stand_nr = stand_nr + 1 " +
+    "UPDATE sitzungen SET runde = runde + 1, quelle = 'neu', beitrag_seit = NULL, stand_nr = stand_nr + 1 " +
     "WHERE code = ?1 AND zustand = 'sammeln' AND quelle = 'gespeichert' AND " +
     ALLE_BEIGETRAGEN +
     " AND NOT " +
@@ -137,9 +157,14 @@ export const STAPEL_DURCH =
     "(SELECT COUNT(*) FROM rezepte r WHERE r.code = ?1 AND r.runde = sitzungen.runde) * " +
     "(SELECT COUNT(*) FROM teilnehmer t WHERE t.code = ?1)";
 
-/** Die Treffer mit allem, was die App zum Anzeigen braucht - in der Reihenfolge, in der sie im Stapel lagen. ?1 code */
+/**
+ * Die Treffer mit allem, was die App zum Anzeigen braucht - in der Reihenfolge, in der sie
+ * im Stapel lagen. `hat_inhalt` sagt, ob zu einem selbst erfassten Rezept der Inhalt
+ * hinterlegt ist. ?1 code
+ */
 export const TREFFER_LISTE =
-    "SELECT r.rezept_id, r.titel, r.quelle_url, r.bild_url, r.zubereitungszeit, r.schluessel, r.von " +
+    "SELECT r.rezept_id, r.titel, r.quelle_url, r.bild_url, r.zubereitungszeit, r.schluessel, r.von, " +
+    "EXISTS (SELECT 1 FROM inhalte i WHERE i.code = r.code AND i.rezept_id = r.rezept_id) AS hat_inhalt " +
     "FROM rezepte r WHERE r.code = ?1 AND r.rezept_id IN (" +
     TREFFER_KENNUNGEN +
     ") ORDER BY r.runde, r.position, r.rezept_id";
@@ -158,3 +183,18 @@ export const STAND_ZAHLEN =
     "(SELECT COUNT(*) FROM (" +
     TREFFER_KENNUNGEN +
     ")) AS treffer";
+
+/**
+ * Hinterlegt den Inhalt eines selbst erfassten Rezepts - aber nur, wenn es ein gemeinsamer
+ * Treffer ist, keine Adresse hat und von genau diesem Geraet stammt. Alles andere bleibt,
+ * wo es ist: auf dem Geraet.
+ *
+ * ?1 code, ?2 rezept_id, ?3 inhalt (JSON), ?4 teilnehmer
+ */
+export const INHALT_SPEICHERN =
+    "INSERT INTO inhalte (code, rezept_id, inhalt) SELECT ?1, ?2, ?3 " +
+    "WHERE EXISTS (SELECT 1 FROM rezepte r JOIN sitzungen z ON z.code = r.code " +
+    "WHERE r.code = ?1 AND r.rezept_id = ?2 AND r.von = ?4 AND r.quelle_url IS NULL " +
+    "AND z.zustand IN ('frage', 'beendet')) AND ?2 IN (" +
+    TREFFER_KENNUNGEN +
+    ") ON CONFLICT (code, rezept_id) DO UPDATE SET inhalt = excluded.inhalt";

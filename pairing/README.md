@@ -12,18 +12,20 @@ erlauben, dieselbe Swipe-Runde zu teilen.
 - was die Runde sucht: wie viele Gerichte, Essen oder Getraenke
 - was in dieser Runde nicht auf den Tisch darf: Ernaehrungsform, Unvertraeglichkeiten
   und Abneigungen beider Personen, **vereinigt** - ohne Vermerk, von wem welche Angabe stammt
+- Zutaten und Zubereitung eines **selbst erfassten** Rezepts, sobald beide es mochten -
+  und nur dann (siehe unten)
 
 ## Was er nicht speichert
 
-Keine Konten, keine Namen, keine Zutaten, keine Zubereitung, keine
-Einkaufslisten, keine Adressen, keine Geraetekennungen. Er kennt keine E-Mail
-und kann niemanden wiedererkennen: Die Kennung einer Person gilt nur innerhalb
-einer Sitzung.
+Keine Konten, keine Namen, keine Fotos, keine Einkaufslisten, keine Adressen,
+keine Geraetekennungen. Zutaten und Zubereitung speichert er nicht - mit der einen
+Ausnahme oben. Er kennt keine E-Mail und kann niemanden wiedererkennen: Die Kennung
+einer Person gilt nur innerhalb einer Sitzung.
 
 Eine Sitzung verfaellt nach zwoelf Stunden. Ein taeglicher Auftrag loescht, was
 abgelaufen ist, und wer die Runde eroeffnet hat, kann sie jederzeit sofort
-loeschen. Dann verschwinden Karten, Beteiligte und Stimmen mit - dafuer sorgen
-die Fremdschluessel, und genau das prueft ein Test.
+loeschen. Dann verschwinden Karten, Beteiligte, Stimmen und hinterlegte
+Rezeptinhalte mit - dafuer sorgen die Fremdschluessel, und genau das prueft ein Test.
 
 ## Warum Titel und Angaben ueberhaupt den Server sehen
 
@@ -42,12 +44,31 @@ Das ist eine bewusste Abweichung vom sonstigen Grundsatz, dass nichts das Geraet
 verlaesst. Sie gilt nur fuer eine laufende gemeinsame Runde, und die App sagt es
 vor dem Start deutlich.
 
+## Warum der Inhalt eines selbst erfassten Treffers den Server sieht
+
+Ein Rezept aus dem Web holt sich die andere Person selbst von seiner Adresse. Ein
+selbst erfasstes hat keine: Es steht nur auf dem Telefon, auf dem es eingetippt
+wurde. Beide konnten sich darauf einigen - aber nur eine Person konnte es kochen.
+
+Deshalb hinterlegt die App Zutaten, Zubereitung, Portionen, Zeit und Schlagworte
+eines solchen Rezepts beim Dienst, **sobald es ein gemeinsamer Treffer ist**. Die
+Grenzen zieht die Datenbank in derselben Anweisung, die speichert:
+
+- nur fuer Karten ohne Quelladresse,
+- nur wenn beide Ja gesagt haben,
+- nur vom Geraet, das die Karte beigesteuert hat,
+- nur wenn nicht mehr gewischt wird (`frage` oder `beendet`),
+- hoechstens 32 KB, ohne Foto.
+
+Was nicht gemocht wurde, verlaesst das Telefon also nie. Der Inhalt haengt an der
+Sitzung und wird mit ihr geloescht.
+
 ## Ablauf (Fassung 2)
 
 | Zustand | Was passiert |
 |---|---|
 | `lobby` | Eine Person eroeffnet und bekommt sofort den Code. Die zweite tritt bei. Wer eroeffnet hat, legt Anzahl, Art (Essen, Getraenke, beides) und Quelle fest; die andere Person sieht es mit. |
-| `sammeln` | Beide Geraete steuern Karten bei, die zu den vereinigten Angaben passen. Der Dienst mischt sie abwechselnd zu einem Stapel; ein Rezept, das beide kennen, liegt nur einmal darin. |
+| `sammeln` | Beide Geraete steuern Karten bei, die zu den vereinigten Angaben passen. Der Dienst mischt sie abwechselnd zu einem Stapel; ein Rezept, das beide kennen, liegt nur einmal darin. Fehlt ein Beitrag, geht es eine Minute nach dem ersten ohne ihn weiter (`fristRestMs` zaehlt herunter). |
 | `laeuft` | Beide wischen denselben Stapel in derselben Reihenfolge. Jede Stimme kommt sofort an. Sind genug Treffer da, endet die Runde fuer beide. |
 | `frage` | Der Stapel ist durch, das Ziel nicht erreicht. Wer eroeffnet hat, entscheidet: mit neuen Rezepten weiter oder aufhoeren. |
 | `beendet` | Die Treffer stehen fest (`endeGrund`: `ziel`, `leer`, `gastgeber` oder `verlassen`). |
@@ -74,6 +95,8 @@ ablesen, wie die andere Person gerade gewischt hat.
 | `POST` | `/v2/sitzung/{code}/weiter` | Nach der Frage mit neuen Rezepten weitermachen |
 | `POST` | `/v2/sitzung/{code}/beenden` | Aufhoeren und behalten, was gefunden wurde |
 | `POST` | `/v2/sitzung/{code}/schliessen` | Sofort loeschen - nur wer eroeffnet hat |
+| `POST` | `/v2/sitzung/{code}/inhalt` | Zutaten und Zubereitung eines eigenen, selbst erfassten Treffers hinterlegen |
+| `GET`  | `/v2/sitzung/{code}/inhalt?teilnehmer=…&rezept=…` | Den hinterlegten Inhalt eines Treffers holen; `inhalt: null`, solange noch nichts da ist |
 | `GET`  | `/v2/sitzung/{code}?teilnehmer=…&stand=…&runde=…` | Stand; nur fuer Beteiligte |
 
 Jede Antwort ist der aktuelle Stand aus Sicht der anfragenden Person. Der Stapel
@@ -93,6 +116,19 @@ weicht ab); hat sich seit `stand` nichts getan, kommt nur `unveraendert`.
 
 Trifft eine App auf eine Runde der anderen Fassung, antwortet der Dienst mit
 `426` - "bitte aktualisieren" statt einer Runde, die nur halb funktioniert.
+
+## Warum eine Runde nicht ewig auf Karten wartet
+
+Schickte ein Telefon seine Karten nie - Funkloch, App geschlossen, Akku leer -,
+blieb die Runde im Zustand `sammeln` stehen, bis jemand sie von Hand beendete.
+Jetzt laeuft mit dem ersten Beitrag eine Frist von einer Minute. Ist sie um, baut
+der Dienst den Stapel aus dem, was da ist; kam gar nichts Passendes, geht es wie
+sonst mit neuen Rezepten weiter.
+
+Der Dienst hat dafuer keinen Wecker. Er prueft die Frist, wenn ein Telefon nach
+dem Stand fragt - und das tun beide ohnehin alle paar Sekunden, solange sie warten.
+Wie bei allen Uebergaengen steht die Bedingung im `WHERE` einer einzigen Anweisung:
+Fragen beide im selben Augenblick, baut nur eine Anfrage den Stapel.
 
 ## Warum der Dienst entscheidet, wann Schluss ist
 
@@ -123,4 +159,6 @@ nicht von der ausgefuehrten abweichen.
 Cloudflare (workerd ueber Miniflare, echte D1-Datenbank, echte Migrationen) und
 spielt mit zwei gedachten Telefonen ganze Runden durch: Lobby, vereinigte
 Angaben, gleicher Stapel fuer beide, Zuruecknehmen, Ende beim Ziel, die Frage
-nach dem Weitermachen - und dass die alte Fassung weiterlaeuft.
+nach dem Weitermachen, die Frist fuer fehlende Beitraege, die Uebergabe eines
+selbst erfassten Treffers samt allem, was dabei abgewiesen werden muss - und dass
+die alte Fassung weiterlaeuft.
