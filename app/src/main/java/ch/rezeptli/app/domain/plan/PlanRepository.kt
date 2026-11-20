@@ -52,17 +52,26 @@ interface PlanRepository {
 }
 
 /**
- * Was der Plan sich ueber verworfene Vorschlaege merkt.
+ * Was der Plan sich merkt: verworfene Vorschlaege und was zuletzt gekocht wurde.
  *
  * Wer eine Mahlzeit tauscht, will dieses Rezept in dieser Woche nicht - also darf es beim
  * naechsten Tausch nicht wiederkommen. Ohne dieses Gedaechtnis drehte sich das Ersetzen im
  * Kreis: Das eben Verworfene war sofort wieder der beste freie Kandidat.
+ *
+ * Und was gerade gekocht wurde, soll nicht gleich wieder im Plan stehen - auch dann nicht,
+ * wenn das Rezept nur fuer den Plan geholt und inzwischen weggeraeumt wurde.
  */
 interface PlanMemory {
     suspend fun rejected(): Set<String>
 
     suspend fun reject(key: String)
 
-    /** Ein neuer Plan faengt ohne Vorgeschichte an. */
-    suspend fun clear()
+    /** Ein neuer Plan vergisst, was im alten verworfen wurde. Was gekocht wurde, bleibt. */
+    suspend fun clearRejected()
+
+    /** Erkennungszeichen gekochter Gerichte (siehe [RecentlyCooked.keysOf]) und wann zuletzt gekocht wurde. */
+    suspend fun cooked(): Map<String, Long>
+
+    /** Vermerkt die Gerichte [keys] als um [at] gekocht - `null` nimmt den Vermerk zurueck. */
+    suspend fun noteCooked(keys: Collection<String>, at: Long?)
 }

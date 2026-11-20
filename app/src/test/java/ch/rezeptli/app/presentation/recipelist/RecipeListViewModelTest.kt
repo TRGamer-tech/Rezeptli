@@ -9,13 +9,12 @@ import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.usecase.DeleteRecipeUseCase
 import ch.rezeptli.app.domain.usecase.MarkRecipeCookedUseCase
-import ch.rezeptli.app.domain.usecase.ObserveOpenShoppingCountUseCase
 import ch.rezeptli.app.domain.usecase.ObservePagedRecipesUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRecipeCountUseCase
 import ch.rezeptli.app.domain.usecase.ObserveTagsUseCase
+import ch.rezeptli.app.fake.FakePlanMemory
 import ch.rezeptli.app.fake.FakePlanRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
-import ch.rezeptli.app.fake.FakeShoppingListRepository
 import ch.rezeptli.app.fake.FakeUserProfileRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -50,7 +49,6 @@ class RecipeListViewModelTest {
         ),
     )
 
-    private val shoppingRepository = FakeShoppingListRepository()
     private val planRepository = FakePlanRepository(
         listOf(
             PlanEntry(
@@ -71,10 +69,9 @@ class RecipeListViewModelTest {
         observePagedRecipes = ObservePagedRecipesUseCase(repository),
         observeRecipeCount = ObserveRecipeCountUseCase(repository),
         observeTags = ObserveTagsUseCase(repository),
-        observeOpenShoppingCount = ObserveOpenShoppingCountUseCase(shoppingRepository),
         profileRepository = FakeUserProfileRepository(),
         deleteRecipe = DeleteRecipeUseCase(repository, planRepository),
-        markRecipeCooked = MarkRecipeCookedUseCase(repository, planRepository),
+        markRecipeCooked = MarkRecipeCookedUseCase(repository, planRepository, FakePlanMemory()),
     )
 
     private val aelpler = RecipeSummary(id = 1L, title = "Älplermagronen")
@@ -259,10 +256,9 @@ class RecipeListViewModelTest {
             observePagedRecipes = ObservePagedRecipesUseCase(emptyRepository),
             observeRecipeCount = ObserveRecipeCountUseCase(emptyRepository),
             observeTags = ObserveTagsUseCase(emptyRepository),
-            observeOpenShoppingCount = ObserveOpenShoppingCountUseCase(FakeShoppingListRepository()),
             profileRepository = FakeUserProfileRepository(),
             deleteRecipe = DeleteRecipeUseCase(emptyRepository, FakePlanRepository()),
-            markRecipeCooked = MarkRecipeCookedUseCase(emptyRepository, FakePlanRepository()),
+            markRecipeCooked = MarkRecipeCookedUseCase(emptyRepository, FakePlanRepository(), FakePlanMemory()),
         )
         advanceUntilIdle()
 

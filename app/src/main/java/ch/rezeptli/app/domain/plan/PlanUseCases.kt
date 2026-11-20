@@ -3,7 +3,6 @@ package ch.rezeptli.app.domain.plan
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.ShoppingItem
-import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.profile.LanguageRegion
 import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.UserProfile
@@ -24,6 +23,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -195,24 +195,39 @@ class ObservePlanUseCase @Inject constructor(
 /** Baut den Wochenplan aus Profil und Rezepten neu. */
 class GeneratePlanUseCase @Inject constructor(
     private val profileRepository: UserProfileRepository,
+    private val planRepository: PlanRepository,
+    private val recipeRepository: RecipeRepository,
     private val source: PlanCandidateSource,
     private val generator: PlanGenerator,
     private val persister: PlanPersister,
     private val memory: PlanMemory,
 ) {
-    suspend operator fun invoke(onStage: (PlanStage) -> Unit = {}): PlanOutcome {
+    suspend operator fun invoke(
+        now: Long = System.currentTimeMillis(),
+        onStage: (PlanStage) -> Unit = {},
+    ): PlanOutcome {
         onStage(PlanStage.FINDING)
         val profile = profileRepository.profile.first()
         val candidates = source.candidates(refresh = true, profile = profile)
         if (candidates.isEmpty()) return PlanOutcome.Failed(PlanFailure.NO_RECIPES)
 
         onStage(PlanStage.CHOOSING)
-        val draft = generator.generate(candidates, profile)
+        // Abwechslung: Was kuerzlich gekocht wurde, kommt nicht gleich wieder - und wer den
+        // Plan neu baut, soll nicht dieselben Gerichte in anderer Reihenfolge bekommen.
+        val lastPlan = planRepository.currentPlan().mapNotNullTo(mutableSetOf()) { entry ->
+            recipeRepository.getRecipe(entry.recipeId)?.let(PlanCandidate::keyOf)
+        }
+        val draft = generator.generate(
+            candidates = candidates,
+            profile = profile,
+            cooked = RecentlyCooked(memory.cooked(), now),
+            lastPlan = lastPlan,
+        )
         if (draft.isIncomplete) return PlanOutcome.Failed(PlanFailure.NOTHING_FITS)
 
         onStage(PlanStage.SHOPPING)
         // Eine neue Woche: Was in der alten verworfen wurde, darf wieder vorgeschlagen werden.
-        memory.clear()
+        memory.clearRejected()
         persister.save(draft, keep = false)
         return PlanOutcome.Built(draft)
     }
@@ -237,7 +252,7 @@ class ReplaceMealUseCase @Inject constructor(
     private val memory: PlanMemory,
 ) {
     /** `false`, wenn es keine Alternative gab. */
-    suspend operator fun invoke(day: Weekday, slot: MealSlot): Boolean {
+    suspend operator fun invoke(day: Weekday, slot: MealSlot, now: Long = System.currentTimeMillis()): Boolean {
         val place = PlanPlace(day, slot)
         val profile = profileRepository.profile.first()
         val draft = currentDraft(profile)
@@ -245,14 +260,15 @@ class ReplaceMealUseCase @Inject constructor(
 
         val avoid = memory.rejected() + current.candidate.key
         val taken = draft.meals.mapTo(mutableSetOf()) { it.candidate.key }
+        val cooked = RecentlyCooked(memory.cooked(), now)
 
         var pool = source.candidates(refresh = false, profile = profile)
-        if (generator.countUsable(pool, profile, without = avoid + taken) < MIN_CHOICES) {
+        if (generator.countUsable(pool, profile, without = avoid + taken, cooked = cooked) < MIN_CHOICES) {
             // Kaum noch Unverbrauchtes - frisch nachziehen, bevor wieder dasselbe kommt.
             pool = source.candidates(refresh = true, profile = profile)
         }
 
-        val replaced = generator.replace(draft, place, pool, profile, avoid)
+        val replaced = generator.replace(draft, place, pool, profile, avoid, cooked = cooked)
         if (replaced === draft) return false
 
         memory.reject(current.candidate.key)
@@ -323,56 +339,92 @@ class AdjustPlanUseCase @Inject constructor(
     }
 }
 
+/** Wie mit einer vollen Woche umgegangen wird, wenn neue Gerichte in den Plan sollen. */
+enum class PlanAddMode {
+    /** Nur auf freie Plaetze - was nicht passt, bleibt draussen. */
+    FREE_ONLY,
+
+    /** Reichen die freien Plaetze nicht, weichen geplante Mahlzeiten, die noch nicht gekocht sind. */
+    REPLACE_UNCOOKED,
+}
+
+/** Was aus den Gerichten wurde, die in den Plan sollten. */
+data class PlanAddition(
+    /** Auf freie Plaetze gelegt. */
+    val added: Int = 0,
+    /** An die Stelle einer geplanten, noch nicht gekochten Mahlzeit gesetzt. */
+    val replaced: Int = 0,
+    /** Standen schon im Plan. */
+    val alreadyPlanned: Int = 0,
+    /** Fanden keinen Platz. */
+    val noRoom: List<Recipe> = emptyList(),
+) {
+    val placed: Int get() = added + replaced
+}
+
 /**
- * Nimmt Treffer aus der gemeinsamen Runde in den Wochenplan auf.
+ * Nimmt Rezepte in den Wochenplan auf - etwa die Treffer einer gemeinsamen Runde.
  *
- * Sie kommen auf die freien Plaetze der Kochtage; sind keine mehr frei, auf irgendeinen
- * freien Platz der Woche. Ist die Woche voll, bleibt der Rest draussen - ein Plan ersetzt
- * nichts, was schon steht.
+ * Sie kommen zuerst auf die freien Plaetze der Kochtage, dann auf irgendeinen freien Platz
+ * der Woche. Ist die Woche voll, bleibt der Rest draussen und kommt in [PlanAddition.noRoom]
+ * zurueck: Ein Plan ersetzt nichts ungefragt. Erst mit [PlanAddMode.REPLACE_UNCOOKED] - also
+ * nach einer Rueckfrage - weichen geplante Mahlzeiten, die noch nicht gekocht sind; zuerst
+ * die ab heute, denn was vom Wochenanfang uebrig ist, kocht niemand mehr nach.
  */
 class AddToPlanUseCase @Inject constructor(
     private val profileRepository: UserProfileRepository,
     private val planRepository: PlanRepository,
     private val recipeRepository: RecipeRepository,
-    private val loadWebRecipe: LoadWebRecipeUseCase,
     private val classifier: RecipeClassifier,
     private val generator: PlanGenerator,
     private val persister: PlanPersister,
 ) {
-    /**
-     * Gibt zurueck, wie viele Rezepte tatsaechlich in den Plan kamen.
-     *
-     * [ownIds] nennt zu Treffern, die schon auf diesem Geraet liegen, die hiesige
-     * Rezeptnummer - sie muessen nicht geladen werden. Alle anderen holt die App von ihrer
-     * Adresse; ein Treffer ohne Adresse (ein selbst erfasstes Rezept der anderen Person)
-     * laesst sich nicht uebernehmen.
-     */
-    suspend operator fun invoke(matches: List<SharedRecipe>, ownIds: Map<Long, Long> = emptyMap()): Int {
-        val profile = profileRepository.profile.first()
-        val existing = planRepository.currentPlan()
-        val occupied = existing.mapTo(mutableSetOf()) { it.place }
+    suspend operator fun invoke(
+        recipes: List<Recipe>,
+        mode: PlanAddMode = PlanAddMode.FREE_ONLY,
+        today: Weekday = currentWeekday(),
+    ): PlanAddition {
+        if (recipes.isEmpty()) return PlanAddition()
 
+        val profile = profileRepository.profile.first()
+        val planned = planRepository.currentPlan().mapNotNull { entry ->
+            recipeRepository.getRecipe(entry.recipeId)?.let { entry to it }
+        }
+        val known = planned.mapTo(mutableSetOf()) { (_, recipe) -> PlanCandidate.keyOf(recipe) }
+
+        // Was schon im Plan steht, kommt kein zweites Mal hinein.
+        val fresh = recipes.filter { known.add(PlanCandidate.keyOf(it)) }
+        val alreadyPlanned = recipes.size - fresh.size
+        if (fresh.isEmpty()) return PlanAddition(alreadyPlanned = alreadyPlanned)
+
+        val occupied = planned.mapTo(mutableSetOf()) { (entry, _) -> entry.place }
         val everywhere = MealSlot.entries
             .sortedByDescending { it == MealSlot.ABEND }
             .flatMap { slot -> Weekday.entries.map { day -> PlanPlace(day, slot) } }
         val free = (generator.placesOf(profile) + everywhere).distinct().filter { it !in occupied }
-        if (free.isEmpty()) return 0
 
-        val planned = existing.mapNotNull { entry -> recipeRepository.getRecipe(entry.recipeId)?.let { entry to it } }
-        val known = planned.mapTo(mutableSetOf()) { (_, recipe) -> PlanCandidate.keyOf(recipe) }
-
-        val additions = mutableListOf<Recipe>()
-        for (match in matches) {
-            if (additions.size >= free.size) break
-            val recipe = ownIds[match.recipeId]?.let { recipeRepository.getRecipe(it) }
-                ?: match.sourceUrl?.let { url -> (loadWebRecipe(url) as? WebImportOutcome.Loaded)?.recipe }
-                ?: continue
-            // Was schon im Plan steht, kommt kein zweites Mal hinein.
-            if (known.add(PlanCandidate.keyOf(recipe))) additions += recipe
+        // Wer weichen kann: noch nicht gekocht, die naechsten Tage zuerst.
+        val replaceable = if (mode == PlanAddMode.REPLACE_UNCOOKED) {
+            planned
+                .map { (entry, _) -> entry }
+                .filterNot { it.isCooked }
+                .sortedWith(compareBy({ (it.day.ordinal - today.ordinal + DAYS) % DAYS }, { it.slot.ordinal }))
+                .map { it.place }
+        } else {
+            emptyList()
         }
-        if (additions.isEmpty()) return 0
 
-        val kept = planned.map { (entry, recipe) ->
+        val onFree = fresh.take(free.size).zip(free)
+        val onReplaced = fresh.drop(free.size).take(replaceable.size).zip(replaceable)
+        val noRoom = fresh.drop(free.size + replaceable.size)
+        if (onFree.isEmpty() &&
+            onReplaced.isEmpty()
+        ) {
+            return PlanAddition(alreadyPlanned = alreadyPlanned, noRoom = noRoom)
+        }
+
+        val taken = onReplaced.mapTo(mutableSetOf()) { (_, place) -> place }
+        val kept = planned.filterNot { (entry, _) -> entry.place in taken }.map { (entry, recipe) ->
             PlannedMeal(
                 day = entry.day,
                 slot = entry.slot,
@@ -381,7 +433,7 @@ class AddToPlanUseCase @Inject constructor(
                 cost = entry.cost,
             )
         }
-        val added = additions.zip(free).map { (recipe, place) ->
+        val added = (onFree + onReplaced).map { (recipe, place) ->
             val candidate = PlanCandidate(recipe, classifier.classify(recipe))
             val scaled = generator.scaledRecipe(recipe, profile.persons)
             PlannedMeal(place.day, place.slot, candidate, profile.persons, generator.mealCostOf(scaled, profile))
@@ -390,6 +442,17 @@ class AddToPlanUseCase @Inject constructor(
         val meals = (kept + added).sortedWith(compareBy({ it.day.ordinal }, { it.slot.ordinal }))
         val basket = generator.basketFor(meals.map { it.candidate to it.cost }, profile.persons, profile)
         persister.save(PlanDraft(meals, basket, profile.budget), keep = true)
-        return added.size
+        return PlanAddition(
+            added = onFree.size,
+            replaced = onReplaced.size,
+            alreadyPlanned = alreadyPlanned,
+            noRoom = noRoom,
+        )
+    }
+
+    private companion object {
+        const val DAYS = 7
+
+        fun currentWeekday(): Weekday = Weekday.entries[LocalDate.now().dayOfWeek.value - 1]
     }
 }

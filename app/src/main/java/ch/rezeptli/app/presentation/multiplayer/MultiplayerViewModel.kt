@@ -2,6 +2,7 @@ package ch.rezeptli.app.presentation.multiplayer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.ActiveRound
 import ch.rezeptli.app.domain.multiplayer.ActiveRoundRepository
@@ -9,6 +10,7 @@ import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.RoundEnd
 import ch.rezeptli.app.domain.multiplayer.RoundKeys
+import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundPoll
 import ch.rezeptli.app.domain.multiplayer.RoundSource
@@ -19,6 +21,8 @@ import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.AddToPlanUseCase
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.plan.PlanAddMode
+import ch.rezeptli.app.domain.plan.PlanAddition
 import ch.rezeptli.app.domain.plan.ReadRecipeCardUseCase
 import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Dislike
@@ -31,14 +35,17 @@ import ch.rezeptli.app.domain.repository.RecipeRepository
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.BuildRoundContributionUseCase
-import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
+import ch.rezeptli.app.domain.usecase.FetchMatchesUseCase
+import ch.rezeptli.app.domain.usecase.FetchedMatch
+import ch.rezeptli.app.domain.usecase.KeepMatchesUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRoundUseCase
-import ch.rezeptli.app.domain.usecase.SaveRecipeResult
-import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
-import ch.rezeptli.app.domain.usecase.WebImportOutcome
+import ch.rezeptli.app.domain.usecase.ShareOwnMatchesUseCase
 import ch.rezeptli.app.presentation.swipe.CardInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,18 +119,13 @@ data class MultiplayerUiState(
     val isOffline: Boolean = false,
     /** Die Angaben zur angetippten Karte, solange das Blatt offen ist. */
     val info: CardInfo? = null,
-    /** Laeuft gerade das Uebernehmen der Treffer? */
-    val isKeeping: Boolean = false,
-    /** Wie viele Treffer schon in der Sammlung sind. */
-    val keptRecipes: Int = 0,
-    /** Wie viele Zutaten dabei auf der Einkaufsliste gelandet sind, sobald fertig. */
-    val addedItems: Int? = null,
-    /** Treffer, die sich nicht uebernehmen liessen: selbst erfasste Rezepte der anderen Person. */
-    val notImportable: Int = 0,
-    /** Laeuft gerade das Uebernehmen in den Wochenplan? */
-    val isPlanning: Boolean = false,
-    /** Wie viele Treffer im Wochenplan gelandet sind, sobald fertig. */
-    val plannedMeals: Int? = null,
+    /**
+     * Wie viele Sekunden der Dienst noch auf fehlende Karten wartet - `null`, solange keine
+     * Frist laeuft. Danach beginnt die Runde mit dem, was da ist.
+     */
+    val waitSeconds: Int? = null,
+    /** Was mit den Treffern geschehen ist und gerade geschieht. */
+    val import: MatchImport = MatchImport(),
 ) {
     /** Was man selbst mitbringt, in der Form, in der es an den Dienst geht. */
     val ownRestrictions: DietaryFilter get() = DietaryFilter.of(own)
@@ -149,6 +151,68 @@ data class MultiplayerUiState(
 
     /** Laeuft eine Runde, die "Zurueck" nicht einfach beenden soll? */
     val isInRound: Boolean get() = step != MultiplayerStep.START && step != MultiplayerStep.TREFFER
+}
+
+/** Was sich mit den Treffern anfangen laesst. */
+enum class MatchAction {
+    /** In die eigene Sammlung nehmen. */
+    KEEP,
+
+    /** Auf Plaetze des Wochenplans legen. */
+    PLAN,
+}
+
+/** Was beim Einplanen der Treffer herauskam - ueber alle Anlaeufe zusammengezaehlt. */
+data class PlanSummary(
+    val added: Int = 0,
+    val replaced: Int = 0,
+    val alreadyPlanned: Int = 0,
+) {
+    val placed: Int get() = added + replaced
+
+    operator fun plus(more: PlanAddition): PlanSummary = PlanSummary(
+        added = added + more.added,
+        replaced = replaced + more.replaced,
+        alreadyPlanned = alreadyPlanned + more.alreadyPlanned,
+    )
+}
+
+/**
+ * Der Stand rund ums Uebernehmen der Treffer.
+ *
+ * Frueher gab es dafuer zwei Zahlen und eine Meldung, die drei verschiedene Ursachen in einen
+ * Satz packte ("die Woche ist voll oder die Rezepte liessen sich nicht laden"). Hier steht
+ * jede Ursache fuer sich - nur so laesst sich sagen, was zu tun ist.
+ */
+data class MatchImport(
+    /** Laeuft gerade etwas? */
+    val running: MatchAction? = null,
+    /** Wie viele Treffer beim laufenden Holen schon erledigt sind. */
+    val progress: Int = 0,
+    /** Treffer in der Sammlung: Karte (Nummer des Dienstes) zu Rezept (Nummer auf diesem Geraet). */
+    val kept: Map<Long, Long> = emptyMap(),
+    /** Wurde "behalten" schon einmal versucht? */
+    val keepTried: Boolean = false,
+    /** Was bisher im Wochenplan gelandet ist - `null`, solange es niemand versucht hat. */
+    val plan: PlanSummary? = null,
+    /** So viele Treffer haben keinen freien Platz in der Woche - die Rueckfrage steht offen. */
+    val askToReplace: Int = 0,
+    /** So viele Treffer blieben draussen, weil die Woche voll ist. */
+    val noRoom: Int = 0,
+    /** Beim letzten Anlauf nicht geladen: Die Rezeptseite antwortete nicht. */
+    val notLoaded: Int = 0,
+    /** Beim letzten Anlauf noch nicht da: selbst erfasste Rezepte, die das andere Telefon erst schicken muss. */
+    val notYetShared: Int = 0,
+    /** Was "Erneut versuchen" wiederholt. */
+    val retry: MatchAction? = null,
+    /** Steht die Frage "fuer wie viele?" offen? */
+    val askPortions: Boolean = false,
+    /** Wie viele Posten die Einkaufsliste hat, nachdem die Zutaten der behaltenen Treffer dazukamen. */
+    val listItems: Int? = null,
+) {
+    val isBusy: Boolean get() = running != null
+
+    val hasProblems: Boolean get() = notLoaded + notYetShared > 0
 }
 
 /**
@@ -180,8 +244,9 @@ class MultiplayerViewModel @Inject constructor(
     private val profileRepository: UserProfileRepository,
     private val recipeRepository: RecipeRepository,
     private val readCard: ReadRecipeCardUseCase,
-    private val loadWebRecipe: LoadWebRecipeUseCase,
-    private val saveRecipe: SaveRecipeUseCase,
+    private val fetchMatches: FetchMatchesUseCase,
+    private val keepMatches: KeepMatchesUseCase,
+    private val shareOwnMatches: ShareOwnMatchesUseCase,
     private val addToShoppingList: AddRecipesToShoppingListUseCase,
     private val addToPlan: AddToPlanUseCase,
 ) : ViewModel() {
@@ -217,6 +282,24 @@ class MultiplayerViewModel @Inject constructor(
      */
     private var visit = 0
     private var pollJob: Job? = null
+
+    /** Zaehlt die Frist herunter, bis die Runde auch ohne die fehlenden Karten beginnt. */
+    private var waitJob: Job? = null
+
+    /** Neue Karten, die schon vorbereitet werden, waehrend noch gespeicherte Rezepte dran sind. */
+    private var prepared: Prepared? = null
+
+    /** Eigene selbst erfasste Treffer, deren Inhalt schon beim Dienst liegt. */
+    private val shared = mutableSetOf<Long>()
+    private var sharingJob: Job? = null
+
+    /** Treffer, die sich beim letzten Anlauf nicht holen liessen - "Erneut versuchen" nimmt genau diese. */
+    private var failedMatches: List<SharedRecipe> = emptyList()
+
+    /** Geholte Treffer, fuer die die Woche keinen freien Platz hatte - sie warten auf die Antwort. */
+    private var waitingForRoom: List<Recipe> = emptyList()
+
+    private data class Prepared(val round: Int, val offers: Deferred<List<RoundOffer>>)
 
     private data class Queued(val sequence: Long, val vote: SharedVote)
 
@@ -332,10 +415,7 @@ class MultiplayerViewModel @Inject constructor(
                 selectionCount = selection.size,
                 matches = emptyList(),
                 end = null,
-                addedItems = null,
-                plannedMeals = null,
-                keptRecipes = 0,
-                notImportable = 0,
+                import = MatchImport(),
             )
         }
         apply(state)
@@ -398,6 +478,7 @@ class MultiplayerViewModel @Inject constructor(
             )
         }
         flush()
+        lastState?.let(::prepareNextRound)
     }
 
     /**
@@ -498,11 +579,17 @@ class MultiplayerViewModel @Inject constructor(
     private fun leaveRound(resumable: String?) {
         visit += 1
         pollJob?.cancel()
+        waitJob?.cancel()
+        sharingJob?.cancel()
+        dropPrepared()
         forgetStack()
         lastState = null
         contributingRound = NO_ROUND
         settingsInFlight = 0
         isSending = false
+        shared.clear()
+        failedMatches = emptyList()
+        waitingForRoom = emptyList()
         if (resumable == null) viewModelScope.launch { activeRounds.clear() }
 
         _uiState.update {
@@ -628,16 +715,99 @@ class MultiplayerViewModel @Inject constructor(
             )
         }
 
+        trackDeadline(state)
+        shareOwn(state)
+        prepareNextRound(state)
+
         when (state.phase) {
             RoundPhase.SAMMELN -> contributeIfNeeded(state)
 
             RoundPhase.BEENDET -> {
                 pollJob?.cancel()
+                dropPrepared()
                 viewModelScope.launch { activeRounds.clear() }
             }
 
             else -> Unit
         }
+    }
+
+    /**
+     * Zeigt, wie lange noch auf fehlende Karten gewartet wird.
+     *
+     * Der Dienst nennt den Rest, nicht die Uhrzeit - die Uhren zweier Telefone gehen nie
+     * gleich. Heruntergezaehlt wird hier; ist die Frist um, laesst das naechste Nachfragen
+     * die Runde beginnen.
+     */
+    private fun trackDeadline(state: RoundState) {
+        waitJob?.cancel()
+        val rest = state.contributionWaitMs?.takeIf { state.phase == RoundPhase.SAMMELN }
+        if (rest == null) {
+            _uiState.update { it.copy(waitSeconds = null) }
+            return
+        }
+        waitJob = viewModelScope.launch {
+            var sekunden = ((rest + MILLIS - 1) / MILLIS).toInt()
+            while (true) {
+                _uiState.update { it.copy(waitSeconds = sekunden) }
+                if (sekunden <= 0) break
+                delay(MILLIS)
+                sekunden -= 1
+            }
+        }
+    }
+
+    /**
+     * Hinterlegt den Inhalt der eigenen selbst erfassten Rezepte, die Treffer geworden sind.
+     *
+     * Die andere Person kann sie sonst nicht uebernehmen. Mehrere Anlaeufe, weil die App nach
+     * dem Ende der Runde nicht mehr regelmaessig nachfragt - es gaebe sonst keine zweite
+     * Gelegenheit.
+     */
+    private fun shareOwn(state: RoundState) {
+        val matches = state.matches ?: return
+        val offen = shareOwnMatches.wanted(matches) - shared
+        if (offen.isEmpty() || sharingJob?.isActive == true) return
+
+        val besuch = visit
+        sharingJob = viewModelScope.launch {
+            repeat(SHARE_ATTEMPTS) { anlauf ->
+                if (besuch != visit) return@launch
+                shared += shareOwnMatches(state.code, matches.filter { it.recipeId in offen && it.recipeId !in shared })
+                if (shared.containsAll(offen)) return@launch
+                delay(SHARE_RETRY_MS * (anlauf + 1))
+            }
+        }
+    }
+
+    /**
+     * Bereitet neue Karten vor, solange noch gespeicherte Rezepte dran sind.
+     *
+     * Neue Karten muessen an ihrer Rezeptseite geprueft werden, sobald jemand etwas nicht
+     * isst - das dauerte nach "weiter mit neuen Rezepten" eine Viertelminute. Zeichnet sich
+     * ab, dass die gespeicherten nicht reichen (der halbe Stapel ist durch, das Ziel fehlt
+     * noch), beginnt die Vorbereitung schon jetzt; beim Weitermachen liegt sie dann bereit.
+     */
+    private fun prepareNextRound(state: RoundState) {
+        val naechste = state.round + 1
+        if (prepared?.round == naechste) return
+
+        val unterwegs = state.phase == RoundPhase.LAEUFT &&
+            stackRound == state.round &&
+            history.size * 2 >= _uiState.value.stack.size
+        val lohnt = state.source == RoundSource.GESPEICHERT &&
+            state.matchCount < state.target &&
+            (state.phase == RoundPhase.FRAGE || unterwegs)
+        if (!lohnt) return
+
+        dropPrepared()
+        val kommende = state.copy(round = naechste, source = RoundSource.NEU)
+        prepared = Prepared(naechste, viewModelScope.async { buildContribution(kommende) })
+    }
+
+    private fun dropPrepared() {
+        prepared?.offers?.cancel()
+        prepared = null
     }
 
     private fun stepFor(
@@ -701,7 +871,8 @@ class MultiplayerViewModel @Inject constructor(
         val besuch = visit
 
         viewModelScope.launch {
-            val offers = buildContribution(state, selection)
+            val vorbereitet = prepared?.takeIf { it.round == state.round && state.source == RoundSource.NEU }
+            val offers = vorbereitet?.offers?.await() ?: buildContribution(state, selection)
             if (besuch != visit) return@launch
 
             val result = pairing.contribute(state.code, state.round, offers, stackRound)
@@ -784,69 +955,166 @@ class MultiplayerViewModel @Inject constructor(
     // ------------------------------------------------------------------ Treffer uebernehmen
 
     /**
-     * Uebernimmt die gemeinsamen Treffer: in die Sammlung und auf die Einkaufsliste.
+     * Nimmt die gemeinsamen Treffer in die eigene Sammlung.
      *
-     * Was schon auf dem Geraet liegt, ist sofort da. Was die andere Person beigesteuert hat,
-     * wird von seiner Adresse geholt. Nur ein selbst erfasstes Rezept der anderen Person
-     * laesst sich nicht holen - davon kennt die App bloss den Titel, und das sagt sie auch.
+     * Die Einkaufsliste bleibt dabei, wie sie ist: Ein Rezept zu behalten heisst nicht, es
+     * diese Woche zu kochen. Wer die Zutaten will, sagt es danach ausdruecklich.
      */
-    fun onKeepMatches() {
-        val treffer = _uiState.value.matches
-        if (treffer.isEmpty() || _uiState.value.isKeeping) return
-
-        _uiState.update { it.copy(isKeeping = true, keptRecipes = 0, addedItems = null, notImportable = 0) }
-
-        viewModelScope.launch {
-            val kennungen = mutableListOf<Long>()
-            var nichtHolbar = 0
-
-            treffer.forEach { rezept ->
-                val eigene = ownIdOf(rezept)?.takeIf { recipeRepository.getRecipe(it) != null }
-                val quelle = rezept.sourceUrl
-                when {
-                    eigene != null -> {
-                        // Es kann bisher nur fuer den Wochenplan gespeichert gewesen sein.
-                        recipeRepository.setInCollection(eigene, true)
-                        kennungen += eigene
-                    }
-
-                    quelle != null -> when (val geladen = loadWebRecipe(quelle)) {
-                        is WebImportOutcome.Loaded ->
-                            when (val gespeichert = saveRecipe(geladen.recipe)) {
-                                is SaveRecipeResult.Saved -> kennungen += gespeichert.recipeId
-                                else -> Unit
-                            }
-
-                        is WebImportOutcome.Failed -> Unit
-                    }
-
-                    else -> nichtHolbar += 1
-                }
-                _uiState.update { it.copy(keptRecipes = kennungen.size) }
-            }
-
-            val zutaten = if (kennungen.isEmpty()) 0 else addToShoppingList(kennungen)
-            _uiState.update { it.copy(isKeeping = false, addedItems = zutaten, notImportable = nichtHolbar) }
-        }
-    }
+    fun onKeepMatches() = importMatches(MatchAction.KEEP, _uiState.value.matches)
 
     /**
      * Legt die gemeinsamen Treffer auf freie Plaetze des Wochenplans.
      *
      * Das ist der eigentliche Zweck der gemeinsamen Runde: Am Ende steht nicht eine Liste,
-     * sondern eine Woche, auf die sich beide geeinigt haben.
+     * sondern eine Woche, auf die sich beide geeinigt haben. Ist die Woche voll, wird
+     * gefragt, statt still nichts zu tun.
      */
-    fun onAddToPlan() {
-        val treffer = _uiState.value.matches
-        if (treffer.isEmpty() || _uiState.value.isPlanning) return
+    fun onAddToPlan() = importMatches(MatchAction.PLAN, _uiState.value.matches)
 
-        _uiState.update { it.copy(isPlanning = true, plannedMeals = null) }
+    /** Versucht es noch einmal - nur mit den Treffern, die beim letzten Mal nicht zu holen waren. */
+    fun onRetryImport() {
+        val aktion = _uiState.value.import.retry ?: return
+        importMatches(aktion, failedMatches)
+    }
+
+    /**
+     * Holt die Treffer als ganze Rezepte und fuehrt [action] damit aus.
+     *
+     * Was sich nicht holen laesst, bleibt in [failedMatches] - mit dem Grund: Die Rezeptseite
+     * antwortete nicht, oder das Telefon der anderen Person hat ein selbst erfasstes Rezept
+     * noch nicht geschickt. Beides laesst sich wiederholen.
+     */
+    private fun importMatches(action: MatchAction, targets: List<SharedRecipe>) {
+        val state = _uiState.value
+        if (state.import.isBusy) return
+        // Was schon in der Sammlung liegt, wird nicht ein zweites Mal geholt und gespeichert.
+        val offen = if (action == MatchAction.KEEP) targets.filter { it.recipeId !in state.import.kept } else targets
+        if (offen.isEmpty()) return
+
+        val besuch = visit
+        _uiState.update {
+            it.copy(
+                import = it.import.copy(running = action, progress = 0, retry = null, notLoaded = 0, notYetShared = 0),
+            )
+        }
         viewModelScope.launch {
-            val eigene = buildMap {
-                treffer.forEach { rezept -> ownIdOf(rezept)?.let { put(rezept.recipeId, it) } }
+            val geholt = fetchMatches(state.code, offen) { erledigt ->
+                _uiState.update { it.copy(import = it.import.copy(progress = erledigt)) }
             }
-            val anzahl = addToPlan(treffer, eigene)
-            _uiState.update { it.copy(isPlanning = false, plannedMeals = anzahl) }
+            if (besuch != visit) return@launch
+
+            val bereit = geholt.filterIsInstance<FetchedMatch.Ready>()
+            failedMatches = geholt.filterNot { it is FetchedMatch.Ready }.map { it.match }
+            val probleme = MatchProblems(
+                notLoaded = geholt.count { it is FetchedMatch.NotLoaded },
+                notYetShared = geholt.count { it is FetchedMatch.NotYetShared },
+            )
+
+            when (action) {
+                MatchAction.KEEP -> keep(bereit, probleme)
+                MatchAction.PLAN -> plan(bereit, probleme)
+            }
+        }
+    }
+
+    private data class MatchProblems(val notLoaded: Int, val notYetShared: Int) {
+        val any: Boolean get() = notLoaded + notYetShared > 0
+    }
+
+    private suspend fun keep(ready: List<FetchedMatch.Ready>, problems: MatchProblems) {
+        val gespeichert = keepMatches(ready)
+        _uiState.update {
+            it.copy(
+                import = it.import.copy(
+                    running = null,
+                    kept = it.import.kept + gespeichert,
+                    keepTried = true,
+                    notLoaded = problems.notLoaded,
+                    notYetShared = problems.notYetShared,
+                    retry = MatchAction.KEEP.takeIf { problems.any },
+                ),
+            )
+        }
+    }
+
+    private suspend fun plan(ready: List<FetchedMatch.Ready>, problems: MatchProblems) {
+        // Ein Treffer, der schon in der Sammlung liegt, kommt von dort - mit seiner Nummer,
+        // sonst stuende er als zweite Kopie im Plan.
+        val behalten = _uiState.value.import.kept
+        val rezepte = ready.map { treffer ->
+            behalten[treffer.match.recipeId]?.let { recipeRepository.getRecipe(it) } ?: treffer.recipe
+        }
+        val ergebnis = addToPlan(rezepte)
+        waitingForRoom = ergebnis.noRoom
+        _uiState.update {
+            it.copy(
+                import = it.import.copy(
+                    running = null,
+                    plan = (it.import.plan ?: PlanSummary()) + ergebnis,
+                    askToReplace = ergebnis.noRoom.size,
+                    noRoom = 0,
+                    notLoaded = problems.notLoaded,
+                    notYetShared = problems.notYetShared,
+                    retry = MatchAction.PLAN.takeIf { problems.any },
+                ),
+            )
+        }
+    }
+
+    /** Die Woche ist voll: Die Treffer ersetzen geplante Mahlzeiten, die noch nicht gekocht sind. */
+    fun onReplaceInPlan() {
+        val wartend = waitingForRoom
+        if (wartend.isEmpty() || _uiState.value.import.isBusy) return
+        waitingForRoom = emptyList()
+
+        val besuch = visit
+        _uiState.update { it.copy(import = it.import.copy(running = MatchAction.PLAN, askToReplace = 0)) }
+        viewModelScope.launch {
+            val ergebnis = addToPlan(wartend, PlanAddMode.REPLACE_UNCOOKED)
+            if (besuch != visit) return@launch
+            _uiState.update {
+                it.copy(
+                    import = it.import.copy(
+                        running = null,
+                        plan = (it.import.plan ?: PlanSummary()) + ergebnis,
+                        // Auch nach dem Ersetzen kann etwas uebrig bleiben: wenn schon alles gekocht ist.
+                        noRoom = ergebnis.noRoom.size,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Die Woche bleibt, wie sie ist - was keinen Platz fand, bleibt draussen. */
+    fun onKeepPlanAsIs() {
+        val uebrig = waitingForRoom.size
+        waitingForRoom = emptyList()
+        _uiState.update { it.copy(import = it.import.copy(askToReplace = 0, noRoom = uebrig)) }
+    }
+
+    // ------------------------------------------------------------------ Einkaufsliste
+
+    /** Vor dem Uebernehmen der Zutaten steht die Frage, fuer wie viele eingekauft wird. */
+    fun onListRequest() {
+        val stand = _uiState.value.import
+        if (stand.kept.isEmpty() || stand.isBusy) return
+        _uiState.update { it.copy(import = it.import.copy(askPortions = true)) }
+    }
+
+    fun onListDismiss() {
+        _uiState.update { it.copy(import = it.import.copy(askPortions = false)) }
+    }
+
+    /** Legt die Zutaten der behaltenen Treffer auf die Einkaufsliste - umgerechnet auf [persons]. */
+    fun onAddToShoppingList(persons: Int) {
+        val kennungen = _uiState.value.import.kept.values
+            .distinct()
+        _uiState.update { it.copy(import = it.import.copy(askPortions = false)) }
+        if (kennungen.isEmpty()) return
+
+        viewModelScope.launch {
+            val posten = addToShoppingList(kennungen, persons = persons)
+            _uiState.update { it.copy(import = it.import.copy(listItems = posten)) }
         }
     }
 
@@ -861,5 +1129,10 @@ class MultiplayerViewModel @Inject constructor(
 
     private companion object {
         const val MAX_CODE_LENGTH = 8
+        const val MILLIS = 1_000L
+
+        /** So oft wird versucht, den Inhalt eigener Treffer zu hinterlegen - mit wachsender Pause. */
+        const val SHARE_ATTEMPTS = 4
+        const val SHARE_RETRY_MS = 3_000L
     }
 }

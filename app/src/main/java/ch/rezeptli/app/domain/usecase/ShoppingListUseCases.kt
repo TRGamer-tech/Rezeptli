@@ -28,8 +28,10 @@ class ObserveOpenShoppingCountUseCase @Inject constructor(
  * Bestehende Posten bleiben erhalten und werden ergaenzt - wer nach einer zweiten
  * Swipe-Runde nochmal Zutaten hinzufuegt, verliert die erste Liste nicht.
  *
- * Mit [persons] werden die Mengen auf den eigenen Haushalt umgerechnet - sofern das Rezept
- * sagt, fuer wie viele es gedacht ist. Ohne diese Angabe bleiben die Mengen, wie sie sind.
+ * Mit [persons] werden die Mengen umgerechnet: von der Zahl, fuer die das Rezept gedacht ist,
+ * auf die gewuenschte. Sagt ein Rezept nicht, fuer wie viele es reicht, gilt
+ * [assumedServings] - die Oberflaeche fragt danach, statt still zu raten. Ohne [persons]
+ * bleiben die Mengen, wie das Rezept sie nennt.
  *
  * Gibt zurueck, wie viele Posten die Liste danach umfasst.
  */
@@ -38,14 +40,18 @@ class AddRecipesToShoppingListUseCase @Inject constructor(
     private val shoppingListRepository: ShoppingListRepository,
     private val aggregator: ShoppingListAggregator,
 ) {
-    suspend operator fun invoke(recipeIds: List<Long>, persons: Int? = null): Int {
+    suspend operator fun invoke(
+        recipeIds: List<Long>,
+        persons: Int? = null,
+        assumedServings: Int = IngredientScaler.DEFAULT_SERVINGS,
+    ): Int {
         val recipes = recipeIds
             .mapNotNull { recipeRepository.getRecipe(it) }
             .map { recipe ->
-                if (persons == null || recipe.servings == null) {
+                if (persons == null) {
                     recipe
                 } else {
-                    val factor = IngredientScaler.factor(persons, recipe.servings)
+                    val factor = IngredientScaler.factor(persons, recipe.servings ?: assumedServings)
                     recipe.copy(ingredients = IngredientScaler.scale(recipe.ingredients, factor), servings = persons)
                 }
             }

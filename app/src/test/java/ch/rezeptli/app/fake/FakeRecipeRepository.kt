@@ -104,6 +104,12 @@ class FakeRecipeRepository(
         }
     }
 
+    override suspend fun setServings(id: Long, servings: Int) {
+        recipes.value[id]?.let { recipe ->
+            recipes.value = recipes.value + (id to recipe.copy(servings = servings))
+        }
+    }
+
     override suspend fun deleteRecipe(id: Long) {
         deletedIds.add(id)
         recipes.value = recipes.value - id

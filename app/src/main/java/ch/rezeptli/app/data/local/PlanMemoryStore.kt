@@ -15,10 +15,13 @@ import javax.inject.Singleton
 private val Context.planMemoryDataStore: DataStore<Preferences> by preferencesDataStore(name = "plan")
 
 /**
- * Merkt sich die in dieser Woche verworfenen Vorschlaege als kleine Einstellungsdatei.
+ * Merkt sich als kleine Einstellungsdatei, was in dieser Woche verworfen und was in den
+ * letzten Wochen gekocht wurde.
  *
- * Es sind hoechstens ein paar Dutzend Adressen, sie gelten bis zum naechsten neu gebauten
- * Plan und haben keine Beziehung zu etwas anderem - dafuer braucht es keine Tabelle.
+ * Es sind hoechstens ein paar Dutzend Adressen und Titel ohne Beziehung zu etwas anderem -
+ * dafuer braucht es keine Tabelle. Die gekochten Gerichte stehen bewusst hier und nicht nur
+ * am Rezept: Ein Rezept, das bloss fuer den Plan geholt wurde, wird mit dem Plan wieder
+ * weggeraeumt, und der Vermerk ginge mit ihm verloren.
  */
 @Singleton
 class PlanMemoryStore @Inject constructor(
@@ -31,11 +34,21 @@ class PlanMemoryStore @Inject constructor(
         context.planMemoryDataStore.edit { it[REJECTED] = it[REJECTED].orEmpty() + key }
     }
 
-    override suspend fun clear() {
+    override suspend fun clearRejected() {
         context.planMemoryDataStore.edit { it.remove(REJECTED) }
+    }
+
+    override suspend fun cooked(): Map<String, Long> =
+        CookedEntries.decode(runCatching { context.planMemoryDataStore.data.first()[COOKED] }.getOrNull())
+
+    override suspend fun noteCooked(keys: Collection<String>, at: Long?) {
+        context.planMemoryDataStore.edit { stored ->
+            stored[COOKED] = CookedEntries.updated(stored[COOKED], keys, at, now = System.currentTimeMillis())
+        }
     }
 
     private companion object {
         val REJECTED = stringSetPreferencesKey("verworfen")
+        val COOKED = stringSetPreferencesKey("gekocht")
     }
 }

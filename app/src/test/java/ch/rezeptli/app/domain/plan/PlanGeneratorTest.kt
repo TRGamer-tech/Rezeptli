@@ -17,6 +17,7 @@ import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -381,6 +382,187 @@ class PlanGeneratorTest {
             .first { it.place == platz }
             .candidate.key
         assertSame(plan, generator.replace(plan, platz, pool, profil, avoid = verworfen, random = Random(99)))
+    }
+
+    private val tag = 24L * 60 * 60 * 1_000
+    private val heute = 20_000 * tag
+
+    /** Was vor wie vielen Tagen gekocht wurde - nach Titel. */
+    private fun gekocht(vararg vorTagen: Pair<String, Int>) = RecentlyCooked(
+        cookedAt = vorTagen.associate { (titel, tage) -> titel.lowercase() to heute - tage * tag },
+        now = heute,
+    )
+
+    @Test
+    fun `was kuerzlich gekocht wurde, kommt nicht gleich wieder in den Plan`() {
+        val gegessen = setOf("Gulasch", "Omelette", "Gratin")
+        val gekocht = gekocht("Gulasch" to 1, "Omelette" to 6, "Gratin" to 13)
+
+        repeat(20) { startwert ->
+            val plan = generator.generate(pool, profile(tage = 4), Random(startwert), cooked = gekocht)
+
+            // Sieben Rezepte, drei eben gekocht: Die vier anderen fuellen die vier Tage.
+            assertEquals(4, plan.meals.size)
+            assertTrue(plan.titles().none { it in gegessen }, "Startwert $startwert: ${plan.titles()}")
+        }
+    }
+
+    @Test
+    fun `gibt es sonst nichts, kommt auch kuerzlich Gekochtes - zuerst, was am laengsten her ist`() {
+        val gekocht = gekocht("Gulasch" to 1, "Omelette" to 6, "Gratin" to 13)
+
+        repeat(10) { startwert ->
+            val plan = generator.generate(pool, profile(tage = 6), Random(startwert), cooked = gekocht)
+
+            // Vier frische Gerichte reichen nicht fuer sechs Tage: Zwei gekochte helfen aus -
+            // das von gestern bleibt draussen.
+            assertEquals(6, plan.meals.size)
+            assertTrue("Gratin" in plan.titles())
+            assertTrue("Omelette" in plan.titles())
+            assertFalse("Gulasch" in plan.titles())
+        }
+    }
+
+    @Test
+    fun `der Vermerk am Rezept selbst zaehlt genauso`() {
+        // Eigene Rezepte tragen ihr Kochdatum bei sich - dafuer braucht es keinen Eintrag im Gedaechtnis.
+        val mitDatum = pool.map { kandidat ->
+            if (kandidat.recipe.title != "Gulasch") {
+                kandidat
+            } else {
+                kandidat.copy(recipe = kandidat.recipe.copy(lastCookedAt = heute - 2 * tag))
+            }
+        }
+
+        repeat(20) { startwert ->
+            val plan = generator.generate(mitDatum, profile(tage = 6), Random(startwert), cooked = gekocht())
+
+            assertEquals(6, plan.meals.size)
+            assertFalse("Gulasch" in plan.titles(), "Startwert $startwert")
+        }
+    }
+
+    @Test
+    fun `dasselbe Gericht aus einer anderen Quelle gilt auch als gekocht`() {
+        val anderswo = candidate("Gulasch", "Rindfleisch" to 500.0, "Paprika" to 200.0).let {
+            it.copy(recipe = it.recipe.copy(sourceUrl = "https://anderswo.ch/gulasch", title = "  GULASCH "))
+        }
+        val gekocht = RecentlyCooked(RecentlyCooked.keysOf(pool.first().recipe).associateWith { heute - tag }, heute)
+
+        assertEquals(listOf("https://beispiel.ch/gulasch", "gulasch"), RecentlyCooked.keysOf(pool.first().recipe))
+        assertTrue(gekocht.isRecent(anderswo.recipe))
+        assertEquals(1, gekocht.daysSince(anderswo.recipe))
+        // Ein anderes Gericht derselben Seite ist damit nicht gemeint.
+        assertNull(gekocht.daysSince(pool[1].recipe))
+    }
+
+    @Test
+    fun `nach zwei Wochen ist ein Gericht wieder waehlbar, nach vier Wochen zaehlt es wie jedes andere`() {
+        val gulasch = pool.first().recipe
+
+        fun vor(tage: Int) = gekocht("Gulasch" to tage)
+
+        assertTrue(vor(0).isRecent(gulasch))
+        assertTrue(vor(13).isRecent(gulasch))
+        assertFalse(vor(14).isRecent(gulasch))
+        // Zwischen zwei und vier Wochen verliert es noch Punkte - immer weniger.
+        assertTrue(vor(14).fade(gulasch) > vor(21).fade(gulasch))
+        assertTrue(vor(21).fade(gulasch) > vor(27).fade(gulasch))
+        assertTrue(vor(27).fade(gulasch) > 0.0)
+        assertEquals(0.0, vor(28).fade(gulasch))
+        assertNull(vor(28).daysSince(gulasch))
+        assertEquals(0.0, RecentlyCooked.NONE.fade(gulasch))
+        // Eine verstellte Uhr macht aus "eben gekocht" kein "nie gekocht".
+        assertTrue(vor(-3).isRecent(gulasch))
+    }
+
+    @Test
+    fun `ein knappes Budget holt das Essen von gestern nicht zurueck`() {
+        // Ausgerechnet die guenstigsten Gerichte gab es gerade erst: Gespart wird trotzdem nicht mit ihnen.
+        val gegessen = setOf("Omelette", "Linsensuppe", "Pasta Pesto")
+        val gekocht = gekocht("Omelette" to 1, "Linsensuppe" to 2, "Pasta Pesto" to 3)
+
+        repeat(10) { startwert ->
+            val knapp = profile(tage = 3) { it.copy(weeklyBudget = 5) }
+            val plan = generator.generate(pool, knapp, Random(startwert), cooked = gekocht)
+
+            assertEquals(3, plan.meals.size)
+            assertTrue(plan.titles().none { it in gegessen }, "Startwert $startwert: ${plan.titles()}")
+        }
+    }
+
+    @Test
+    fun `ersetzen meidet kuerzlich Gekochtes, solange es anderes gibt`() {
+        val profil = profile(tage = 3)
+        val gegessen = setOf("Gulasch", "Omelette")
+        val gekocht = gekocht("Gulasch" to 1, "Omelette" to 2)
+        val platz = PlanPlace(Weekday.DIENSTAG, MealSlot.ABEND)
+
+        repeat(20) { startwert ->
+            val plan = generator.generate(pool, profil, Random(startwert), cooked = gekocht)
+            val neu = generator.replace(plan, platz, pool, profil, random = Random(startwert + 100), cooked = gekocht)
+
+            // Sieben Rezepte, zwei gekocht, drei im Plan: Es bleiben genau zwei frische zur Wahl.
+            val vorschlag = neu.meals
+                .first { it.place == platz }
+                .recipe.title
+            assertFalse(vorschlag in gegessen, "Startwert $startwert: $vorschlag")
+            assertFalse(vorschlag in plan.titles())
+        }
+    }
+
+    @Test
+    fun `ist beim Ersetzen nur noch Gekochtes frei, kommt eben das`() {
+        val profil = profile(tage = 3)
+        val plan = generator.generate(pool, profil, Random(9))
+        val imPlan = plan.titles().toSet()
+        val uebrige = pool.map { it.recipe.title }.filterNot { it in imPlan }
+        val gekocht = gekocht(*uebrige.map { it to 3 }.toTypedArray())
+        val platz = PlanPlace(Weekday.DIENSTAG, MealSlot.ABEND)
+
+        val neu = generator.replace(plan, platz, pool, profil, random = Random(1), cooked = gekocht)
+
+        // Lieber ein Gericht von vor drei Tagen als gar keinen Vorschlag.
+        assertTrue(
+            neu.meals
+                .first { it.place == platz }
+                .recipe.title in uebrige,
+        )
+    }
+
+    @Test
+    fun `wer den Plan neu baut, bekommt andere Gerichte als eben`() {
+        val profil = profile(tage = 3)
+
+        repeat(10) { startwert ->
+            val erster = generator.generate(pool, profil, Random(startwert))
+            val eben = erster.meals.mapTo(mutableSetOf()) { it.candidate.key }
+
+            val zweiter = generator.generate(pool, profil, Random(startwert + 50), lastPlan = eben)
+
+            // Sieben Rezepte, drei waren eben dran: Die vier anderen reichen fuer drei neue Tage.
+            assertEquals(3, zweiter.meals.size)
+            assertTrue(zweiter.titles().none { it in erster.titles() }, "Startwert $startwert: ${zweiter.titles()}")
+        }
+    }
+
+    @Test
+    fun `reicht das Neue nicht, fuellen Gerichte des alten Plans auf - vor allem, was kuerzlich gekocht wurde`() {
+        val profil = profile(tage = 6)
+        val eben = setOf(
+            "Gulasch",
+            "Gemüsecurry",
+            "Omelette",
+        ).mapTo(mutableSetOf()) { "https://beispiel.ch/${it.lowercase()}" }
+        val gekocht = gekocht("Gratin" to 2)
+
+        repeat(10) { startwert ->
+            val plan = generator.generate(pool, profil, Random(startwert), cooked = gekocht, lastPlan = eben)
+
+            // Drei neue, drei aus dem alten Plan - das Gratin von vorgestern braucht es nicht.
+            assertEquals(6, plan.meals.size)
+            assertFalse("Gratin" in plan.titles(), "Startwert $startwert: ${plan.titles()}")
+        }
     }
 
     @Test

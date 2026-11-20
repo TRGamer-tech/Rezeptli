@@ -101,6 +101,10 @@ class RecipeRepositoryImpl @Inject constructor(
         recipeDao.setInCollection(id, inCollection, System.currentTimeMillis())
     }
 
+    override suspend fun setServings(id: Long, servings: Int) = withContext(ioDispatcher) {
+        recipeDao.setServings(id, servings, System.currentTimeMillis())
+    }
+
     override suspend fun deleteRecipe(id: Long) = withContext(ioDispatcher) {
         // Das Foto gehoert zum Rezept - beim Loeschen darf keine verwaiste Datei zurueckbleiben.
         val photoUri = recipeDao.recipeWithDetails(id)?.recipe?.photoUri

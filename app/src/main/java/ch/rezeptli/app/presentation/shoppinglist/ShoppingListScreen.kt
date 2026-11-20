@@ -74,10 +74,7 @@ import kotlinx.coroutines.launch
 
 /** Die Einkaufsliste: nach Warengruppen sortiert, zum Abhaken. */
 @Composable
-fun ShoppingListRoute(
-    onBack: () -> Unit,
-    viewModel: ShoppingListViewModel = hiltViewModel(),
-) {
+fun ShoppingListRoute(viewModel: ShoppingListViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -88,7 +85,6 @@ fun ShoppingListRoute(
     ShoppingListScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
-        onBack = onBack,
         onCopy = { text ->
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText(listTitle, text))
@@ -111,7 +107,6 @@ fun ShoppingListRoute(
 fun ShoppingListScreen(
     uiState: ShoppingListUiState,
     snackbarHostState: SnackbarHostState,
-    onBack: () -> Unit,
     onCopy: (String) -> Unit,
     onShare: (String) -> Unit,
     onCheckedChange: (ShoppingItem, Boolean) -> Unit,
@@ -130,7 +125,6 @@ fun ShoppingListScreen(
         topBar = {
             RezeptliTopBar(
                 title = stringResource(R.string.shopping_title),
-                onBack = onBack,
                 actions = {
                     if (!uiState.isEmpty) {
                         val context = LocalContext.current

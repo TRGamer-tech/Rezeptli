@@ -5,6 +5,8 @@ import ch.rezeptli.app.domain.multiplayer.RoundEnd
 import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundSource
+import ch.rezeptli.app.domain.multiplayer.SharedContent
+import ch.rezeptli.app.domain.multiplayer.SharedIngredient
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
@@ -159,6 +161,107 @@ class PairingApiTest {
         assertTrue(state.othersDone)
         assertEquals(listOf("Rösti"), state.matches?.map { it.title })
         assertNull(state.end)
+    }
+
+    @Test
+    fun `mit dem ersten Beitrag nennt der Dienst, wie lange er noch auf die anderen wartet`() {
+        val state = PairingApi.stateFrom(
+            body(
+                """{"version":2,"code":"LUH64E","verfaelltAm":1795225400413,"standNr":4,"zustand":"sammeln",""" +
+                    """"gastgeber":true,"teilnehmer":2,"ziel":2,"art":"essen","quelle":"gespeichert","runde":0,""" +
+                    """"einschraenkungen":{"ernaehrung":[],"unvertraeglich":[],"ohne":[],"eigene":[]},""" +
+                    """"beigetragen":true,"wartetAuf":1,"karten":1,"entschieden":0,"andereFertig":false,""" +
+                    """"trefferAnzahl":0,"endeGrund":null,"fristRestMs":59995}""",
+            ),
+        )
+
+        assertEquals(RoundPhase.SAMMELN, state.phase)
+        assertTrue(state.hasContributed)
+        assertEquals(59_995L, state.contributionWaitMs)
+    }
+
+    @Test
+    fun `am Ende steht bei jedem Treffer, ob der Inhalt eines selbst erfassten Rezepts bereitliegt`() {
+        val state = PairingApi.stateFrom(
+            body(
+                """{"version":2,"code":"LUH64E","verfaelltAm":1795225400413,"standNr":10,"zustand":"beendet",""" +
+                    """"gastgeber":false,"teilnehmer":2,"ziel":2,"art":"essen","quelle":"gespeichert","runde":0,""" +
+                    """"einschraenkungen":{"ernaehrung":[],"unvertraeglich":[],"ohne":[],"eigene":[]},""" +
+                    """"beigetragen":true,"wartetAuf":0,"karten":2,"entschieden":2,"andereFertig":true,""" +
+                    """"trefferAnzahl":2,"endeGrund":"ziel","fristRestMs":null,"treffer":[""" +
+                    """{"rezeptId":1,"titel":"Omas Hackbraten","quelleUrl":null,"bildUrl":null,""" +
+                    """"zubereitungszeit":null,"schluessel":"e:anna:7","vonMir":false,"inhalt":true},""" +
+                    """{"rezeptId":2,"titel":"Rösti","quelleUrl":"https://beispiel.ch/roesti","bildUrl":null,""" +
+                    """"zubereitungszeit":null,"schluessel":"u1","vonMir":true,"inhalt":false}]}""",
+            ),
+        )
+
+        assertNull(state.contributionWaitMs)
+        val (hackbraten, roesti) = state.matches!!
+        assertTrue(hackbraten.isHandwritten)
+        assertTrue(hackbraten.hasContent)
+        assertFalse(hackbraten.isMine)
+        assertFalse(roesti.isHandwritten)
+        assertFalse(roesti.hasContent)
+    }
+
+    @Test
+    fun `der Inhalt eines selbst erfassten Treffers kommt mit Zutaten, Schritten, Portionen und Zeit`() {
+        val content = PairingApi.contentFrom(
+            body(
+                """{"rezeptId":1,"inhalt":{"zubereitung":"Mischen, formen, backen.",""" +
+                    """"schritte":["Mischen und formen.","Eine Stunde backen."],"zutaten":[""" +
+                    """{"name":"Hackfleisch","menge":800,"einheit":"GRAMM","notiz":null},""" +
+                    """{"name":"Zwiebeln","menge":2,"einheit":null,"notiz":"fein gehackt"},""" +
+                    """{"name":"Salz","menge":null,"einheit":null,"notiz":null}],""" +
+                    """"portionen":4,"zeit":75,"tags":["Familie"]}}""",
+            ),
+        )!!
+
+        assertEquals("Mischen, formen, backen.", content.instructions)
+        assertEquals(listOf("Mischen und formen.", "Eine Stunde backen."), content.steps)
+        assertEquals(
+            listOf(
+                SharedIngredient("Hackfleisch", amount = 800.0, unit = "GRAMM"),
+                SharedIngredient("Zwiebeln", amount = 2.0, note = "fein gehackt"),
+                SharedIngredient("Salz"),
+            ),
+            content.ingredients,
+        )
+        assertEquals(4, content.servings)
+        assertEquals(75, content.prepTimeMinutes)
+        assertEquals(listOf("Familie"), content.tags)
+    }
+
+    @Test
+    fun `ist der Inhalt noch nicht hinterlegt, ist das kein Fehler - es gibt nur noch nichts`() {
+        assertNull(PairingApi.contentFrom(body("""{"rezeptId":1,"inhalt":null}""")))
+    }
+
+    @Test
+    fun `hinterlegt wird nur, was zum Kochen noetig ist`() {
+        val gesendet = PairingApi.contentBody(
+            participantId = "geraet-1",
+            recipeId = 7L,
+            content = SharedContent(
+                instructions = "Backen.",
+                steps = listOf("Backen."),
+                ingredients = listOf(
+                    SharedIngredient("Mehl", amount = 250.0, unit = "GRAMM"),
+                    SharedIngredient("Salz"),
+                ),
+                servings = 4,
+            ),
+        )
+
+        assertEquals("geraet-1", gesendet.getValue("teilnehmer").jsonPrimitive.content)
+        assertEquals("7", gesendet.getValue("rezeptId").jsonPrimitive.content)
+        val inhalt = gesendet.getValue("inhalt").jsonObject
+        assertEquals(setOf("zubereitung", "schritte", "zutaten", "portionen", "tags"), inhalt.keys)
+        val (mehl, salz) = inhalt.getValue("zutaten").jsonArray.map { it.jsonObject }
+        assertEquals(setOf("name", "menge", "einheit"), mehl.keys)
+        // Was es nicht gibt, wird nicht als leeres Feld mitgeschickt.
+        assertEquals(setOf("name"), salz.keys)
     }
 
     @Test

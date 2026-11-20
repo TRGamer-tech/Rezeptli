@@ -17,6 +17,7 @@ import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.settings.AppearanceRepository
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,7 @@ data class PreferencesUiState(
     val profile: UserProfile = UserProfile.EMPTY,
     /** Die App-Einstellung - ob Android selbst Animationen entfernt hat, weiss nur die Oberflaeche. */
     val reduceMotion: Boolean = false,
+    val theme: ThemeChoice = ThemeChoice.SYSTEM,
     val showResetDialog: Boolean = false,
 )
 
@@ -59,9 +61,10 @@ class PreferencesViewModel @Inject constructor(
     val uiState: StateFlow<PreferencesUiState> = combine(
         profileRepository.profile,
         appearanceRepository.reduceMotion,
+        appearanceRepository.theme,
         dialogVisible.asStateFlow(),
-    ) { profile, reduceMotion, showDialog ->
-        PreferencesUiState(profile = profile, reduceMotion = reduceMotion, showResetDialog = showDialog)
+    ) { profile, reduceMotion, theme, showDialog ->
+        PreferencesUiState(profile = profile, reduceMotion = reduceMotion, theme = theme, showResetDialog = showDialog)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -104,6 +107,10 @@ class PreferencesViewModel @Inject constructor(
 
     fun onReduceMotionChange(reduce: Boolean) {
         viewModelScope.launch { appearanceRepository.setReduceMotion(reduce) }
+    }
+
+    fun onThemeSelect(theme: ThemeChoice) {
+        viewModelScope.launch { appearanceRepository.setTheme(theme) }
     }
 
     fun onResetRequest() {

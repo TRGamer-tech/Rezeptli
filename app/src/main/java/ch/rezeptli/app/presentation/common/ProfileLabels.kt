@@ -8,6 +8,7 @@ import ch.rezeptli.app.domain.profile.Cuisine
 import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.settings.ThemeChoice
 
 /*
  * Beschriftungen der Profil-Aufzaehlungen.
@@ -89,3 +90,13 @@ fun Dislike.labelRes(): Int = when (this) {
     Dislike.TOFU -> R.string.abneigung_tofu
     Dislike.VEGAN -> R.string.abneigung_vegan
 }
+
+@Composable
+fun ThemeChoice.label(): String = stringResource(
+    when (this) {
+        ThemeChoice.SYSTEM -> R.string.design_system
+        ThemeChoice.HELL -> R.string.design_hell
+        ThemeChoice.DUNKEL -> R.string.design_dunkel
+        ThemeChoice.MATERIAL_YOU -> R.string.design_material_you
+    },
+)

@@ -9,7 +9,6 @@ import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.usecase.DeleteRecipeUseCase
 import ch.rezeptli.app.domain.usecase.MarkRecipeCookedUseCase
-import ch.rezeptli.app.domain.usecase.ObserveOpenShoppingCountUseCase
 import ch.rezeptli.app.domain.usecase.ObservePagedRecipesUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRecipeCountUseCase
 import ch.rezeptli.app.domain.usecase.ObserveTagsUseCase
@@ -39,7 +38,6 @@ data class RecipeListUiState(
     val maxPrepTimeMinutes: Int? = null,
     val availableTags: List<String> = emptyList(),
     val totalRecipeCount: Int = 0,
-    val openShoppingItems: Int = 0,
     val firstName: String = "",
     val isFilterVisible: Boolean = false,
     /** `true` zeigt nur Gekochtes, `false` nur noch nie Gekochtes, `null` alles. */
@@ -78,7 +76,6 @@ class RecipeListViewModel @Inject constructor(
     observePagedRecipes: ObservePagedRecipesUseCase,
     observeRecipeCount: ObserveRecipeCountUseCase,
     observeTags: ObserveTagsUseCase,
-    observeOpenShoppingCount: ObserveOpenShoppingCountUseCase,
     profileRepository: UserProfileRepository,
     private val deleteRecipe: DeleteRecipeUseCase,
     private val markRecipeCooked: MarkRecipeCookedUseCase,
@@ -110,10 +107,6 @@ class RecipeListViewModel @Inject constructor(
 
         observeTags()
             .onEach { tags -> _uiState.update { it.copy(availableTags = tags) } }
-            .launchIn(viewModelScope)
-
-        observeOpenShoppingCount()
-            .onEach { count -> _uiState.update { it.copy(openShoppingItems = count) } }
             .launchIn(viewModelScope)
 
         profileRepository.profile

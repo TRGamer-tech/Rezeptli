@@ -1,5 +1,11 @@
 package ch.rezeptli.app.presentation.cooking
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,6 +17,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,27 +43,35 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.AmountFormatter
 import ch.rezeptli.app.domain.model.Ingredient
+import ch.rezeptli.app.domain.timer.CookingTimer
+import ch.rezeptli.app.domain.timer.TimerState
 import ch.rezeptli.app.presentation.common.KeepScreenOn
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.AmountStepper
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyFilledTonalButton
 import ch.rezeptli.app.presentation.common.components.BouncyIconButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
@@ -68,6 +84,18 @@ import ch.rezeptli.app.presentation.common.theme.cardSurface
 import ch.rezeptli.app.presentation.common.theme.floatingPanel
 import ch.rezeptli.app.presentation.common.theme.highlightRing
 import kotlin.math.abs
+
+/** Was sich am Timer tun laesst - gebuendelt, damit es nicht einzeln durch jede Ebene gereicht wird. */
+class TimerActions(
+    val onStart: () -> Unit = {},
+    val onStop: () -> Unit = {},
+    /** Eine Minute mehr oder weniger, waehrend er laeuft. */
+    val onAdjust: (Int) -> Unit = {},
+    /** Eine Minute mehr oder weniger, bevor er gestartet ist. */
+    val onPlannedChange: (Int) -> Unit = {},
+    /** Zum Schritt blaettern, zu dem der laufende Timer gehoert. */
+    val onShowStep: () -> Unit = {},
+)
 
 /**
  * Der Kochmodus: ein Schritt pro Karte.
@@ -93,15 +121,72 @@ fun CookingRoute(
     // Beim Kochen liegt das Geraet auf der Arbeitsflaeche - der Bildschirm soll anbleiben.
     KeepScreenOn()
 
+    // Solange ein Timer laeuft, schliesst auch die Zurueck-Taste nicht einfach: erst fragen.
+    BackHandler(enabled = uiState.timer?.isFinished == false) { viewModel.onCloseRequest() }
+
+    val askForNotifications = rememberNotificationRequest()
+    val timerActions = remember(viewModel, askForNotifications) {
+        TimerActions(
+            onStart = {
+                viewModel.onStartTimer()
+                askForNotifications()
+            },
+            onStop = viewModel::onStopTimer,
+            onAdjust = viewModel::onAdjustTimer,
+            onPlannedChange = viewModel::onPlannedMinutesChange,
+            onShowStep = viewModel::onShowTimerStep,
+        )
+    }
+
     CookingScreen(
         uiState = uiState,
-        onClose = onClose,
+        onClose = viewModel::onCloseRequest,
         onNextStep = viewModel::onNextStep,
         onPreviousStep = viewModel::onPreviousStep,
-        onStartTimer = viewModel::onStartTimer,
-        onStopTimer = viewModel::onStopTimer,
+        timerActions = timerActions,
         onFinish = viewModel::onFinish,
     )
+
+    if (uiState.pendingExit != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::onExitDismiss,
+            title = { Text(stringResource(R.string.kochmodus_timer_laeuft_titel)) },
+            text = { Text(stringResource(R.string.kochmodus_timer_laeuft_text)) },
+            confirmButton = {
+                BouncyTextButton(onClick = viewModel::onExitConfirm) {
+                    Text(stringResource(R.string.kochmodus_timer_laeuft_beenden))
+                }
+            },
+            dismissButton = {
+                BouncyTextButton(onClick = viewModel::onExitDismiss) {
+                    Text(stringResource(R.string.kochmodus_timer_laeuft_bleiben))
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Fragt beim Starten eines Timers, ob die App Mitteilungen zeigen darf.
+ *
+ * Gebraucht wird das nur fuer die Anzeige, waehrend das Telefon gesperrt oder eine andere
+ * App offen ist. Klingeln tut der Timer auch ohne - deshalb startet er sofort und wartet
+ * nicht auf die Antwort. Wer zweimal abgelehnt hat, wird von Android nicht mehr gefragt.
+ */
+@Composable
+private fun rememberNotificationRequest(): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    return remember(context, launcher) {
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,8 +196,7 @@ fun CookingScreen(
     onClose: () -> Unit,
     onNextStep: () -> Unit,
     onPreviousStep: () -> Unit,
-    onStartTimer: () -> Unit,
-    onStopTimer: () -> Unit,
+    timerActions: TimerActions,
     onFinish: () -> Unit,
 ) {
     Scaffold(
@@ -151,8 +235,7 @@ fun CookingScreen(
                     uiState = uiState,
                     onNextStep = onNextStep,
                     onPreviousStep = onPreviousStep,
-                    onStartTimer = onStartTimer,
-                    onStopTimer = onStopTimer,
+                    timerActions = timerActions,
                     onFinish = onFinish,
                 )
             }
@@ -165,8 +248,7 @@ private fun CookingContent(
     uiState: CookingUiState,
     onNextStep: () -> Unit,
     onPreviousStep: () -> Unit,
-    onStartTimer: () -> Unit,
-    onStopTimer: () -> Unit,
+    timerActions: TimerActions,
     onFinish: () -> Unit,
 ) {
     val swipeThreshold = LocalConfiguration.current.screenWidthDp / SWIPE_FRACTION
@@ -233,12 +315,21 @@ private fun CookingContent(
                         text = step.text,
                         ingredients = uiState.ingredientsByStep[step.position].orEmpty(),
                         timer = uiState.timerForCurrentStep,
-                        timerMinutes = step.timerMinutes,
-                        onStartTimer = onStartTimer,
-                        onStopTimer = onStopTimer,
+                        timerMinutes = uiState.minutesFor(step),
+                        timerActions = timerActions,
                     )
                 }
             }
+        }
+
+        // Gehoert der Timer zu einem anderen Schritt, bleibt er hier unten sichtbar.
+        uiState.timerElsewhere?.let { timer ->
+            TimerStrip(
+                timer = timer,
+                stepNumber = uiState.timerStepNumber,
+                actions = timerActions,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
         }
 
         Row(
@@ -278,8 +369,7 @@ private fun StepCard(
     ingredients: List<Ingredient>,
     timer: TimerState?,
     timerMinutes: Int?,
-    onStartTimer: () -> Unit,
-    onStopTimer: () -> Unit,
+    timerActions: TimerActions,
 ) {
     Column(
         modifier = Modifier
@@ -314,48 +404,53 @@ private fun StepCard(
         }
 
         if (timerMinutes != null) {
-            TimerSection(
-                timer = timer,
-                minutes = timerMinutes,
-                onStartTimer = onStartTimer,
-                onStopTimer = onStopTimer,
-            )
+            TimerSection(timer = timer, minutes = timerMinutes, actions = timerActions)
         }
     }
 }
 
+/**
+ * Der Timer eines Schritts: stellen, starten, nachstellen, stoppen.
+ *
+ * Die Minuten aus dem Rezept sind ein Vorschlag. Der eigene Herd, die eigene Pfanne und der
+ * eigene Geschmack wissen es oft besser - deshalb laesst sich die Zeit vor dem Start und
+ * auch waehrend sie laeuft um Minuten verschieben.
+ */
 @Composable
 private fun TimerSection(
     timer: TimerState?,
     minutes: Int,
-    onStartTimer: () -> Unit,
-    onStopTimer: () -> Unit,
+    actions: TimerActions,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .floatingPanel(Tokens.Radius.LgShape)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when {
-            timer == null -> BouncyFilledTonalButton(
-                onClick = onStartTimer,
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) {
-                MotionIcon(
-                    imageVector = Icons.Filled.Timer,
-                    contentDescription = null,
-                    motion = IconMotion.WIGGLE,
-                    playOnAppear = true,
+            timer == null -> {
+                AmountStepper(
+                    value = minutes,
+                    caption = pluralStringResource(R.plurals.kochmodus_timer_minuten_wort, minutes),
+                    range = 1..CookingTimer.MAX_MINUTES,
+                    onChange = { actions.onPlannedChange(it - minutes) },
                 )
-                Text(
-                    text = "  " + pluralStringResource(
-                        R.plurals.kochmodus_timer_minuten,
-                        minutes,
-                        minutes,
-                    ),
-                )
+                BouncyFilledTonalButton(
+                    onClick = actions.onStart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                ) {
+                    MotionIcon(
+                        imageVector = Icons.Filled.Timer,
+                        contentDescription = null,
+                        motion = IconMotion.WIGGLE,
+                        playOnAppear = true,
+                    )
+                    Text(text = "  " + stringResource(R.string.kochmodus_timer_starten))
+                }
             }
 
             timer.isFinished -> {
@@ -371,26 +466,38 @@ private fun TimerSection(
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
-                BouncyOutlinedButton(
-                    onClick = onStopTimer,
-                    modifier = Modifier.heightIn(min = 48.dp),
+                BouncyButton(
+                    onClick = actions.onStop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
                 ) {
                     Text(stringResource(R.string.kochmodus_timer_stoppen))
+                }
+                BouncyOutlinedButton(
+                    onClick = { actions.onAdjust(+1) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                ) {
+                    Text(stringResource(R.string.kochmodus_timer_nochmal))
                 }
             }
 
             else -> {
+                val gesprochen = timer.spoken()
                 Text(
                     text = timer.remainingSeconds.asClock(),
-                    style = MaterialTheme.typography.displaySmall,
-                    modifier = Modifier.clearAndSetSemantics {
-                        contentDescription = "${timer.remainingSeconds / 60} Minuten verbleibend"
-                    },
+                    style = RezeptliTheme.amountStyle.merge(MaterialTheme.typography.displaySmall),
+                    modifier = Modifier.clearAndSetSemantics { contentDescription = gesprochen },
                 )
                 RezeptliProgressBar(progress = timer.progress, color = RezeptliTheme.accents.butter)
+                MinuteButtons(timer = timer, onAdjust = actions.onAdjust)
                 BouncyOutlinedButton(
-                    onClick = onStopTimer,
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    onClick = actions.onStop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
                 ) {
                     Text(stringResource(R.string.kochmodus_timer_stoppen))
                 }
@@ -398,6 +505,96 @@ private fun TimerSection(
         }
     }
 }
+
+/** "− 1 Min." und "+ 1 Min." nebeneinander - fuer den laufenden Timer. */
+@Composable
+private fun MinuteButtons(
+    timer: TimerState,
+    onAdjust: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val weniger = stringResource(R.string.kochmodus_timer_weniger)
+    val mehr = stringResource(R.string.kochmodus_timer_mehr)
+
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        BouncyFilledTonalButton(
+            onClick = { onAdjust(-1) },
+            enabled = timer.canShorten,
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = weniger },
+        ) {
+            Text(stringResource(R.string.kochmodus_timer_weniger_kurz), maxLines = 1)
+        }
+        BouncyFilledTonalButton(
+            onClick = { onAdjust(+1) },
+            enabled = timer.canExtend,
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = mehr },
+        ) {
+            Text(stringResource(R.string.kochmodus_timer_mehr_kurz), maxLines = 1)
+        }
+    }
+}
+
+/**
+ * Der Timer eines anderen Schritts, als schmaler Streifen ueber den Knoepfen.
+ *
+ * Antippen blaettert zu seinem Schritt. Klingelt er, laesst er sich gleich hier abstellen -
+ * niemand soll mit nassen Haenden nach dem richtigen Schritt suchen muessen.
+ */
+@Composable
+private fun TimerStrip(
+    timer: TimerState,
+    stepNumber: Int?,
+    actions: TimerActions,
+    modifier: Modifier = Modifier,
+) {
+    val nummer = stepNumber ?: (timer.stepPosition + 1)
+    val text = if (timer.isFinished) {
+        stringResource(R.string.kochmodus_timer_streifen_um, nummer)
+    } else {
+        stringResource(R.string.kochmodus_timer_streifen, nummer, timer.remainingSeconds.asClock())
+    }
+    val zeigen = stringResource(R.string.kochmodus_timer_zeigen)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .floatingPanel(Tokens.Radius.LgShape)
+            .clickable(onClickLabel = zeigen, role = Role.Button, onClick = actions.onShowStep)
+            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (timer.isFinished) {
+            RingingIcon()
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Timer,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = text,
+            style = RezeptliTheme.amountStyle.merge(MaterialTheme.typography.titleMedium),
+            color = if (timer.isFinished) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        BouncyTextButton(onClick = actions.onStop, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(stringResource(R.string.timer_meldung_stoppen))
+        }
+    }
+}
+
+/** Die Restzeit in Worten - fuer alle, die den Bildschirm vorgelesen bekommen. */
+@Composable
+private fun TimerState.spoken(): String =
+    stringResource(R.string.kochmodus_timer_rest, remainingSeconds / 60, remainingSeconds % 60)
 
 @Composable
 private fun Ingredient.displayLine(): String {
@@ -446,11 +643,18 @@ private fun RingingIcon() {
     )
 }
 
-/** Sekunden als "12:05" - beim Kochen liest sich das schneller als eine Zahl. */
+/** Sekunden als "12:05" - beim Kochen liest sich das schneller als eine Zahl. Ab einer Stunde "1:05:00". */
 private fun Int.asClock(): String {
     val safe = coerceAtLeast(0)
-    return "%d:%02d".format(safe / 60, safe % 60)
+    val hours = safe / SECONDS_PER_HOUR
+    val minutes = safe % SECONDS_PER_HOUR / 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, safe % 60)
+    } else {
+        "%d:%02d".format(minutes, safe % 60)
+    }
 }
 
 private const val SWIPE_FRACTION = 4
+private const val SECONDS_PER_HOUR = 3600
 private const val RING_CYCLE_MS = 1200

@@ -6,6 +6,8 @@ import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.RoundState
+import ch.rezeptli.app.domain.multiplayer.SharedContent
+import ch.rezeptli.app.domain.multiplayer.SharedIngredient
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.CourseChoice
@@ -105,6 +107,41 @@ internal object PairingApi {
     }
 
     /**
+     * Der Inhalt eines selbst erfassten Rezepts, das ein gemeinsamer Treffer geworden ist.
+     *
+     * Das ist die einzige Stelle, an der Zutaten und Zubereitung das Geraet verlassen.
+     */
+    fun contentBody(participantId: String, recipeId: Long, content: SharedContent): JsonObject = buildJsonObject {
+        put("teilnehmer", participantId)
+        put("rezeptId", recipeId)
+        put(
+            "inhalt",
+            buildJsonObject {
+                put("zubereitung", content.instructions)
+                put("schritte", buildJsonArray { content.steps.forEach { add(it) } })
+                put(
+                    "zutaten",
+                    buildJsonArray {
+                        content.ingredients.forEach { ingredient ->
+                            add(
+                                buildJsonObject {
+                                    put("name", ingredient.name)
+                                    ingredient.amount?.let { put("menge", it) }
+                                    ingredient.unit?.let { put("einheit", it) }
+                                    ingredient.note?.let { put("notiz", it) }
+                                },
+                            )
+                        }
+                    },
+                )
+                content.servings?.let { put("portionen", it) }
+                content.prepTimeMinutes?.let { put("zeit", it) }
+                put("tags", buildJsonArray { content.tags.forEach { add(it) } })
+            },
+        )
+    }
+
+    /**
      * Was nicht auf den Tisch darf, in der Form des Dienstes.
      *
      * Die drei Listen bleiben getrennt, weil sie Verschiedenes bedeuten: Eine Ernaehrungsform
@@ -141,10 +178,37 @@ internal object PairingApi {
         othersDone = body.bool("andereFertig"),
         matchCount = body.int("trefferAnzahl") ?: 0,
         end = endFrom(body.string("endeGrund")),
+        contributionWaitMs = body.long("fristRestMs"),
         matches = (body["treffer"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.toSharedRecipe() },
         stack = (body["stapel"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.toSharedRecipe() },
         votes = (body["stimmen"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.toVote() },
     )
+
+    /** Der hinterlegte Inhalt eines Treffers - `null`, wenn die Antwort keinen brauchbaren enthaelt. */
+    fun contentFrom(body: JsonObject): SharedContent? {
+        val inhalt = body["inhalt"] as? JsonObject ?: return null
+        val ingredients = (inhalt["zutaten"] as? JsonArray)
+            ?.mapNotNull { eintrag ->
+                val zeile = eintrag as? JsonObject ?: return@mapNotNull null
+                val name = zeile.string("name") ?: return@mapNotNull null
+                SharedIngredient(
+                    name = name,
+                    amount = zeile.double("menge"),
+                    unit = zeile.string("einheit"),
+                    note = zeile.string("notiz"),
+                )
+            }.orEmpty()
+        val content = SharedContent(
+            instructions = inhalt.string("zubereitung").orEmpty(),
+            steps = inhalt.names("schritte"),
+            ingredients = ingredients,
+            servings = inhalt.int("portionen"),
+            prepTimeMinutes = inhalt.int("zeit"),
+            tags = inhalt.names("tags"),
+        )
+        val leer = content.ingredients.isEmpty() && content.instructions.isBlank() && content.steps.isEmpty()
+        return content.takeUnless { leer }
+    }
 
     /** Die Antwortcodes des Dienstes, uebersetzt in etwas, das die App erklaeren kann. */
     fun errorFor(statusCode: Int): PairingError = when (statusCode) {
@@ -195,6 +259,7 @@ internal object PairingApi {
             prepTimeMinutes = int("zubereitungszeit"),
             key = string("schluessel").orEmpty(),
             isMine = bool("vonMir"),
+            hasContent = bool("inhalt"),
         )
     }
 
@@ -224,6 +289,13 @@ internal object PairingApi {
     private fun JsonObject.int(name: String): Int? = this[name].primitive()?.content?.toIntOrNull()
 
     private fun JsonObject.long(name: String): Long? = this[name].primitive()?.content?.toLongOrNull()
+
+    private fun JsonObject.double(name: String): Double? =
+        this[name]
+            .primitive()
+            ?.content
+            ?.toDoubleOrNull()
+            ?.takeIf { it.isFinite() && it > 0 }
 
     private fun JsonObject.bool(name: String): Boolean = this[name].primitive()?.content == "true"
 

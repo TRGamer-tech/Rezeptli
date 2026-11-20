@@ -47,6 +47,9 @@ interface RecipeRepository {
     /** Nimmt ein gespeichertes Rezept in die Sammlung auf oder heraus. */
     suspend fun setInCollection(id: Long, inCollection: Boolean)
 
+    /** Haelt fest, fuer wie viele ein Rezept gedacht ist - wenn es das selbst nicht sagt. */
+    suspend fun setServings(id: Long, servings: Int)
+
     suspend fun deleteRecipe(id: Long)
 
     /** Entfernt Rezepte, die nur fuer den Plan geholt wurden und dort nicht mehr stehen. */

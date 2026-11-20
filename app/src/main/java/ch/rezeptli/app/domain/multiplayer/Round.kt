@@ -8,7 +8,9 @@ import ch.rezeptli.app.domain.plan.DietaryFilter
  * Eine Karte der gemeinsamen Runde, wie beide sie sehen.
  *
  * Bewusst wenig: Geteilt wird nur, was zum Entscheiden noetig ist - Titel, Bild und Zeit.
- * Zutaten und Zubereitung bleiben auf dem Geraet.
+ * Zutaten und Zubereitung bleiben auf dem Geraet - mit einer Ausnahme: Wird ein selbst
+ * erfasstes Rezept zum gemeinsamen Treffer, hinterlegt sein Geraet den Inhalt beim Dienst,
+ * damit die andere Person es uebernehmen kann (siehe [SharedContent]).
  *
  * [recipeId] vergibt der Dienst und gilt nur in dieser Runde: Die Rezeptnummern der beiden
  * Telefone beginnen beide bei 1 und sagen einander nichts. Wiedererkannt wird ein Rezept
@@ -23,6 +25,35 @@ data class SharedRecipe(
     val key: String = "",
     /** Hat dieses Geraet die Karte beigesteuert? */
     val isMine: Boolean = false,
+    /** Nur bei Treffern: Liegt der Inhalt eines selbst erfassten Rezepts beim Dienst bereit? */
+    val hasContent: Boolean = false,
+) {
+    /** Selbst erfasst: Es gibt keine Adresse, von der sich das Rezept holen liesse. */
+    val isHandwritten: Boolean get() = sourceUrl == null
+}
+
+/**
+ * Zutaten und Zubereitung eines selbst erfassten Rezepts - fuer die Uebergabe an die andere
+ * Person, wenn es ein gemeinsamer Treffer geworden ist.
+ *
+ * Ohne Foto: Das liegt als Datei auf einem Telefon und waere fuer den kurzlebigen Dienst
+ * zu gross. Einheiten reisen als Name der Aufzaehlung ("GRAMM"); eine, die die andere App
+ * nicht kennt, faellt beim Lesen weg, die Zutat bleibt.
+ */
+data class SharedContent(
+    val instructions: String = "",
+    val steps: List<String> = emptyList(),
+    val ingredients: List<SharedIngredient> = emptyList(),
+    val servings: Int? = null,
+    val prepTimeMinutes: Int? = null,
+    val tags: List<String> = emptyList(),
+)
+
+data class SharedIngredient(
+    val name: String,
+    val amount: Double? = null,
+    val unit: String? = null,
+    val note: String? = null,
 )
 
 /** Eine Karte, die ein Geraet zum Stapel beisteuert - noch ohne Nummer, die vergibt der Dienst. */
@@ -114,6 +145,12 @@ data class RoundState(
     val othersDone: Boolean = false,
     val matchCount: Int = 0,
     val end: RoundEnd? = null,
+    /**
+     * Wie lange der Dienst noch auf fehlende Beitraege wartet, in Millisekunden ab diesem
+     * Stand - `null`, solange niemand beigetragen hat. Danach beginnt die Runde mit den
+     * Karten, die da sind.
+     */
+    val contributionWaitMs: Long? = null,
     val matches: List<SharedRecipe>? = null,
     val stack: List<SharedRecipe>? = null,
     val votes: List<SharedVote>? = null,

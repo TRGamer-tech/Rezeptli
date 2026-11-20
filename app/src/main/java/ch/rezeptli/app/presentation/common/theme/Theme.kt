@@ -9,6 +9,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import ch.rezeptli.app.domain.settings.ThemeChoice
 
 /**
  * Werte, die Material nicht kennt, die aber im ganzen Design gebraucht werden.
@@ -143,30 +144,41 @@ object RezeptliTheme {
 /**
  * Das Theme der App.
  *
- * Dynamic Color (Material You) bleibt bewusst aus: Die Wisch-Rueckmeldung braucht
- * verlaessliche Gruen- und Rottoene, die sich nicht mit dem Hintergrundbild des
- * Geraets aendern - und die Marktfarben sind das Gesicht der App.
+ * [theme] ist die Wahl aus den Vorlieben: wie das Geraet (die Vorgabe), hell, dunkel oder
+ * Material You. Mit Material You kommen die Farben aus dem Hintergrundbild; die
+ * Wisch-Rueckmeldung behaelt trotzdem ihre verlaesslichen Gruen- und Rottoene, siehe
+ * [fittedTo]. Auf Geraeten ohne Material You sieht diese Wahl aus wie "wie das Geraet".
  *
  * [reduceMotion] kommt aus den App-Einstellungen. Die Android-Einstellung "Animationen
  * entfernen" gilt immer, auch wenn die App-Einstellung aus ist.
  */
 @Composable
 fun RezeptliTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    theme: ThemeChoice = ThemeChoice.SYSTEM,
     reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val darkTheme = when (theme) {
+        ThemeChoice.HELL -> false
+        ThemeChoice.DUNKEL -> true
+        ThemeChoice.SYSTEM, ThemeChoice.MATERIAL_YOU -> isSystemInDarkTheme()
+    }
+    val dynamic = if (theme == ThemeChoice.MATERIAL_YOU) materialYouScheme(darkTheme) else null
+    val accents = (if (darkTheme) DarkAccents else LightAccents).let { own ->
+        dynamic?.let { own.fittedTo(it, darkTheme) } ?: own
+    }
+
     val systemReduced = rememberSystemReducedMotion()
     val motion = if (reduceMotion || systemReduced) MotionScheme.Reduced else MotionScheme.Full
 
     CompositionLocalProvider(
-        LocalAccentColors provides if (darkTheme) DarkAccents else LightAccents,
+        LocalAccentColors provides accents,
         LocalTagPalette provides if (darkTheme) DarkTags else LightTags,
         LocalIsDark provides darkTheme,
         LocalMotion provides motion,
     ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
+            colorScheme = dynamic ?: if (darkTheme) DarkColors else LightColors,
             typography = RezeptliTypography,
             shapes = RezeptliShapes,
             content = content,

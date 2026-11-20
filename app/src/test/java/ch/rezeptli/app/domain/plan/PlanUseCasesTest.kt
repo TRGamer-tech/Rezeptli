@@ -27,6 +27,7 @@ import ch.rezeptli.app.domain.usecase.DeleteRecipeUseCase
 import ch.rezeptli.app.domain.usecase.KeepRecipeUseCase
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.MarkRecipeCookedUseCase
+import ch.rezeptli.app.domain.usecase.RememberServingsUseCase
 import ch.rezeptli.app.fake.FakePlanMemory
 import ch.rezeptli.app.fake.FakePlanRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
@@ -149,7 +150,7 @@ class PlanUseCasesTest {
     private fun planer(profile: FakeUserProfileRepository = profil()): Planer {
         val quelle = source(profile)
         return Planer(
-            bauen = GeneratePlanUseCase(profile, quelle, generator, persister, memory),
+            bauen = GeneratePlanUseCase(profile, planRepository, recipes, quelle, generator, persister, memory),
             ersetzen = ReplaceMealUseCase(
                 profile,
                 planRepository,
@@ -324,7 +325,7 @@ class PlanUseCasesTest {
     fun `was im Kochmodus fertig gekocht wurde, ist im Plan abgehakt - und laesst sich zuruecknehmen`() = runTest {
         planer().bauen()
         val mahlzeit = planRepository.currentPlan().first()
-        val vermerken = MarkRecipeCookedUseCase(recipes, planRepository)
+        val vermerken = MarkRecipeCookedUseCase(recipes, planRepository, memory)
 
         vermerken(mahlzeit.recipeId, cookedAt = 1_700_000_000_000L)
 
@@ -338,15 +339,163 @@ class PlanUseCasesTest {
     }
 
     @Test
+    fun `was gekocht wurde, kommt in den naechsten Plaenen nicht wieder - auch wenn das Rezept weg ist`() = runTest {
+        val tag = 24L * 60 * 60 * 1_000
+        val heute = 20_000 * tag
+        val planer = planer(profil { it.copy(mealSlots = setOf(MealSlot.ABEND)) })
+        planer.bauen(now = heute)
+        // Ein Gericht, das nur fuer den Plan geholt wurde: Es verschwindet mit dem naechsten Plan.
+        val gekocht = planRepository.currentPlan().first { recipes.getRecipe(it.recipeId)?.inCollection == false }
+        val titel = recipes.getRecipe(gekocht.recipeId)!!.title
+        MarkRecipeCookedUseCase(recipes, planRepository, memory)(gekocht.recipeId, cookedAt = heute)
+
+        repeat(6) { runde ->
+            planer.bauen(now = heute + runde * tag)
+
+            assertEquals(5, planRepository.currentPlan().size)
+            assertFalse(titel in titelImPlan(), "Plan ${runde + 2}: ${titelImPlan()}")
+        }
+        // Der Vermerk am Rezept ist mit dem Rezept verschwunden - gemerkt hat es sich der Plan selbst.
+        assertNull(recipes.getRecipe(gekocht.recipeId))
+    }
+
+    @Test
+    fun `gekocht wird unter Adresse und Titel vermerkt - und der Vermerk laesst sich zuruecknehmen`() = runTest {
+        planer().bauen()
+        val mahlzeit = planRepository.currentPlan().first { recipes.getRecipe(it.recipeId)?.sourceUrl != null }
+        val rezept = recipes.getRecipe(mahlzeit.recipeId)!!
+        val vermerken = MarkRecipeCookedUseCase(recipes, planRepository, memory)
+
+        vermerken(mahlzeit.recipeId, cookedAt = 1_700_000_000_000L)
+
+        assertEquals(
+            mapOf(rezept.sourceUrl to 1_700_000_000_000L, rezept.title.lowercase() to 1_700_000_000_000L),
+            memory.cooked(),
+        )
+
+        vermerken(mahlzeit.recipeId, cookedAt = null)
+
+        assertTrue(memory.cooked().isEmpty())
+    }
+
+    @Test
+    fun `ein neu gebauter Plan bringt andere Gerichte als der alte`() = runTest {
+        val planer = planer(profil { it.copy(mealSlots = setOf(MealSlot.ABEND)) })
+        planer.bauen()
+        val vorher = titelImPlan()
+
+        planer.bauen()
+
+        // Fuenf Abendessen aus achtzehn Gerichten: Es gibt genug, um nichts zu wiederholen.
+        assertEquals(5, titelImPlan().size)
+        assertTrue(titelImPlan().none { it in vorher }, "Vorher $vorher, jetzt ${titelImPlan()}")
+    }
+
+    @Test
+    fun `ein neuer Plan vergisst Verworfenes, aber nicht, was gekocht wurde`() = runTest {
+        val planer = planer()
+        planer.bauen()
+        planer.ersetzen(Weekday.MONTAG, MealSlot.ABEND)
+        val mahlzeit = planRepository.currentPlan().first()
+        MarkRecipeCookedUseCase(recipes, planRepository, memory)(mahlzeit.recipeId, cookedAt = 42L)
+
+        planer.bauen()
+
+        assertTrue(memory.rejected().isEmpty())
+        assertTrue(memory.cooked().isNotEmpty())
+    }
+
+    @Test
     fun `der Vermerk gekocht ueberlebt das Tauschen einer anderen Mahlzeit`() = runTest {
         val planer = planer()
         planer.bauen()
         val gekocht = planRepository.currentPlan().first { it.day == Weekday.MONTAG && it.slot == MealSlot.MITTAG }
-        MarkRecipeCookedUseCase(recipes, planRepository)(gekocht.recipeId, cookedAt = 42L)
+        MarkRecipeCookedUseCase(recipes, planRepository, memory)(gekocht.recipeId, cookedAt = 42L)
 
         planer.ersetzen(Weekday.FREITAG, MealSlot.ABEND)
 
         assertEquals(42L, planRepository.currentPlan().first { it.place == gekocht.place }.cookedAt)
+    }
+
+    private fun inDenPlan(profile: FakeUserProfileRepository = profil()) =
+        AddToPlanUseCase(profile, planRepository, recipes, classifier, generator, persister)
+
+    private fun gericht(nummer: Int) = Recipe(
+        title = "Treffer $nummer",
+        instructions = "Kochen.",
+        ingredients = listOf(Ingredient(name = "Kartoffeln", amount = 500.0, unit = IngredientUnit.GRAMM)),
+        servings = 4,
+        sourceUrl = "https://treffer.example/$nummer",
+    )
+
+    @Test
+    fun `neue Gerichte kommen zuerst auf freie Kochtage, dann auf den Rest der Woche`() = runTest {
+        // Fuenf Kochtage, nur abends: Montag bis Freitag sind die Plaetze, die zuerst gefuellt werden.
+        val profil = profil { it.copy(mealSlots = setOf(MealSlot.ABEND)) }
+
+        val ergebnis = inDenPlan(profil)((1..6).map(::gericht))
+
+        assertEquals(PlanAddition(added = 6), ergebnis)
+        val plan = planRepository.currentPlan()
+        assertEquals(Weekday.entries.take(6), plan.map { it.day })
+        assertTrue(plan.all { it.slot == MealSlot.ABEND && it.servings == 2 })
+        // Wie beim Plan selbst: Die Rezepte stehen im Plan, nicht in der Sammlung.
+        assertEquals(1, recipes.visible(RecipeFilter()).size)
+    }
+
+    @Test
+    fun `ist die Woche voll, bleibt draussen, was keinen Platz findet - ersetzt wird nur auf Wunsch`() = runTest {
+        planer(profil { it.copy(cookDays = Weekday.entries.toSet()) }).bauen()
+        val vorher = planRepository.currentPlan()
+        assertEquals(14, vorher.size)
+
+        val ergebnis = inDenPlan()(listOf(gericht(1), gericht(2)))
+
+        assertEquals(0, ergebnis.placed)
+        assertEquals(listOf("Treffer 1", "Treffer 2"), ergebnis.noRoom.map { it.title })
+        assertEquals(vorher.map { it.recipeId }, planRepository.currentPlan().map { it.recipeId })
+    }
+
+    @Test
+    fun `beim Ersetzen weichen zuerst die naechsten Tage - und nie, was schon gekocht ist`() = runTest {
+        planer(profil { it.copy(cookDays = Weekday.entries.toSet()) }).bauen()
+        val mittwochMittag = planRepository.currentPlan().first {
+            it.day == Weekday.MITTWOCH &&
+                it.slot == MealSlot.MITTAG
+        }
+        MarkRecipeCookedUseCase(recipes, planRepository, memory)(mittwochMittag.recipeId, cookedAt = 42L)
+
+        val ergebnis = inDenPlan()(
+            listOf(gericht(1), gericht(2), gericht(3)),
+            mode = PlanAddMode.REPLACE_UNCOOKED,
+            today = Weekday.MITTWOCH,
+        )
+
+        assertEquals(PlanAddition(replaced = 3), ergebnis)
+        val plan = planRepository.currentPlan()
+        assertEquals(14, plan.size)
+        val neu = plan.filter { recipes.getRecipe(it.recipeId)?.title?.startsWith("Treffer") == true }
+        // Heute Mittag ist schon gekocht und bleibt; es weichen heute Abend und der Donnerstag.
+        assertEquals(
+            listOf(
+                PlanPlace(Weekday.MITTWOCH, MealSlot.ABEND),
+                PlanPlace(Weekday.DONNERSTAG, MealSlot.MITTAG),
+                PlanPlace(Weekday.DONNERSTAG, MealSlot.ABEND),
+            ),
+            neu.map { it.place },
+        )
+        assertEquals(42L, plan.first { it.place == mittwochMittag.place }.cookedAt)
+        assertEquals(mittwochMittag.recipeId, plan.first { it.place == mittwochMittag.place }.recipeId)
+    }
+
+    @Test
+    fun `was schon im Plan steht, kommt kein zweites Mal hinein`() = runTest {
+        inDenPlan()(listOf(gericht(1)))
+
+        val ergebnis = inDenPlan()(listOf(gericht(1), gericht(2)))
+
+        assertEquals(PlanAddition(added = 1, alreadyPlanned = 1), ergebnis)
+        assertEquals(2, planRepository.currentPlan().size)
     }
 
     private fun anpassen(profile: FakeUserProfileRepository) =
@@ -396,7 +545,7 @@ class PlanUseCasesTest {
         val profil = profil()
         planer(profil).bauen()
         val gekocht = planRepository.currentPlan().first()
-        MarkRecipeCookedUseCase(recipes, planRepository)(gekocht.recipeId, cookedAt = 42L)
+        MarkRecipeCookedUseCase(recipes, planRepository, memory)(gekocht.recipeId, cookedAt = 42L)
 
         profil.update { it.copy(householdSize = 3) }
         anpassen(profil)()
@@ -440,6 +589,43 @@ class PlanUseCasesTest {
         val hackfleisch = shopping.getItems().first { it.name == "Hackfleisch" }
         assertEquals(400.0, hackfleisch.amount)
         assertEquals(IngredientUnit.GRAMM, hackfleisch.unit)
+    }
+
+    @Test
+    fun `nennt das Rezept keine Portionen, gilt die Annahme aus der Rueckfrage`() = runTest {
+        val ohneAngabe = eigenes.copy(id = 2L, title = "Tante Rosas Eintopf", servings = null)
+        recipes.saveRecipe(ohneAngabe)
+        val aufDieListe = AddRecipesToShoppingListUseCase(recipes, shopping, ShoppingListAggregator())
+
+        // "Das Rezept reicht fuer 8" - fuer zwei braucht es ein Viertel.
+        aufDieListe(listOf(2L), persons = 2, assumedServings = 8)
+
+        assertEquals(200.0, shopping.getItems().first { it.name == "Hackfleisch" }.amount)
+    }
+
+    @Test
+    fun `eine genannte Portionszahl merkt sich das Rezept - danach stimmt die Rechnung von selbst`() = runTest {
+        val ohneAngabe = eigenes.copy(id = 2L, title = "Tante Rosas Eintopf", servings = null)
+        recipes.saveRecipe(ohneAngabe)
+        val aufDieListe = AddRecipesToShoppingListUseCase(recipes, shopping, ShoppingListAggregator())
+
+        RememberServingsUseCase(recipes)(2L, servings = 8)
+        aufDieListe(listOf(2L), persons = 4)
+
+        assertEquals(8, recipes.getRecipe(2L)?.servings)
+        assertEquals(400.0, shopping.getItems().first { it.name == "Hackfleisch" }.amount)
+    }
+
+    @Test
+    fun `zweimal dasselbe Rezept auf die Liste zaehlt die Mengen zusammen`() = runTest {
+        val aufDieListe = AddRecipesToShoppingListUseCase(recipes, shopping, ShoppingListAggregator())
+
+        aufDieListe(listOf(eigenes.id), persons = 4)
+        aufDieListe(listOf(eigenes.id), persons = 2)
+
+        // 800 g fuer vier und 400 g fuer zwei - ein Posten, nicht zwei: 1,2 kg.
+        val hackfleisch = shopping.getItems().filter { it.name == "Hackfleisch" }
+        assertEquals(listOf(1.2 to IngredientUnit.KILOGRAMM), hackfleisch.map { it.amount to it.unit })
     }
 
     @Test

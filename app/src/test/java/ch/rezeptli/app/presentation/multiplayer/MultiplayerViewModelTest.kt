@@ -4,6 +4,7 @@ import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.deck.DeckTitles
 import ch.rezeptli.app.domain.model.Ingredient
+import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.WebRecipe
@@ -14,6 +15,8 @@ import ch.rezeptli.app.domain.multiplayer.RoundKeys
 import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundSource
+import ch.rezeptli.app.domain.multiplayer.SharedContent
+import ch.rezeptli.app.domain.multiplayer.SharedIngredient
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedVote
@@ -22,15 +25,19 @@ import ch.rezeptli.app.domain.plan.AddToPlanUseCase
 import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.plan.MealLabel
 import ch.rezeptli.app.domain.plan.PlanGenerator
 import ch.rezeptli.app.domain.plan.PlanPersister
+import ch.rezeptli.app.domain.plan.PlanWrite
 import ch.rezeptli.app.domain.plan.ReadRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.RecipeClassifier
 import ch.rezeptli.app.domain.profile.Country
 import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.ranking.SourceOrigin
 import ch.rezeptli.app.domain.repository.DeckPool
 import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
@@ -39,9 +46,12 @@ import ch.rezeptli.app.domain.translate.NoTranslation
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.BuildRoundContributionUseCase
 import ch.rezeptli.app.domain.usecase.BuildSwipeDeckUseCase
+import ch.rezeptli.app.domain.usecase.FetchMatchesUseCase
+import ch.rezeptli.app.domain.usecase.KeepMatchesUseCase
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRoundUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
+import ch.rezeptli.app.domain.usecase.ShareOwnMatchesUseCase
 import ch.rezeptli.app.fake.FakeActiveRoundRepository
 import ch.rezeptli.app.fake.FakePairingRepository
 import ch.rezeptli.app.fake.FakePairingRepository.Companion.CODE
@@ -179,6 +189,7 @@ class MultiplayerViewModelTest {
         val readCard = ReadRecipeCardUseCase(web, IngredientTextParser(), RecipeClassifier())
         val checkCard = CheckRecipeCardUseCase(readCard)
         val loadWebRecipe = LoadWebRecipeUseCase(web, IngredientTextParser(), InstructionSplitter(), NoTranslation)
+        val saveRecipe = SaveRecipeUseCase(recipes, InstructionSplitter())
         val generator = PlanGenerator(ShoppingListAggregator())
         return MultiplayerViewModel(
             pairing = pairing,
@@ -202,14 +213,14 @@ class MultiplayerViewModelTest {
             profileRepository = profileRepository,
             recipeRepository = recipes,
             readCard = readCard,
-            loadWebRecipe = loadWebRecipe,
-            saveRecipe = SaveRecipeUseCase(recipes, InstructionSplitter()),
+            fetchMatches = FetchMatchesUseCase(pairing, recipes, loadWebRecipe),
+            keepMatches = KeepMatchesUseCase(recipes, saveRecipe),
+            shareOwnMatches = ShareOwnMatchesUseCase(pairing, recipes),
             addToShoppingList = AddRecipesToShoppingListUseCase(recipes, shoppingRepository, ShoppingListAggregator()),
             addToPlan = AddToPlanUseCase(
                 profileRepository = profileRepository,
                 planRepository = planRepository,
                 recipeRepository = recipes,
-                loadWebRecipe = loadWebRecipe,
                 classifier = RecipeClassifier(),
                 generator = generator,
                 persister = PlanPersister(recipes, shoppingRepository, planRepository),
@@ -990,22 +1001,158 @@ class MultiplayerViewModelTest {
         assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
     }
 
+    private val eintopfInhalt = SharedContent(
+        instructions = "Alles in den Topf, eine Stunde köcheln.",
+        steps = listOf("Gemüse schneiden.", "Eine Stunde köcheln."),
+        ingredients = listOf(
+            SharedIngredient(name = "Kartoffeln", amount = 500.0, unit = "GRAMM"),
+            SharedIngredient(name = "Lauch", amount = 2.0),
+            SharedIngredient(name = "Salz"),
+        ),
+        servings = 4,
+        prepTimeMinutes = 70,
+    )
+
+    /** Laesst die Wartezeit zwischen zwei Ladeversuchen vergehen. */
+    private fun TestScope.ladenAbwarten() {
+        advanceTimeBy(RETRY_MS)
+        runCurrent()
+    }
+
     @Test
-    fun `Treffer uebernehmen - das eigene bleibt, das fremde wird geholt, das nicht Holbare wird genannt`() = runTest {
+    fun `Treffer behalten - das eigene bleibt, das fremde wird geholt, die Einkaufsliste bleibt leer`() = runTest {
         mitViewModel { viewModel ->
             dreiTreffer(viewModel)
+            pairing.partnerShares(
+                viewModel.state.matches
+                    .first { it.title == "Beats Eintopf" }
+                    .recipeId,
+                eintopfInhalt,
+            )
 
             viewModel.onKeepMatches()
+            runCurrent()
 
-            assertEquals(2, viewModel.state.keptRecipes)
-            assertEquals(1, viewModel.state.notImportable)
-            assertFalse(viewModel.state.isKeeping)
+            val stand = viewModel.state.import
+            assertEquals(3, stand.kept.size)
+            assertFalse(stand.isBusy)
+            assertFalse(stand.hasProblems)
             // Das Risotto der anderen Person liegt jetzt in der eigenen Sammlung ...
             assertTrue(sammlung.visible(RecipeFilter()).any { it.title == "Risotto" })
             // ... die Rösti nicht doppelt ...
             assertEquals(1, sammlung.visible(RecipeFilter()).count { it.title == "Rösti" })
-            // ... und die Zutaten beider stehen auf der Einkaufsliste.
-            assertTrue((viewModel.state.addedItems ?: 0) >= 4)
+            // ... und auf der Einkaufsliste steht nichts: Behalten heisst nicht einkaufen.
+            assertTrue(shoppingRepository.getItems().isEmpty())
+            assertNull(stand.listItems)
+        }
+    }
+
+    @Test
+    fun `ein selbst erfasstes Rezept der anderen Person kommt mit Zutaten und Schritten an`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            val karte = viewModel.state.matches.first { it.title == "Beats Eintopf" }
+
+            // Ihr Telefon hat den Inhalt noch nicht geschickt: Das ist kein Fehler, nur zu frueh.
+            viewModel.onKeepMatches()
+            runCurrent()
+            assertEquals(2, viewModel.state.import.kept.size)
+            assertEquals(1, viewModel.state.import.notYetShared)
+            assertEquals(0, viewModel.state.import.notLoaded)
+            assertEquals(MatchAction.KEEP, viewModel.state.import.retry)
+
+            pairing.partnerShares(karte.recipeId, eintopfInhalt)
+            viewModel.onRetryImport()
+            runCurrent()
+
+            assertEquals(3, viewModel.state.import.kept.size)
+            assertFalse(viewModel.state.import.hasProblems)
+            val eintopf = sammlung.getRecipe(
+                viewModel.state.import.kept
+                    .getValue(karte.recipeId),
+            )!!
+            assertEquals("Beats Eintopf", eintopf.title)
+            assertEquals(listOf("Kartoffeln", "Lauch", "Salz"), eintopf.ingredients.map { it.name })
+            assertEquals(500.0, eintopf.ingredients.first().amount)
+            assertEquals(IngredientUnit.GRAMM, eintopf.ingredients.first().unit)
+            assertEquals(2, eintopf.steps.size)
+            assertEquals(4, eintopf.servings)
+            assertNull(eintopf.sourceUrl)
+        }
+    }
+
+    @Test
+    fun `das eigene selbst erfasste Rezept wird beim Treffer von selbst hinterlegt - und nur dieses`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 1)
+            val gratinKarte = viewModel.kennung("Omas Gratin")
+
+            // Solange gewischt wird, verlaesst kein Rezeptinhalt das Geraet.
+            viewModel.onSwiped(gratinKarte, liked = true)
+            viewModel.onSwiped(viewModel.kennung("Lachs mit Reis"), liked = true)
+            assertTrue(pairing.sharedContents.isEmpty())
+
+            pairing.partnerVotes(gratinKarte, liked = true)
+            nachfragen()
+
+            assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
+            assertEquals(setOf(gratinKarte), pairing.sharedContents.keys)
+            val inhalt = pairing.sharedContents.getValue(gratinKarte)
+            assertEquals(listOf("Kartoffeln", "Rahm"), inhalt.ingredients.map { it.name })
+            assertEquals("In der Pfanne anbraten.", inhalt.instructions)
+        }
+    }
+
+    @Test
+    fun `scheitert das Hinterlegen am Netz, wird es nachgeholt - auch wenn die Runde schon zu Ende ist`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 1)
+            val gratinKarte = viewModel.kennung("Omas Gratin")
+            pairing.failNextContentCalls = 2
+
+            viewModel.onSwiped(gratinKarte, liked = true)
+            pairing.partnerVotes(gratinKarte, liked = true)
+            nachfragen()
+            assertTrue(pairing.sharedContents.isEmpty())
+
+            advanceTimeBy(SHARE_WAIT_MS)
+            runCurrent()
+
+            assertEquals(setOf(gratinKarte), pairing.sharedContents.keys)
+        }
+    }
+
+    @Test
+    fun `antwortet eine Rezeptseite nicht, sagt die App es - und erneut versuchen holt genau das nach`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            pairing.partnerShares(
+                viewModel.state.matches
+                    .first { it.title == "Beats Eintopf" }
+                    .recipeId,
+                eintopfInhalt,
+            )
+            web.unreachable = setOf(risottoUrl)
+
+            viewModel.onKeepMatches()
+            ladenAbwarten()
+
+            // Zwei Anlaeufe, bevor die App aufgibt - ein einzelner Aussetzer soll nicht auffallen.
+            assertEquals(2, web.loadCalls.count { it == risottoUrl })
+            assertEquals(2, viewModel.state.import.kept.size)
+            assertEquals(1, viewModel.state.import.notLoaded)
+            assertEquals(MatchAction.KEEP, viewModel.state.import.retry)
+
+            web.unreachable = emptySet()
+            viewModel.onRetryImport()
+            runCurrent()
+
+            assertEquals(3, viewModel.state.import.kept.size)
+            assertFalse(viewModel.state.import.hasProblems)
+            assertNull(viewModel.state.import.retry)
+            // Geholt wurde beim zweiten Mal nur, was gefehlt hat.
+            assertEquals(3, web.loadCalls.count { it == risottoUrl })
+            assertEquals(1, sammlung.visible(RecipeFilter()).count { it.title == "Beats Eintopf" })
         }
     }
 
@@ -1015,12 +1162,217 @@ class MultiplayerViewModelTest {
             dreiTreffer(viewModel)
 
             viewModel.onAddToPlan()
+            runCurrent()
 
-            // Rösti (eigene Sammlung) und Risotto (von der Seite geholt) - der Eintopf laesst sich nicht holen.
-            assertEquals(2, viewModel.state.plannedMeals)
+            // Rösti (eigene Sammlung) und Risotto (von der Seite geholt) - der Eintopf ist noch nicht da.
+            val stand = viewModel.state.import
+            assertEquals(PlanSummary(added = 2), stand.plan)
+            assertEquals(1, stand.notYetShared)
+            assertEquals(MatchAction.PLAN, stand.retry)
             val geplant = planRepository.currentPlan().map { it.recipeId }
             assertTrue(roesti.id in geplant)
             assertEquals(2, geplant.size)
+            assertFalse(roesti.sourceUrl in web.loadCalls)
+            // Der Plan fuellt die Sammlung nicht: Das Risotto steht nur im Plan.
+            assertFalse(sammlung.visible(RecipeFilter()).any { it.title == "Risotto" })
+        }
+    }
+
+    /** Eine Woche, in der jeder Platz belegt ist - mittags und abends, Montag bis Sonntag. */
+    private suspend fun volleWoche(gekocht: Set<Weekday> = emptySet()) {
+        val fuellung = listOf(lachs, tofu, smoothie)
+        val eintraege = Weekday.entries.flatMapIndexed { tag, wochentag ->
+            MealSlot.entries.mapIndexed { zeit, slot ->
+                PlanWrite(
+                    day = wochentag,
+                    slot = slot,
+                    recipeId = fuellung[(tag * 2 + zeit) % fuellung.size].id,
+                    servings = 2,
+                    cost = 5.0,
+                    label = MealLabel.ALLTAG,
+                    cookedAt = 1L.takeIf { wochentag in gekocht },
+                )
+            }
+        }
+        planRepository.savePlan(eintraege, emptyList())
+    }
+
+    @Test
+    fun `ist die Woche voll, wird gefragt - statt still nichts zu tun`() = runTest {
+        volleWoche()
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+
+            viewModel.onAddToPlan()
+            runCurrent()
+
+            val stand = viewModel.state.import
+            assertEquals(PlanSummary(), stand.plan)
+            assertEquals(2, stand.askToReplace, "Rösti und Risotto warten auf eine Antwort")
+            assertEquals(14, planRepository.currentPlan().size)
+            assertFalse(planRepository.currentPlan().any { it.recipeId == roesti.id })
+        }
+    }
+
+    @Test
+    fun `ersetzen tauscht nur Mahlzeiten, die noch nicht gekocht sind`() = runTest {
+        val schonGekocht = Weekday.entries.toSet() - Weekday.SONNTAG
+        volleWoche(gekocht = schonGekocht)
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            viewModel.onAddToPlan()
+            runCurrent()
+
+            viewModel.onReplaceInPlan()
+            runCurrent()
+
+            val stand = viewModel.state.import
+            assertEquals(PlanSummary(replaced = 2), stand.plan)
+            assertEquals(0, stand.askToReplace)
+            assertEquals(0, stand.noRoom)
+            val plan = planRepository.currentPlan()
+            assertEquals(14, plan.size)
+            // Nur der Sonntag war noch offen - dort stehen jetzt die Treffer.
+            assertEquals(12, plan.count { it.isCooked })
+            assertTrue(plan.filter { it.day == Weekday.SONNTAG }.any { it.recipeId == roesti.id })
+            assertTrue(plan.filter { it.day != Weekday.SONNTAG }.none { it.recipeId == roesti.id })
+        }
+    }
+
+    @Test
+    fun `wer die Woche lassen will, wie sie ist, erfaehrt, was draussen bleibt`() = runTest {
+        volleWoche()
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            viewModel.onAddToPlan()
+            runCurrent()
+
+            viewModel.onKeepPlanAsIs()
+
+            assertEquals(0, viewModel.state.import.askToReplace)
+            assertEquals(2, viewModel.state.import.noRoom)
+            assertFalse(planRepository.currentPlan().any { it.recipeId == roesti.id })
+        }
+    }
+
+    @Test
+    fun `was schon im Plan steht, wird nicht doppelt geplant - und genau das steht dann da`() = runTest {
+        planRepository.savePlan(
+            listOf(PlanWrite(Weekday.MONTAG, MealSlot.ABEND, roesti.id, 2, 5.0, MealLabel.ALLTAG)),
+            emptyList(),
+        )
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+
+            viewModel.onAddToPlan()
+            runCurrent()
+
+            assertEquals(PlanSummary(added = 1, alreadyPlanned = 1), viewModel.state.import.plan)
+            assertEquals(1, planRepository.currentPlan().count { it.recipeId == roesti.id })
+        }
+    }
+
+    @Test
+    fun `Zutaten kommen erst auf Wunsch auf die Einkaufsliste - fuer die genannte Personenzahl`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            viewModel.onKeepMatches()
+            runCurrent()
+            assertTrue(shoppingRepository.getItems().isEmpty())
+
+            viewModel.onListRequest()
+            assertTrue(viewModel.state.import.askPortions)
+            viewModel.onAddToShoppingList(persons = 2)
+            runCurrent()
+
+            assertFalse(viewModel.state.import.askPortions)
+            val liste = shoppingRepository.getItems()
+            assertEquals(liste.size, viewModel.state.import.listItems)
+            // Das Risotto ist fuer vier gedacht: 300 g Reis werden fuer zwei zu 150 g.
+            assertEquals(150.0, liste.first { it.name.contains("Risottoreis") }.amount)
+        }
+    }
+
+    // ------------------------------------------------------------------ das andere Telefon meldet sich nicht
+
+    @Test
+    fun `meldet sich das andere Telefon nicht, laeuft eine Frist - dann geht es allein los`() = runTest {
+        mitViewModel { viewModel ->
+            lobbyAlsGastgeber(viewModel)
+            viewModel.onStart()
+
+            // Die eigenen Karten sind abgegeben; die der anderen Person fehlen.
+            assertEquals(MultiplayerStep.SAMMELN, viewModel.state.step)
+            assertTrue(viewModel.state.hasContributed)
+            assertEquals(60, viewModel.state.waitSeconds)
+
+            advanceTimeBy(10_000)
+            runCurrent()
+            assertTrue(
+                viewModel.state.waitSeconds in 49..51,
+                "Die Frist zaehlt herunter: ${viewModel.state.waitSeconds}",
+            )
+
+            pairing.contributionDeadlinePasses()
+            nachfragen()
+
+            assertEquals(MultiplayerStep.WISCHEN, viewModel.state.step)
+            assertNull(viewModel.state.waitSeconds)
+            assertEquals(
+                listOf("Rösti", "Lachs mit Reis", "Tofu-Geschnetzeltes", "Omas Gratin"),
+                viewModel.offeneTitel(),
+            )
+        }
+    }
+
+    // ------------------------------------------------------------------ neue Karten im Voraus
+
+    @Test
+    fun `neue Karten werden vorbereitet, sobald der halbe Stapel durch ist und das Ziel noch fehlt`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 3)
+            assertEquals(0, web.deckPoolCalls)
+
+            // Sechs Karten: nach der dritten ist die Haelfte durch.
+            viewModel.state.remainingCards
+                .take(2)
+                .forEach { viewModel.onSwiped(it.id, liked = false) }
+            assertEquals(0, web.deckPoolCalls, "noch nicht - es kann ja noch reichen")
+            viewModel.onSwiped(
+                viewModel.state.remainingCards
+                    .first()
+                    .id,
+                liked = false,
+            )
+            runCurrent()
+            assertEquals(1, web.deckPoolCalls)
+
+            pairing.partnerVotesAll { false }
+            viewModel.state.remainingCards.forEach { viewModel.onSwiped(it.id, liked = false) }
+            nachfragen()
+            assertEquals(MultiplayerStep.FRAGE, viewModel.state.step)
+
+            viewModel.onContinue()
+            runCurrent()
+
+            // Was vorbereitet war, geht sofort raus - es wird nicht noch einmal gesucht.
+            assertEquals(1, web.deckPoolCalls)
+            assertTrue(pairing.myContributions.getValue(1).isNotEmpty())
+        }
+    }
+
+    @Test
+    fun `reichen die gespeicherten Rezepte, wird nichts vorbereitet`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 1)
+            val karte = viewModel.kennung("Rösti")
+            pairing.partnerVotes(karte, liked = true)
+
+            viewModel.onSwiped(karte, liked = true)
+            nachfragen()
+
+            assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
+            assertEquals(0, web.deckPoolCalls)
         }
     }
 
@@ -1056,5 +1408,11 @@ class MultiplayerViewModelTest {
     private companion object {
         /** Etwas mehr als der Abstand, in dem die App beim Dienst nachfragt. */
         const val POLL_MS = 2_600L
+
+        /** Etwas mehr als die Pause zwischen zwei Versuchen, eine Rezeptseite zu laden. */
+        const val RETRY_MS = 1_300L
+
+        /** Genug fuer alle Anlaeufe, den Inhalt eigener Treffer zu hinterlegen. */
+        const val SHARE_WAIT_MS = 20_000L
     }
 }

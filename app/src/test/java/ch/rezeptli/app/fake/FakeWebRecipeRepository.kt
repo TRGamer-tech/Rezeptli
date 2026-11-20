@@ -60,8 +60,16 @@ class FakeWebRecipeRepository(
         warmedUpSources = sourceIds
     }
 
+    /** Adressen, die gerade nicht antworten - so, als waere das Netz weg oder die Seite gestoert. */
+    var unreachable: Set<String> = emptySet()
+
+    /** Jede Adresse, die geladen werden sollte - auch die, bei denen es nicht klappte. */
+    val loadCalls: MutableList<String> = mutableListOf()
+
     override suspend fun loadRecipe(url: String): WebRecipeResult {
+        loadCalls += url
         error?.let { return WebRecipeResult.Failed(it) }
+        if (url in unreachable) return WebRecipeResult.Failed(WebImportError.NO_CONNECTION)
         val recipe = recipeByUrl[url] ?: return WebRecipeResult.Failed(WebImportError.NO_RECIPE_FOUND)
         return WebRecipeResult.Loaded(recipe)
     }

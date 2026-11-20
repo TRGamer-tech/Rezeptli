@@ -138,7 +138,10 @@ class BuildRoundContributionUseCase @Inject constructor(
      * Stapel als zwei Leute, die auf einen Ladebalken schauen.
      */
     private suspend fun fresh(rules: CardRules, missing: Int): List<RoundOffer> {
-        val wanted = CuratedDeckBuilder.deckSizeFor(missing.coerceAtLeast(1))
+        // Beide Geraete steuern bei - jedes also die Haelfte dessen, was der Stapel braucht.
+        // Vorher brachte jedes den ganzen Stapel mit: doppelt so viele Seiten zu pruefen,
+        // doppelt so lange zu warten, und am Ende doppelt so viele Karten wie noetig.
+        val wanted = ((CuratedDeckBuilder.deckSizeFor(missing.coerceAtLeast(1)) + 1) / 2).coerceAtLeast(MIN_FRESH)
         val drawn = buildDeck(
             size = wanted * if (rules.needsPage) DRAW_FACTOR_CHECKED else DRAW_FACTOR,
             exclude = recipeRepository.savedSourceUrls(),
@@ -231,8 +234,14 @@ class BuildRoundContributionUseCase @Inject constructor(
         /** Mit Pruefung faellt zusaetzlich heraus, was nicht passt oder sich nicht laden laesst. */
         const val DRAW_FACTOR_CHECKED = 4
 
-        const val CHECK_BATCH = 6
-        const val PAGE_TIMEOUT_MS = 10_000L
-        const val CHECK_BUDGET_MS = 30_000L
+        /** Weniger als das lohnt den Stapel nicht - auch wenn nur noch ein Gericht fehlt. */
+        const val MIN_FRESH = 8
+
+        /** So viele Rezeptseiten werden gleichzeitig geprueft. Sie liegen bei verschiedenen Anbietern. */
+        const val CHECK_BATCH = 10
+
+        /** Eine Seite, die so lange nicht antwortet, haelt nur auf - die naechste Karte ist schneller. */
+        const val PAGE_TIMEOUT_MS = 7_000L
+        const val CHECK_BUDGET_MS = 20_000L
     }
 }

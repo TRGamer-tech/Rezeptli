@@ -16,6 +16,7 @@ import ch.rezeptli.app.domain.profile.StoreChain
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.settings.AppearanceRepository
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
 import ch.rezeptli.app.fake.FakePlanRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
@@ -49,6 +50,12 @@ class PreferencesViewModelTest {
 
         override suspend fun setReduceMotion(reduce: Boolean) {
             reduceMotion.value = reduce
+        }
+
+        override val theme = MutableStateFlow(ThemeChoice.SYSTEM)
+
+        override suspend fun setTheme(choice: ThemeChoice) {
+            theme.value = choice
         }
     }
 
@@ -174,13 +181,22 @@ class PreferencesViewModelTest {
     }
 
     @Test
-    fun `Bewegung reduzieren gehoert nicht zu den Vorlieben und uebersteht das Zuruecksetzen`() = runTest {
+    fun `Bewegung und Design gehoeren nicht zu den Vorlieben und ueberstehen das Zuruecksetzen`() = runTest {
         val viewModel = createViewModel()
 
         viewModel.onReduceMotionChange(true)
+        viewModel.onThemeSelect(ThemeChoice.DUNKEL)
         viewModel.onResetConfirm()
         advanceUntilIdle()
 
         assertTrue(appearance.reduceMotion.value)
+        assertEquals(ThemeChoice.DUNKEL, appearance.theme.value)
+    }
+
+    @Test
+    fun `ein unbekannter gespeicherter Wert faellt auf das Design des Geraets zurueck`() {
+        assertEquals(ThemeChoice.SYSTEM, ThemeChoice.fromName(null))
+        assertEquals(ThemeChoice.SYSTEM, ThemeChoice.fromName("LILA"))
+        assertEquals(ThemeChoice.MATERIAL_YOU, ThemeChoice.fromName("MATERIAL_YOU"))
     }
 }

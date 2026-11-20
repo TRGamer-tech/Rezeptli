@@ -12,6 +12,8 @@ import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.RoundState
+import ch.rezeptli.app.domain.multiplayer.SharedContent
+import ch.rezeptli.app.domain.multiplayer.SharedIngredient
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
@@ -239,6 +241,117 @@ class PairingLiveTest {
                     ).wert("Fortsetzen")
                 assertEquals(3, zurueckgekehrt.stack?.size)
                 assertEquals(listOf(SharedVote(karte, false)), zurueckgekehrt.votes)
+            } finally {
+                repository.closeRound(code)
+            }
+        }
+    }
+
+    @Test
+    fun nachDemErstenBeitragLaeuftEineFrist(): Unit = runBlocking {
+        withTimeout(TEST_TIMEOUT_MS) {
+            val gast = "test-gast-" + System.nanoTime()
+            val lobby = repository.createRound(DietaryFilter()).wert("Eröffnen")
+            val code = lobby.code
+            try {
+                sende("$basis/sitzung/$code/beitreten", JSONObject().put("teilnehmer", gast))
+                repository.configureRound(code, 2, CourseChoice.ESSEN, RoundSource.GESPEICHERT).wert("Einstellen")
+                val gestartet = repository.startRound(code).wert("Starten")
+                // Solange niemand etwas geschickt hat, laeuft keine Frist: Beide suchen noch.
+                assertNull(gestartet.contributionWaitMs)
+
+                // Ab dem ersten Beitrag hat das andere Telefon eine Minute - danach geht es ohne es weiter.
+                val wartend = repository.contribute(code, round = 0, offers = listOf(roesti)).wert("Eigener Beitrag")
+                val rest = wartend.contributionWaitMs
+                assertTrue("Die Frist sollte laufen: $rest", rest != null && rest in 1L..60_000L)
+
+                beitragen(code, gast, runde = 0, karten = listOf(risotto))
+                val stapel = repository.roundState(code, revision = null, knownRound = NO_ROUND).wert("Stapel")!!
+                assertEquals(RoundPhase.LAEUFT, stapel.phase)
+                assertNull("Steht der Stapel, wartet niemand mehr", stapel.contributionWaitMs)
+            } finally {
+                repository.closeRound(code)
+            }
+        }
+    }
+
+    @Test
+    fun einSelbstErfassterTrefferKommtMitSeinemInhaltBeimAnderenAn(): Unit = runBlocking {
+        withTimeout(TEST_TIMEOUT_MS) {
+            val gast = "test-gast-" + System.nanoTime()
+            val lobby = repository.createRound(DietaryFilter()).wert("Eröffnen")
+            val code = lobby.code
+            try {
+                sende("$basis/sitzung/$code/beitreten", JSONObject().put("teilnehmer", gast))
+                repository.configureRound(code, 2, CourseChoice.ESSEN, RoundSource.GESPEICHERT).wert("Einstellen")
+                repository.startRound(code).wert("Starten")
+
+                // Beide bringen ein selbst erfasstes Rezept mit - ohne Adresse, nur mit Titel.
+                val meines = RoundOffer(key = "e:app:1", title = "Omas Hackbraten")
+                val ihres = RoundOffer(key = "e:gast:1", title = "Beats Eintopf")
+                repository.contribute(code, round = 0, offers = listOf(meines)).wert("Eigener Beitrag")
+                beitragen(code, gast, runde = 0, karten = listOf(ihres))
+                val stapel = repository
+                    .roundState(code, revision = null, knownRound = NO_ROUND)
+                    .wert("Stapel")!!
+                    .stack!!
+                val hackbraten = stapel.first { it.title == "Omas Hackbraten" }.recipeId
+                val eintopf = stapel.first { it.title == "Beats Eintopf" }.recipeId
+
+                val inhalt = SharedContent(
+                    instructions = "Mischen, formen, backen.",
+                    steps = listOf("Mischen und formen.", "Eine Stunde backen."),
+                    ingredients = listOf(
+                        SharedIngredient("Hackfleisch", amount = 800.0, unit = "GRAMM"),
+                        SharedIngredient("Salz"),
+                    ),
+                    servings = 4,
+                    prepTimeMinutes = 75,
+                )
+
+                // Solange gewischt wird, nimmt der Dienst keinen Rezeptinhalt an.
+                val zuFrueh = repository.shareContent(code, hackbraten, inhalt)
+                assertTrue("Vor dem Treffer darf nichts hinterlegt werden: $zuFrueh", zuFrueh is PairingResult.Failure)
+
+                stimmen(code, gast, stapel.map { it.recipeId to true })
+                val alleJa = stapel.map { SharedVote(it.recipeId, true) }
+                val ende = repository.sendVotes(code, alleJa, knownRound = 0).wert("Stimmen")
+                assertEquals(RoundPhase.BEENDET, ende.phase)
+                assertEquals(2, ende.matches?.size)
+                assertTrue(ende.matches!!.none { it.hasContent })
+
+                // 1. Das eigene Rezept geht an die andere Person.
+                repository.shareContent(code, hackbraten, inhalt).wert("Hinterlegen")
+                val beimGast = hole("$basis/sitzung/$code/inhalt?teilnehmer=$gast&rezept=$hackbraten")
+                    .getJSONObject("inhalt")
+                assertEquals("Mischen, formen, backen.", beimGast.getString("zubereitung"))
+                assertEquals(2, beimGast.getJSONArray("zutaten").length())
+                assertEquals(4, beimGast.getInt("portionen"))
+
+                // 2. Ihres ist noch nicht da - das ist kein Fehler, nur zu frueh.
+                assertNull(repository.fetchContent(code, eintopf).wert("Noch nicht da"))
+
+                // 3. Sobald ihr Telefon es hinterlegt hat, kommt es hier vollstaendig an.
+                sende(
+                    "$basis/sitzung/$code/inhalt",
+                    JSONObject()
+                        .put("teilnehmer", gast)
+                        .put("rezeptId", eintopf)
+                        .put(
+                            "inhalt",
+                            JSONObject()
+                                .put("zubereitung", "Eine Stunde köcheln.")
+                                .put("zutaten", JSONArray().put(JSONObject().put("name", "Lauch").put("menge", 2)))
+                                .put("portionen", 4),
+                        ),
+                )
+                val geholt = repository.fetchContent(code, eintopf).wert("Holen")!!
+                assertEquals("Eine Stunde köcheln.", geholt.instructions)
+                assertEquals(listOf(SharedIngredient("Lauch", amount = 2.0)), geholt.ingredients)
+                assertEquals(4, geholt.servings)
+
+                val amEnde = repository.roundState(code, revision = null, knownRound = 0).wert("Stand")!!
+                assertTrue("Beide Treffer haben jetzt ihren Inhalt", amEnde.matches!!.all { it.hasContent })
             } finally {
                 repository.closeRound(code)
             }

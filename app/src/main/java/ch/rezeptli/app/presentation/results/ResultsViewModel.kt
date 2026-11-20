@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.ObserveSwipeMatchesUseCase
 import ch.rezeptli.app.presentation.navigation.Destinations
@@ -23,6 +24,9 @@ data class ResultsUiState(
     val isLoading: Boolean = true,
     val matches: List<RecipeSummary> = emptyList(),
     val isAddingToShoppingList: Boolean = false,
+    /** Fuer so viele wird ueblicherweise gekocht - die Vorgabe in der Frage "fuer wie viele?". */
+    val persons: Int = 2,
+    val isPortionDialogVisible: Boolean = false,
 )
 
 sealed interface ResultsEvent {
@@ -41,6 +45,7 @@ class ResultsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     observeSwipeMatches: ObserveSwipeMatchesUseCase,
     private val addRecipesToShoppingList: AddRecipesToShoppingListUseCase,
+    profileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val sessionId: Long = savedStateHandle.get<Long>(Destinations.ARG_SESSION_ID) ?: 0L
 
@@ -54,14 +59,27 @@ class ResultsViewModel @Inject constructor(
         observeSwipeMatches(sessionId)
             .onEach { matches -> _uiState.update { it.copy(matches = matches, isLoading = false) } }
             .launchIn(viewModelScope)
+        profileRepository.profile
+            .onEach { profile -> _uiState.update { it.copy(persons = profile.persons) } }
+            .launchIn(viewModelScope)
     }
 
-    /** Uebernimmt die Zutaten aller Treffer in die Einkaufsliste. */
-    fun onAddToShoppingList() {
+    /** Vor dem Uebernehmen steht die Frage, fuer wie viele eingekauft wird. */
+    fun onAddToShoppingListRequest() {
+        if (_uiState.value.isAddingToShoppingList) return
+        _uiState.update { it.copy(isPortionDialogVisible = true) }
+    }
+
+    fun onAddToShoppingListDismiss() {
+        _uiState.update { it.copy(isPortionDialogVisible = false) }
+    }
+
+    /** Uebernimmt die Zutaten aller Treffer in die Einkaufsliste - umgerechnet auf [persons]. */
+    fun onAddToShoppingList(persons: Int) {
         if (_uiState.value.isAddingToShoppingList) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isAddingToShoppingList = true) }
-            val itemCount = addRecipesToShoppingList(_uiState.value.matches.map { it.id })
+            _uiState.update { it.copy(isAddingToShoppingList = true, isPortionDialogVisible = false) }
+            val itemCount = addRecipesToShoppingList(_uiState.value.matches.map { it.id }, persons = persons)
             _uiState.update { it.copy(isAddingToShoppingList = false) }
             _events.send(ResultsEvent.AddedToShoppingList(itemCount))
         }

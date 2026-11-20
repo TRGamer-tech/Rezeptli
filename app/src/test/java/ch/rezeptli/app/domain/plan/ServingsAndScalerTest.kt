@@ -23,6 +23,21 @@ class ServingsAndScalerTest {
     }
 
     @Test
+    fun `was herauskommt, ist keine Angabe, fuer wie viele es reicht`() {
+        // "1 Blech" fuer vier Personen ergaebe sonst die vierfache Menge.
+        assertNull(ServingsParser.parse("1 Blech"))
+        assertNull(ServingsParser.parse("12 Stück"))
+        assertNull(ServingsParser.parse("ca. 20 Stuecke"))
+        assertNull(ServingsParser.parse("4 Gläser à 250 ml"))
+        assertNull(ServingsParser.parse("1 Springform (26 cm)"))
+        assertNull(ServingsParser.parse("2 Brote"))
+        // Ein Pfannkuchen pro Person ist dagegen eine Portion - "Kuchen" steckt nur im Wort.
+        assertEquals(4, ServingsParser.parse("4 Pfannkuchen-Portionen"))
+        assertEquals(2, ServingsParser.parse("2 Personen"))
+        assertEquals(4, ServingsParser.parse("4 servings"))
+    }
+
+    @Test
     fun `ohne Angabe der Quelle wird von vier Portionen ausgegangen`() {
         assertEquals(0.5, IngredientScaler.factor(target = 2, original = null))
         assertEquals(2.0, IngredientScaler.factor(target = 4, original = 2))

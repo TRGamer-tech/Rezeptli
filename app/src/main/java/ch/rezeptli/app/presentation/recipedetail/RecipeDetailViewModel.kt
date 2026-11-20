@@ -10,6 +10,7 @@ import ch.rezeptli.app.domain.usecase.DeleteRecipeUseCase
 import ch.rezeptli.app.domain.usecase.KeepRecipeUseCase
 import ch.rezeptli.app.domain.usecase.MarkRecipeCookedUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRecipeUseCase
+import ch.rezeptli.app.domain.usecase.RememberServingsUseCase
 import ch.rezeptli.app.presentation.navigation.Destinations
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -32,6 +33,8 @@ data class RecipeDetailUiState(
     val persons: Int = 2,
     /** Laeuft gerade das Uebernehmen der Zutaten auf die Einkaufsliste? */
     val isAddingToList: Boolean = false,
+    /** Die Frage "fuer wie viele?" steht gerade offen. */
+    val isPortionDialogVisible: Boolean = false,
 )
 
 /** Einmalige Ereignisse, die die UI ausloest - Navigation und kurze Rueckmeldungen. */
@@ -45,7 +48,7 @@ sealed interface RecipeDetailEvent {
     /** Das Rezept gehoert jetzt zur Sammlung. */
     data object Kept : RecipeDetailEvent
 
-    /** Die Zutaten stehen auf der Einkaufsliste - [openItems] Posten sind dort noch offen. */
+    /** Die Zutaten stehen auf der Einkaufsliste - umgerechnet auf [persons]. */
     data class AddedToShoppingList(val persons: Int) : RecipeDetailEvent
 }
 
@@ -57,6 +60,7 @@ class RecipeDetailViewModel @Inject constructor(
     private val markRecipeCooked: MarkRecipeCookedUseCase,
     private val keepRecipe: KeepRecipeUseCase,
     private val addToShoppingList: AddRecipesToShoppingListUseCase,
+    private val rememberServings: RememberServingsUseCase,
     profileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val recipeId: Long = savedStateHandle.get<Long>(Destinations.ARG_RECIPE_ID) ?: 0L
@@ -124,15 +128,27 @@ class RecipeDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Legt die Zutaten auf die Einkaufsliste der App - umgerechnet auf den eigenen Haushalt,
-     * wenn das Rezept sagt, fuer wie viele es gedacht ist.
-     */
-    fun onAddToShoppingList() {
+    /** Vor dem Uebernehmen steht die Frage, fuer wie viele eingekauft wird. */
+    fun onAddToShoppingListRequest() {
         if (_uiState.value.isAddingToList) return
-        val persons = _uiState.value.persons
-        _uiState.update { it.copy(isAddingToList = true) }
+        _uiState.update { it.copy(isPortionDialogVisible = true) }
+    }
+
+    fun onAddToShoppingListDismiss() {
+        _uiState.update { it.copy(isPortionDialogVisible = false) }
+    }
+
+    /**
+     * Legt die Zutaten auf die Einkaufsliste der App - umgerechnet auf [persons].
+     *
+     * [baseServings] ist nur gesetzt, wenn das Rezept selbst nicht sagt, fuer wie viele es
+     * gedacht ist, und die Person es im Dialog angegeben hat. Das merkt sich das Rezept.
+     */
+    fun onAddToShoppingList(persons: Int, baseServings: Int?) {
+        if (_uiState.value.isAddingToList) return
+        _uiState.update { it.copy(isAddingToList = true, isPortionDialogVisible = false) }
         viewModelScope.launch {
+            if (baseServings != null) rememberServings(recipeId, baseServings)
             addToShoppingList(listOf(recipeId), persons = persons)
             _uiState.update { it.copy(isAddingToList = false) }
             _events.send(RecipeDetailEvent.AddedToShoppingList(persons))

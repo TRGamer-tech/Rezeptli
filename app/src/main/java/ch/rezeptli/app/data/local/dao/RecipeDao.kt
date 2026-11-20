@@ -146,6 +146,9 @@ abstract class RecipeDao {
     @Query("UPDATE recipes SET inCollection = :inCollection, updatedAt = :now WHERE id = :id")
     abstract suspend fun setInCollection(id: Long, inCollection: Boolean, now: Long)
 
+    @Query("UPDATE recipes SET servings = :servings, updatedAt = :now WHERE id = :id")
+    abstract suspend fun setServings(id: Long, servings: Int, now: Long)
+
     @Query("DELETE FROM recipes WHERE id = :id")
     abstract suspend fun deleteRecipe(id: Long)
 

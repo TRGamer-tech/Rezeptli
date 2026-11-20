@@ -13,6 +13,7 @@ import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.RoundState
+import ch.rezeptli.app.domain.multiplayer.SharedContent
 import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
@@ -112,6 +113,12 @@ class PairingRepositoryImpl @Inject constructor(
             (revision?.let { "&stand=$it" } ?: "")
         return get(url) { body -> if (PairingApi.isUnchanged(body)) null else PairingApi.stateFrom(body) }
     }
+
+    override suspend fun shareContent(code: String, recipeId: Long, content: SharedContent): PairingResult<Unit> =
+        post("${roundUrl(code)}/inhalt", PairingApi.contentBody(participantId(), recipeId, content)) { }
+
+    override suspend fun fetchContent(code: String, recipeId: Long): PairingResult<SharedContent?> =
+        get("${roundUrl(code)}/inhalt?teilnehmer=${participantId()}&rezept=$recipeId", PairingApi::contentFrom)
 
     private fun roundUrl(code: String): String = "$BASE_URL/sitzung/${code.normalizeCode()}"
 

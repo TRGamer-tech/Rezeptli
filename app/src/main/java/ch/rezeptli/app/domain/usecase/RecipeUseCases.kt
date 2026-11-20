@@ -4,7 +4,9 @@ import androidx.paging.PagingData
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.plan.PlanMemory
 import ch.rezeptli.app.domain.plan.PlanRepository
+import ch.rezeptli.app.domain.plan.RecentlyCooked
 import ch.rezeptli.app.domain.repository.RecipeRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -73,15 +75,33 @@ class KeepRecipeUseCase @Inject constructor(
 }
 
 /**
+ * Haelt fest, fuer wie viele ein Rezept gedacht ist, wenn es das selbst nicht sagt.
+ *
+ * Die Angabe kommt von der Person, die es kocht - sie weiss, ob "ein Blech" bei ihr fuer
+ * vier oder fuer acht reicht. Einmal gesagt, rechnet die App ab da richtig um.
+ */
+class RememberServingsUseCase @Inject constructor(
+    private val repository: RecipeRepository,
+) {
+    suspend operator fun invoke(recipeId: Long, servings: Int) {
+        if (servings > 0) repository.setServings(recipeId, servings)
+    }
+}
+
+/**
  * Haelt fest, dass ein Rezept gekocht wurde - am Rezept selbst und, falls es diese Woche
  * im Plan steht, an der Mahlzeit dort. Mit `null` wird der Vermerk zurueckgenommen.
  */
 class MarkRecipeCookedUseCase @Inject constructor(
     private val repository: RecipeRepository,
     private val planRepository: PlanRepository,
+    private val memory: PlanMemory,
 ) {
     suspend operator fun invoke(recipeId: Long, cookedAt: Long? = System.currentTimeMillis()) {
         repository.markCooked(recipeId, cookedAt)
         planRepository.markCooked(recipeId, cookedAt)
+        // Der Plan merkt es sich fuer sich: Ein Rezept, das nur fuer ihn geholt wurde, ist mit
+        // dem naechsten Plan wieder weg - und mit ihm der Vermerk am Rezept.
+        repository.getRecipe(recipeId)?.let { memory.noteCooked(RecentlyCooked.keysOf(it), cookedAt) }
     }
 }

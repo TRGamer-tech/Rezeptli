@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -67,6 +68,7 @@ import ch.rezeptli.app.presentation.common.components.CookedDialog
 import ch.rezeptli.app.presentation.common.components.CookedLabel
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.PortionDialog
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.components.RemoveRecipeDialog
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
@@ -96,8 +98,8 @@ fun RecipeDetailRoute(
     val cookedMessage = stringResource(R.string.recipe_marked_cooked)
     val clearedMessage = stringResource(R.string.rezept_gekocht_entfernt)
     val keptMessage = stringResource(R.string.rezept_gespeichert)
-    val listMessage = stringResource(R.string.rezept_auf_liste)
     val openList = stringResource(R.string.rezept_liste_oeffnen)
+    val resources = LocalContext.current.resources
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
@@ -107,7 +109,7 @@ fun RecipeDetailRoute(
             RecipeDetailEvent.Kept -> scope.launch { snackbarHostState.showSnackbar(keptMessage) }
             is RecipeDetailEvent.AddedToShoppingList -> scope.launch {
                 val ergebnis = snackbarHostState.showSnackbar(
-                    message = listMessage.format(event.persons),
+                    message = resources.getQuantityString(R.plurals.rezept_auf_liste, event.persons, event.persons),
                     actionLabel = openList,
                     duration = SnackbarDuration.Long,
                 )
@@ -130,8 +132,18 @@ fun RecipeDetailRoute(
         onCookedConfirm = viewModel::onCookedConfirm,
         onCookedClear = viewModel::onCookedClear,
         onKeep = viewModel::onKeep,
-        onAddToShoppingList = viewModel::onAddToShoppingList,
+        onAddToShoppingList = viewModel::onAddToShoppingListRequest,
     )
+
+    val recipe = uiState.recipe
+    if (uiState.isPortionDialogVisible && recipe != null) {
+        PortionDialog(
+            defaultPersons = uiState.persons,
+            recipeServings = recipe.servings,
+            onConfirm = viewModel::onAddToShoppingList,
+            onDismiss = viewModel::onAddToShoppingListDismiss,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
