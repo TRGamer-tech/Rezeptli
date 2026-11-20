@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -30,6 +29,7 @@ import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
+import ch.rezeptli.app.presentation.common.components.RezeptliFilterChip
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 
 /** Kurzer Zwischenschritt vor dem Swipen: was soll auf den Stapel? */
@@ -99,10 +99,10 @@ fun SwipeSetupScreen(
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     uiState.availableTags.forEach { tag ->
-                        FilterChip(
+                        RezeptliFilterChip(
                             selected = tag in uiState.selectedTags,
                             onClick = { onToggleTag(tag) },
-                            label = { Text(tag) },
+                            label = tag,
                         )
                     }
                 }
@@ -114,21 +114,17 @@ fun SwipeSetupScreen(
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SETUP_PREP_TIME_OPTIONS.forEach { minutes ->
-                    FilterChip(
+                    RezeptliFilterChip(
                         selected = uiState.maxPrepTimeMinutes == minutes,
                         onClick = {
                             onMaxPrepTimeChange(
                                 if (uiState.maxPrepTimeMinutes == minutes) null else minutes,
                             )
                         },
-                        label = {
-                            Text(
-                                if (minutes == null) {
-                                    stringResource(R.string.filter_time_any)
-                                } else {
-                                    stringResource(R.string.filter_time_minutes, minutes)
-                                },
-                            )
+                        label = if (minutes == null) {
+                            stringResource(R.string.filter_time_any)
+                        } else {
+                            stringResource(R.string.filter_time_minutes, minutes)
                         },
                     )
                 }

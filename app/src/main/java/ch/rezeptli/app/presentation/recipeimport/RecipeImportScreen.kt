@@ -36,9 +36,11 @@ import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.entrance
 import ch.rezeptli.app.presentation.common.form.RecipeFormActions
 import ch.rezeptli.app.presentation.common.form.RecipeFormState
 import ch.rezeptli.app.presentation.common.form.recipeFormFields
+import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /**
  * Import eines kopierten Rezepttexts in zwei Schritten: einfuegen, dann den erkannten
@@ -292,7 +294,10 @@ private fun InfoCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .entrance()
+            .fillMaxWidth(),
+        shape = Tokens.Radius.LgShape,
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Row(
