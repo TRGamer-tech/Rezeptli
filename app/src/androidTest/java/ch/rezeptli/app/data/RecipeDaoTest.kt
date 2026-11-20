@@ -262,6 +262,16 @@ class RecipeDaoTest {
     }
 
     @Test
+    fun dieMeistbenutztenSchlagworteStehenVorn() = runTest {
+        insertRecipe(title = "Eins", tags = listOf("Suppe", "vegan", "Betty Bossi"))
+        insertRecipe(title = "Zwei", tags = listOf("vegan", "Betty Bossi"))
+        insertRecipe(title = "Drei", tags = listOf("Betty Bossi", "asiatisch"))
+
+        // Dreimal, zweimal, je einmal - bei Gleichstand nach dem Alphabet, ohne Ruecksicht auf Grossschreibung.
+        assertEquals(listOf("Betty Bossi", "vegan", "asiatisch", "Suppe"), dao.observeAllTags().first())
+    }
+
+    @Test
     fun wasNurFuerDenPlanGespeichertIstGehoertNichtZurSammlung() = runTest {
         insertRecipe(title = "Meins", tags = listOf("vegetarisch"), sourceUrl = "https://beispiel.ch/meins")
         val planId = insertRecipe(

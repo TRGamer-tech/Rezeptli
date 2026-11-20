@@ -22,6 +22,7 @@ interface RecipeRepository {
 
     fun observeRecipeCount(): Flow<Int>
 
+    /** Die Schlagworte der Sammlung, die meistbenutzten zuerst. */
     fun observeAllTags(): Flow<List<String>>
 
     suspend fun getRecipe(id: Long): Recipe?

@@ -113,12 +113,20 @@ abstract class RecipeDao {
     @Query("SELECT COUNT(*) FROM recipes WHERE inCollection = 1")
     abstract fun observeRecipeCount(): Flow<Int>
 
+    /**
+     * Die Schlagworte der Sammlung - die meistbenutzten zuerst.
+     *
+     * Importierte Rezepte bringen die Stichworte ihrer Seite mit; nach ein paar Dutzend
+     * Rezepten sind das hunderte. Die Reihenfolge nach Haeufigkeit laesst die Oberflaeche
+     * die wenigen zeigen, mit denen sich wirklich eingrenzen laesst, und den Rest einklappen.
+     */
     @Query(
         """
-        SELECT DISTINCT t.tag FROM recipe_tags t
+        SELECT t.tag FROM recipe_tags t
         JOIN recipes r ON r.id = t.recipeId
         WHERE r.inCollection = 1
-        ORDER BY t.tag COLLATE NOCASE ASC
+        GROUP BY t.tag
+        ORDER BY COUNT(*) DESC, t.tag COLLATE NOCASE ASC
         """,
     )
     abstract fun observeAllTags(): Flow<List<String>>

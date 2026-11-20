@@ -55,11 +55,15 @@ class FakeRecipeRepository(
 
     override fun observeAllTags(): Flow<List<String>> =
         recipes.map { current ->
+            // Wie die Datenbank: die meistbenutzten zuerst, bei Gleichstand nach dem Alphabet.
             current
                 .collection()
-                .flatMap { it.tags }
-                .distinct()
-                .sorted()
+                .flatMap { it.tags.distinct() }
+                .groupingBy { it }
+                .eachCount()
+                .entries
+                .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key.lowercase() })
+                .map { it.key }
         }
 
     override suspend fun getRecipe(id: Long): Recipe? = recipes.value[id]
