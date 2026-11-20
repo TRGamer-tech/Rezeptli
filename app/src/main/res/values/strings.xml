@@ -337,4 +337,8 @@
     <!-- Schlagworte im Filter -->
     <string name="tags_alle_anzeigen">Alle %1$d anzeigen</string>
     <string name="tags_weniger_anzeigen">Weniger anzeigen</string>
+    <plurals name="swipe_setup_versteckt">
+        <item quantity="one">%d Rezept passt nicht zu deinen Vorlieben und bleibt draussen.</item>
+        <item quantity="other">%d Rezepte passen nicht zu deinen Vorlieben und bleiben draussen.</item>
+    </plurals>
 </resources>

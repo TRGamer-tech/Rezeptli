@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -142,6 +143,18 @@ fun SwipeSetupScreen(
                     MaterialTheme.colorScheme.error
                 },
             )
+            // Was wegen der Vorlieben fehlt, steht da - sonst waere der kleinere Stapel ein Raetsel.
+            if (uiState.hiddenByPreferences > 0) {
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.swipe_setup_versteckt,
+                        uiState.hiddenByPreferences,
+                        uiState.hiddenByPreferences,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             BouncyButton(
                 onClick = onStart,

@@ -3,8 +3,8 @@ package ch.rezeptli.app.presentation.swipe
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.model.RecipeFilter
-import ch.rezeptli.app.domain.usecase.CountMatchingRecipesUseCase
 import ch.rezeptli.app.domain.usecase.ObserveTagsUseCase
+import ch.rezeptli.app.domain.usecase.SelectSwipeRecipesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +23,8 @@ data class SwipeSetupUiState(
     val selectedTags: Set<String> = emptySet(),
     val maxPrepTimeMinutes: Int? = null,
     val matchingRecipeCount: Int = 0,
+    /** So viele Rezepte bleiben draussen, weil sie nicht zu den Vorlieben passen. */
+    val hiddenByPreferences: Int = 0,
     val isCounting: Boolean = true,
 ) {
     val filter: RecipeFilter
@@ -36,7 +38,7 @@ data class SwipeSetupUiState(
 @HiltViewModel
 class SwipeSetupViewModel @Inject constructor(
     observeTags: ObserveTagsUseCase,
-    countMatchingRecipes: CountMatchingRecipesUseCase,
+    selectRecipes: SelectSwipeRecipesUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SwipeSetupUiState())
     val uiState: StateFlow<SwipeSetupUiState> = _uiState.asStateFlow()
@@ -50,9 +52,15 @@ class SwipeSetupViewModel @Inject constructor(
             .map { it.filter }
             .distinctUntilChanged()
             .onEach { _uiState.update { state -> state.copy(isCounting = true) } }
-            .mapLatest { filter -> countMatchingRecipes(filter) }
-            .onEach { count ->
-                _uiState.update { it.copy(matchingRecipeCount = count, isCounting = false) }
+            .mapLatest { filter -> selectRecipes(filter) }
+            .onEach { selection ->
+                _uiState.update {
+                    it.copy(
+                        matchingRecipeCount = selection.recipeIds.size,
+                        hiddenByPreferences = selection.hiddenByPreferences,
+                        isCounting = false,
+                    )
+                }
             }.launchIn(viewModelScope)
     }
 

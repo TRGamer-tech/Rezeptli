@@ -4,10 +4,14 @@ import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.model.SwipeDecision
 import ch.rezeptli.app.domain.model.SwipeMode
+import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.plan.RecipeClassifier
 import ch.rezeptli.app.domain.repository.RecipeRepository
 import ch.rezeptli.app.domain.repository.SwipeSessionRepository
+import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.swipe.SwipeMatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -17,13 +21,50 @@ data class StartedSwipeSession(
     val recipeIds: List<Long>,
 )
 
+/** Was aus der Sammlung auf den Stapel kommt - und wie viel wegen der Vorlieben draussen bleibt. */
+data class SwipeSelection(
+    val recipeIds: List<Long>,
+    /** So viele Rezepte passen zum Filter, aber nicht zu Ernaehrung, Unvertraeglichkeiten oder Abneigungen. */
+    val hiddenByPreferences: Int = 0,
+)
+
 /**
- * Startet eine Swipe-Session fuer alle Rezepte, die zum Filter passen.
+ * Waehlt aus der eigenen Sammlung, durch welche Rezepte gewischt wird.
+ *
+ * Zum Filter des Bildschirms (Schlagworte, Zeit) kommen die Vorlieben: Wer keine Pilze mag,
+ * bekommt auch aus der eigenen Sammlung kein Pilzgericht vorgelegt. Frueher galten die
+ * Vorlieben hier nicht - gespeicherte Rezepte kamen ungeprueft auf den Stapel, etwa solche,
+ * die jemand aus der Sammlung einer anderen Person uebernommen hatte. Das Versprechen der
+ * Vorlieben ("zeigt Rezeptli beim Wischen nicht") gilt aber fuer jedes Wischen.
+ *
+ * Die Rezepte bleiben in der Sammlung, wie sie sind. Der Bildschirm sagt, wie viele deshalb
+ * fehlen - ein Stapel, der still kleiner ist als die Sammlung, waere ein Raetsel.
+ */
+class SelectSwipeRecipesUseCase @Inject constructor(
+    private val recipeRepository: RecipeRepository,
+    private val profileRepository: UserProfileRepository,
+    private val classifier: RecipeClassifier,
+) {
+    suspend operator fun invoke(filter: RecipeFilter = RecipeFilter.NONE): SwipeSelection {
+        val ids = recipeRepository.getFilteredRecipeIds(filter)
+        val wishes = DietaryFilter.of(profileRepository.profile.first())
+        if (!wishes.isActive) return SwipeSelection(ids)
+
+        val fitting = ids.filter { id ->
+            val recipe = recipeRepository.getRecipe(id) ?: return@filter false
+            wishes.allows(classifier.classify(recipe))
+        }
+        return SwipeSelection(recipeIds = fitting, hiddenByPreferences = ids.size - fitting.size)
+    }
+}
+
+/**
+ * Startet eine Swipe-Session fuer alle Rezepte, die zum Filter und zu den Vorlieben passen.
  *
  * Geladen werden nur die IDs - die Karteninhalte holt der Swipe-Screen nach Bedarf.
  */
 class StartSwipeSessionUseCase @Inject constructor(
-    private val recipeRepository: RecipeRepository,
+    private val selectRecipes: SelectSwipeRecipesUseCase,
     private val sessionRepository: SwipeSessionRepository,
 ) {
     suspend operator fun invoke(
@@ -31,7 +72,7 @@ class StartSwipeSessionUseCase @Inject constructor(
         mode: SwipeMode = SwipeMode.SOLO,
         startedAt: Long = System.currentTimeMillis(),
     ): StartedSwipeSession {
-        val recipeIds = recipeRepository.getFilteredRecipeIds(filter)
+        val recipeIds = selectRecipes(filter).recipeIds
         val sessionId = sessionRepository.startSession(mode, startedAt)
         return StartedSwipeSession(sessionId = sessionId, recipeIds = recipeIds)
     }

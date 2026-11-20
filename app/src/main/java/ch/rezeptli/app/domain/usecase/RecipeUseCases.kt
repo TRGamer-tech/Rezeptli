@@ -33,21 +33,11 @@ class ObserveRecipeCountUseCase @Inject constructor(
     operator fun invoke(): Flow<Int> = repository.observeRecipeCount()
 }
 
-/** Alle vergebenen Tags, alphabetisch - Grundlage der Filter-Chips. */
+/** Alle vergebenen Tags, die meistbenutzten zuerst - Grundlage der Filter-Chips. */
 class ObserveTagsUseCase @Inject constructor(
     private val repository: RecipeRepository,
 ) {
     operator fun invoke(): Flow<List<String>> = repository.observeAllTags()
-}
-
-/**
- * Wie viele Rezepte zu einem Filter passen. Wird vor dem Start einer Swipe-Session
- * gebraucht, damit die Nutzerin sieht, wie gross der Stapel wird.
- */
-class CountMatchingRecipesUseCase @Inject constructor(
-    private val repository: RecipeRepository,
-) {
-    suspend operator fun invoke(filter: RecipeFilter): Int = repository.getFilteredRecipeIds(filter).size
 }
 
 /**
