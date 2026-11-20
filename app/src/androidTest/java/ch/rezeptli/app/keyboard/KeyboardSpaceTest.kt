@@ -2,6 +2,7 @@ package ch.rezeptli.app.keyboard
 
 import android.os.Build
 import android.view.View
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -60,7 +61,6 @@ import ch.rezeptli.app.presentation.shoppinglist.ShoppingListUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,27 +89,33 @@ class KeyboardSpaceTest {
      */
     private fun zeige(mitPlatz: Boolean = true, inhalt: @Composable () -> Unit) {
         // Das Fenster ist das der App: ihr Thema, ihr Eintrag im Manifest, ihr Zeichnen bis unter
-        // die Systemleisten. Nur der Inhalt wird ersetzt.
-        composeTestRule.setContent {
-            RezeptliTheme(reduceMotion = true) {
-                Abstaende()
-                if (mitPlatz) {
-                    KeyboardAwareScaffold(
-                        bottomBar = { tastaturOffen -> if (!tastaturOffen) Leiste() },
-                    ) { platz ->
-                        Box(modifier = platz.fillMaxSize()) { inhalt() }
-                    }
-                } else {
-                    Scaffold(bottomBar = { Leiste() }) { leiste: PaddingValues ->
-                        Box(
-                            modifier = Modifier
-                                .padding(leiste)
-                                .fillMaxSize(),
-                        ) { inhalt() }
+        // die Systemleisten. Nur der Inhalt wird ersetzt - ueber die Activity selbst, denn die
+        // Testregel setzt keinen Inhalt, wo schon einer steht.
+        composeTestRule.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                RezeptliTheme(reduceMotion = true) {
+                    Abstaende()
+                    if (mitPlatz) {
+                        KeyboardAwareScaffold(
+                            bottomBar = { tastaturOffen -> if (!tastaturOffen) Leiste() },
+                        ) { platz ->
+                            Box(modifier = platz.fillMaxSize()) { inhalt() }
+                        }
+                    } else {
+                        Scaffold(bottomBar = { Leiste() }) { leiste: PaddingValues ->
+                            Box(
+                                modifier = Modifier
+                                    .padding(leiste)
+                                    .fillMaxSize(),
+                            ) { inhalt() }
+                        }
                     }
                 }
             }
         }
+        composeTestRule.waitForIdle()
+        // Gemessen wird von der geschlossenen Tastatur aus.
+        composeTestRule.waitUntil(timeoutMillis = WARTEN_MS) { tastatur() == 0 }
     }
 
     /** Steht fuer die Leiste der App: so hoch wie sie, und wie sie ueber der Navigationsleiste. */
@@ -143,6 +149,16 @@ class KeyboardSpaceTest {
             if (insets?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
                 hoehe = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             }
+        }
+        return hoehe
+    }
+
+    /** Die Hoehe der Statusleiste in Pixeln, wie das Fenster sie meldet. */
+    private fun statusleiste(): Int {
+        var hoehe = 0
+        composeTestRule.activityRule.scenario.onActivity { activity ->
+            val insets = ViewCompat.getRootWindowInsets(activity.window.decorView)
+            hoehe = insets?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0
         }
         return hoehe
     }
@@ -320,21 +336,36 @@ class KeyboardSpaceTest {
     }
 
     /**
+     * Auch oben wird der Platz nur einmal gemacht: Die Kopfzeile steht direkt unter der
+     * Statusleiste, ihr Titel in der Mitte ihrer Hoehe.
+     */
+    @Test
+    fun dieKopfzeileStehtDirektUnterDerStatusleiste() {
+        zeige { Einkaufsliste() }
+
+        val titel = composeTestRule.onNodeWithText(text(R.string.shopping_title))
+        val knoten = titel.fetchSemanticsNode()
+        val mitte = knoten.positionInWindow.y + knoten.size.height / 2f
+        val erwartet = statusleiste() + with(composeTestRule.density) { (KOPFZEILE / 2).toPx() }
+        val spiel = with(composeTestRule.density) { SPIEL.toPx() }
+        assertEquals(
+            "Die Mitte des Titels liegt bei $mitte px, erwartet waren $erwartet " +
+                "(Statusleiste ${statusleiste()} px). ${lage(titel)}",
+            erwartet,
+            mitte,
+            spiel,
+        )
+    }
+
+    /**
      * Die Gegenprobe - der gemeldete Fehler, nachgestellt: Ohne den eigens gemachten Platz ist
      * das Feld bei offener Tastatur nicht zu sehen.
      *
-     * Das gilt ab Android 15. Dort fiel das Feld auf dem Emulator ganz zusammen (Hoehe 0,
-     * nichts sichtbar): Die Abstaende fuer die Tastatur kommen ohne den Platz mehrfach an und
-     * lassen dem Inhalt keinen Raum. Bis Android 14 schiebt das System stattdessen das ganze
-     * Fenster nach oben, bis das Feld mit dem Cursor zu sehen ist - dort ist der Fehler so
-     * nicht nachzustellen, und der Test wird uebersprungen.
-     *
-     * Schlaegt er auf einer neueren Version fehl, macht Android den Platz wieder selbst, und
-     * [aboveBarsAndKeyboard] ist zu ueberdenken.
+     * Schlaegt sie fehl, macht Android den Platz wieder selbst, und [aboveBarsAndKeyboard] ist
+     * zu ueberdenken.
      */
     @Test
     fun ohneDenPlatzIstDasFeldBeiOffenerTastaturNichtZuSehen() {
-        assumeTrue("erst ab Android 15 nachzustellen", Build.VERSION.SDK_INT >= ANDROID_15)
         zeige(mitPlatz = false) { Einkaufsliste() }
 
         val feld = composeTestRule.onNode(hasSetTextAction())
@@ -374,7 +405,9 @@ class KeyboardSpaceTest {
         /** Der Rand um die Eingabezeile der Einkaufsliste - und etwas Spiel fuer Rundungen. */
         val ZEILENRAND = 16.dp
         val SPIEL = 8.dp
-        const val ANDROID_15 = 35
+
+        /** So hoch ist die Kopfzeile der Bildschirme. */
+        val KOPFZEILE = 64.dp
         const val FUELLZEILEN = 12
         const val WARTEN_MS = 20_000L
         const val KURZ_MS = 4_000L
