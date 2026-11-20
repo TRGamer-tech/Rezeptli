@@ -155,8 +155,12 @@ class KeyboardSpaceTest {
                 "Leisten ${insets?.getInsets(WindowInsetsCompat.Type.systemBars())}, " +
                 "Dichte ${activity.resources.displayMetrics.density}, Android ${Build.VERSION.SDK_INT}"
         }
+        // Vom Feld nach aussen: wo jede Ebene beginnt und wie hoch sie ist. Daran zeigt sich,
+        // welche Ebene dem Feld den Platz nimmt.
+        val ebenen = generateSequence(knoten.parent) { it.parent }
+            .joinToString(" < ") { "${it.positionInWindow.y.toInt()}+${it.size.height}" }
         return "$fenster; Feld von ${feld.oberkante()} bis ${feld.unterkante()} px, " +
-            "sichtbar ${knoten.boundsInWindow}"
+            "sichtbar ${knoten.boundsInWindow}, platziert ${knoten.layoutInfo.isPlaced}; Ebenen $ebenen"
     }
 
     /** Tippt in das Feld und prueft, dass es danach ganz ueber der Tastatur steht. */
