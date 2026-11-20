@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -177,6 +178,7 @@ fun PlanScreen(
                                 currency = uiState.currency,
                                 showSlot = uiState.showsSlots,
                                 isReplacing = uiState.replacing == meal.place,
+                                doesNotFit = meal.place in uiState.unfitting,
                                 onClick = { onOpenRecipe(meal.recipeId) },
                                 onReplace = { onReplace(meal.day, meal.slot) },
                                 modifier = gleiten.entrance(tagIndex + 4, eintritt, schluessel),
@@ -424,6 +426,7 @@ private fun MealCard(
     currency: Currency,
     showSlot: Boolean,
     isReplacing: Boolean,
+    doesNotFit: Boolean,
     onClick: () -> Unit,
     onReplace: () -> Unit,
     modifier: Modifier = Modifier,
@@ -506,6 +509,26 @@ private fun MealCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            // Die Vorlieben haben sich geaendert, der Plan nicht: Dann steht es hier, statt dass
+            // die Mahlzeit stillschweigend verschwindet oder stillschweigend bleibt.
+            if (doesNotFit) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.plan_passt_nicht),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -68,6 +68,7 @@
     <string name="plan_karte_portion">1 Portion</string>
     <string name="plan_tauschen">Mahlzeit tauschen</string>
     <string name="plan_tauschen_keine">Es gibt keine andere passende Mahlzeit.</string>
+    <string name="plan_passt_nicht">Passt nicht mehr zu deinen Vorlieben. Mit dem Pfeil oben rechts tauschst du es aus.</string>
     <string name="plan_neu_bauen">Plan neu bauen</string>
     <string name="plan_neu_bauen_titel">Plan neu bauen?</string>
     <string name="plan_neu_bauen_text">Die Mahlzeiten und die Einkaufsliste dieses Plans werden ersetzt. Von Hand Ergänztes bleibt stehen.</string>
