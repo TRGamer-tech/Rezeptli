@@ -3,6 +3,7 @@ package ch.rezeptli.app.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.repository.UserProfileRepository
+import ch.rezeptli.app.domain.settings.AppearanceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +30,16 @@ sealed interface StartState {
 @HiltViewModel
 class MainViewModel @Inject constructor(
     profileRepository: UserProfileRepository,
+    appearanceRepository: AppearanceRepository,
 ) : ViewModel() {
+    /** Ob die App ihre Bewegungen reduziert - die Android-Einstellung kommt im Theme dazu. */
+    val reduceMotion: StateFlow<Boolean> = appearanceRepository.reduceMotion
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+
     val startState: StateFlow<StartState> = profileRepository.profile
         .map { if (it.onboardingCompleted) StartState.Bereit else StartState.Onboarding }
         .stateIn(

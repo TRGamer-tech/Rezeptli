@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,10 +33,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.repository.WebImportError
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.entrance
 import ch.rezeptli.app.presentation.common.form.RecipeFormActions
 import ch.rezeptli.app.presentation.common.form.RecipeFormState
 import ch.rezeptli.app.presentation.common.form.recipeFormFields
+import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /**
  * Import eines kopierten Rezepttexts in zwei Schritten: einfuegen, dann den erkannten
@@ -99,7 +101,7 @@ fun RecipeImportScreen(
                 onBack = onBack,
                 actions = {
                     if (uiState.isPreviewVisible) {
-                        TextButton(onClick = onSave, enabled = !uiState.isSaving) {
+                        BouncyTextButton(onClick = onSave, enabled = !uiState.isSaving) {
                             Text(stringResource(R.string.action_save))
                         }
                     }
@@ -192,7 +194,7 @@ private fun TextInputStep(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
+            BouncyButton(
                 onClick = onAnalyse,
                 enabled = rawText.isNotBlank() && !uiState.isLoadingFromWeb,
                 modifier = Modifier.weight(1f),
@@ -204,7 +206,7 @@ private fun TextInputStep(
                 )
             }
             if (rawText.isNotEmpty()) {
-                TextButton(onClick = onClearText) {
+                BouncyTextButton(onClick = onClearText) {
                     Text(stringResource(R.string.import_clear))
                 }
             }
@@ -212,7 +214,7 @@ private fun TextInputStep(
 
         if (rawText.isBlank()) {
             val example = stringResource(R.string.import_example_text)
-            TextButton(onClick = { onTextChange(example) }) {
+            BouncyTextButton(onClick = { onTextChange(example) }) {
                 Text(stringResource(R.string.import_example))
             }
         }
@@ -271,7 +273,7 @@ private fun PreviewStep(
         recipeFormFields(state = form, actions = actions)
 
         item(key = "save") {
-            Button(
+            BouncyButton(
                 onClick = onSave,
                 enabled = !isSaving,
                 modifier = Modifier
@@ -292,7 +294,10 @@ private fun InfoCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .entrance()
+            .fillMaxWidth(),
+        shape = Tokens.Radius.LgShape,
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Row(

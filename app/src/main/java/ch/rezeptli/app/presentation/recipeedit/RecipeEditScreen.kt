@@ -16,14 +16,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,7 +30,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.RecipeImage
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.form.RecipeFormActions
 import ch.rezeptli.app.presentation.common.form.RecipeFormState
@@ -105,7 +105,7 @@ fun RecipeEditScreen(
                 ),
                 onBack = onBack,
                 actions = {
-                    TextButton(onClick = onSave, enabled = !uiState.isSaving) {
+                    BouncyTextButton(onClick = onSave, enabled = !uiState.isSaving) {
                         Text(stringResource(R.string.action_save))
                     }
                 },
@@ -119,7 +119,7 @@ fun RecipeEditScreen(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                RezeptliLoader()
             }
         } else {
             RecipeEditForm(
@@ -144,12 +144,12 @@ fun RecipeEditScreen(
             title = { Text(stringResource(R.string.edit_discard_title)) },
             text = { Text(stringResource(R.string.edit_discard_message)) },
             confirmButton = {
-                TextButton(onClick = onDiscardConfirm) {
+                BouncyTextButton(onClick = onDiscardConfirm) {
                     Text(stringResource(R.string.edit_discard_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDiscardDismiss) {
+                BouncyTextButton(onClick = onDiscardDismiss) {
                     Text(stringResource(R.string.edit_discard_keep))
                 }
             },
@@ -190,7 +190,7 @@ private fun RecipeEditForm(
 
         item(key = "photoActions") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onPickPhoto) {
+                BouncyOutlinedButton(onClick = onPickPhoto) {
                     Icon(imageVector = Icons.Filled.AddAPhoto, contentDescription = null)
                     Text(
                         text = stringResource(
@@ -200,7 +200,7 @@ private fun RecipeEditForm(
                     )
                 }
                 if (form.photoUri != null) {
-                    OutlinedButton(onClick = onPhotoRemove) {
+                    BouncyOutlinedButton(onClick = onPhotoRemove) {
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = stringResource(R.string.edit_photo_remove),
@@ -213,7 +213,7 @@ private fun RecipeEditForm(
         recipeFormFields(state = form, actions = actions)
 
         item(key = "save") {
-            Button(
+            BouncyButton(
                 onClick = onSave,
                 enabled = !isSaving,
                 modifier = Modifier

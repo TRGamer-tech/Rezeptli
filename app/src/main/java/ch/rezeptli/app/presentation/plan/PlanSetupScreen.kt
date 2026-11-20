@@ -18,10 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -37,7 +34,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /**
@@ -83,13 +84,13 @@ private fun PlanSetupScreen(uiState: PlanSetupUiState, viewModel: PlanSetupViewM
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!uiState.step.isFirst) {
-                    OutlinedButton(
+                    BouncyOutlinedButton(
                         onClick = viewModel::onBack,
                         shape = Tokens.Radius.PillShape,
                         modifier = Modifier.heightIn(min = 52.dp),
                     ) { Text(stringResource(R.string.setup_zurueck)) }
                 }
-                Button(
+                BouncyButton(
                     onClick = viewModel::onNext,
                     enabled = !uiState.isSaving,
                     shape = Tokens.Radius.PillShape,
@@ -107,27 +108,33 @@ private fun PlanSetupScreen(uiState: PlanSetupUiState, viewModel: PlanSetupViewM
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            LinearProgressIndicator(
-                progress = { uiState.progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+            RezeptliProgressBar(
+                progress = uiState.progress,
+                height = 8.dp,
+                modifier = Modifier.padding(horizontal = 24.dp),
             )
 
+            // Vorwaerts gleitet der naechste Schritt von rechts herein und federt ein,
+            // zurueck von links. Bei reduzierter Bewegung blenden die Schritte nur ueber.
+            val motion = RezeptliTheme.motion
             AnimatedContent(
                 targetState = uiState.step,
                 transitionSpec = {
                     val forward = targetState.ordinal > initialState.ordinal
                     val direction = if (forward) 1 else -1
-                    (
-                        slideInHorizontally(tween(Tokens.Duration.Base, easing = Tokens.Ease.OutQuad)) {
-                            it / 4 * direction
-                        } + fadeIn(tween(Tokens.Duration.Base))
-                    ).togetherWith(
-                        slideOutHorizontally(tween(Tokens.Duration.Base, easing = Tokens.Ease.OutQuad)) {
-                            -it / 4 * direction
-                        } + fadeOut(tween(Tokens.Duration.Fast)),
-                    )
+                    if (motion.reduced) {
+                        fadeIn(motion.fade()) togetherWith fadeOut(motion.fade())
+                    } else {
+                        (
+                            slideInHorizontally(motion.offsetSpring()) {
+                                it / 3 * direction
+                            } + fadeIn(motion.fade())
+                        ).togetherWith(
+                            slideOutHorizontally(motion.offsetSpring()) {
+                                -it / 3 * direction
+                            } + fadeOut(tween(Tokens.Duration.Fast)),
+                        )
+                    }
                 },
                 modifier = Modifier.weight(1f),
                 label = "Einrichtungsschritt",

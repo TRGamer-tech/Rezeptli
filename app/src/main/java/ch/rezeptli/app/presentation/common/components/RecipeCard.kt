@@ -1,17 +1,16 @@
 package ch.rezeptli.app.presentation.common.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,14 +25,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
+import ch.rezeptli.app.presentation.common.theme.TagColors
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlin.math.abs
 
 /**
@@ -52,13 +57,13 @@ fun RecipeListCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .bouncyClickable(onClick = onClick)
             .cardSurface(Tokens.Radius.LgShape)
-            .clickable(onClick = onClick)
             // 48 dp waere die Untergrenze fuer eine Tippflaeche; hier sind es mehr,
             // weil das Bild ohnehin quadratisch ist.
-            .heightIn(min = 88.dp)
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .heightIn(min = 92.dp)
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RecipeImage(
@@ -70,7 +75,7 @@ fun RecipeListCard(
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 text = recipe.title,
@@ -97,7 +102,13 @@ fun RecipeListCard(
     }
 }
 
-/** Bild eines Rezepts, mit einer freundlichen Platzhalter-Flaeche, wenn keines da ist. */
+/**
+ * Bild eines Rezepts, mit einer freundlichen Platzhalter-Flaeche, wenn keines da ist.
+ *
+ * Das Foto blendet weich ein, sobald es geladen ist. Kommt es aus dem Speicher - etwa
+ * wenn eine Wischkarte nach vorne rueckt -, steht es sofort da; Coil ueberspringt die
+ * Blende dann von selbst.
+ */
 @Composable
 fun RecipeImage(
     photoUri: String?,
@@ -113,42 +124,67 @@ fun RecipeImage(
     if (photoUri.isNullOrBlank() || fehlgeschlagen) {
         RecipePhotoPlaceholder(title = title, modifier = modifier)
     } else {
-        AsyncImage(
-            model = photoUri,
-            contentDescription = stringResource(R.string.recipe_photo_description, title),
-            contentScale = ContentScale.Crop,
-            onError = { fehlgeschlagen = true },
-            modifier = modifier,
-        )
+        val context = LocalContext.current
+        val reduced = RezeptliTheme.motion.reduced
+        val request = remember(photoUri, reduced) {
+            ImageRequest
+                .Builder(context)
+                .data(photoUri)
+                .crossfade(if (reduced) Tokens.Duration.Instant else Tokens.Duration.Base)
+                .build()
+        }
+        // Waehrend das Foto laedt, steht die Platzhalterfarbe da - kein weisses Loch.
+        Box(modifier = modifier.background(placeholderBrush(title))) {
+            AsyncImage(
+                model = request,
+                contentDescription = stringResource(R.string.recipe_photo_description, title),
+                contentScale = ContentScale.Crop,
+                onError = { fehlgeschlagen = true },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
+/** Ein Verlauf in einer Marktfarbe - die Farbe haengt am Titel. */
+@Composable
+private fun placeholderBrush(title: String): Brush {
+    val farbe = placeholderColors(title)
+    return Brush.linearGradient(listOf(farbe.container, MaterialTheme.colorScheme.surfaceContainerLow))
+}
+
+@Composable
+private fun placeholderColors(title: String): TagColors {
+    val farben = RezeptliTheme.tags.all
+    return farben[abs(title.hashCode()) % farben.size]
+}
+
 /**
- * Die Flaeche fuer ein Rezept ohne brauchbares Foto.
+ * Die Flaeche fuer ein Rezept ohne brauchbares Foto: ein Verlauf in einer Marktfarbe
+ * mit dem Kochtopf darauf.
  *
- * Statt einer grauen Flaeche ein Farbverlauf aus der Mesh-Palette des Kits. Er haengt am
- * Titel, ist also fuer dasselbe Rezept immer derselbe - eine Karte, die bei jedem
- * Blaettern die Farbe wechselt, waere nur unruhig.
+ * Die Farbe haengt am Titel, ist also fuer dasselbe Rezept immer dieselbe - eine Karte,
+ * die bei jedem Blaettern die Farbe wechselt, waere nur unruhig.
  */
 @Composable
-private fun RecipePhotoPlaceholder(title: String, modifier: Modifier = Modifier) {
-    val mesh = Tokens.Mesh.All[abs(title.hashCode()) % Tokens.Mesh.All.size]
+private fun RecipePhotoPlaceholder(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    val farbe = placeholderColors(title)
+    val beschreibung = stringResource(R.string.recipe_photo_placeholder)
     Box(
-        modifier = modifier.background(
-            Brush.linearGradient(
-                listOf(
-                    mesh.copy(alpha = 0.45f),
-                    MaterialTheme.colorScheme.surfaceContainer,
-                ),
-            ),
-        ),
+        modifier = modifier
+            .background(placeholderBrush(title))
+            .semantics { contentDescription = beschreibung },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Filled.Restaurant,
-            contentDescription = stringResource(R.string.recipe_photo_placeholder),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(48.dp),
+        CookingPot(
+            animated = false,
+            size = 48.dp,
+            potColor = farbe.content,
+            steamColor = farbe.content.copy(alpha = 0.55f),
+            heartColor = farbe.container,
         )
     }
 }

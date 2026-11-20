@@ -1,24 +1,31 @@
 # Lizenzen mitgelieferter Dateien
 
-## Roboto Flex
+Die App verwendete bis zum Redesign "Marktfrisch" Roboto Flex; die Webseite nutzt
+Roboto Flex weiterhin (siehe unten).
 
-`app/src/main/res/font/roboto_flex.ttf`
+## Fraunces (App)
 
-Copyright 2017 The Roboto Flex Project Authors, lizenziert unter der
-SIL Open Font License 1.1 (siehe `RobotoFlex-OFL.txt`).
+`app/src/main/res/font/fraunces.ttf`
 
-Die Datei ist eine bearbeitete Fassung des Originals:
+Copyright 2020 The Fraunces Project Authors (github.com/undercasetype/Fraunces),
+lizenziert unter der SIL Open Font License 1.1 (siehe `Fraunces-OFL.txt`).
 
-- Die Achsen `GRAD`, `XOPQ`, `YOPQ`, `XTRA`, `YTUC`, `YTLC`, `YTAS`, `YTDE`
-  und `YTFI` sind auf ihrem Standardwert festgesetzt und damit entfernt.
-  Erhalten bleiben `opsz`, `wght`, `wdth` und `slnt`.
-- Der Zeichenvorrat ist auf Latein reduziert (inklusive Umlaute, franzoesischer
-  und italienischer Akzente, Bruchzahlen und Euro-Zeichen).
+Die Datei ist die auf Latein reduzierte variable Schrift aus dem Fontsource-Paket
+`@fontsource-variable/fraunces` 5.3.0 (`fraunces-latin-full-normal.woff2`), ohne
+inhaltliche Aenderung von WOFF2 nach TrueType umgepackt (fontTools), weil Android
+kein WOFF2 liest. Erhalten sind alle vier Achsen: `opsz`, `wght`, `SOFT`, `WONK`.
+194 KB. Zeichen ausserhalb des lateinischen Bereichs (etwa Bruchzeichen wie "⅓")
+zeichnet Android in der Systemschrift.
 
-Dadurch schrumpft die Datei von 1.79 MB auf 396 KB. Die OFL erlaubt diese
-Bearbeitung ausdruecklich; der Schriftname bleibt unveraendert, weil die
-Lizenz nur fuer die reservierten Namen eine Umbenennung verlangt - "Roboto
-Flex" ist kein reservierter Name (die OFL-Datei nennt keinen).
+## Figtree (App)
+
+`app/src/main/res/font/figtree_*.ttf` (Regular, Medium, SemiBold, Bold, ExtraBold)
+
+Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree),
+lizenziert unter der SIL Open Font License 1.1 (siehe `Figtree-OFL.txt`).
+
+Die statischen Schnitte stammen unveraendert aus dem npm-Paket
+`@expo-google-fonts/figtree` 0.4.1 (dort aus Google Fonts), je rund 40 KB.
 
 ## GSAP und ScrollTrigger (Webseite)
 

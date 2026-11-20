@@ -3,7 +3,6 @@ package ch.rezeptli.app.presentation.common.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
@@ -14,48 +13,77 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /*
- * Die wiederkehrenden Oberflaechen-Effekte des Designs.
+ * Die wiederkehrenden Oberflaechen des Designs.
  *
- * Sie liegen hier als Modifier vor, damit "Glas" und "Leuchten" im Bildschirmcode
- * benannt auftauchen statt als Ansammlung von Rand-, Schatten- und Hintergrundwerten.
+ * Sie liegen hier als Modifier vor, damit "Karte" und "schwebende Flaeche" im
+ * Bildschirmcode benannt auftauchen statt als Ansammlung von Rand-, Schatten- und
+ * Hintergrundwerten.
  */
 
 /**
- * Eine schwebende Flaeche - Filterleiste, untere Leiste, Dialogkopf.
+ * Eine Karte: im Hellen ein Blatt Papier auf Creme mit weichem, warmem Schatten, im
+ * Dunkeln eine leicht hellere Flaeche mit Haarlinie.
  *
- * Anmerkung zur Umsetzung: Das UI-Kit beschreibt Glas als Weichzeichnung dessen, was
- * *hinter* der Flaeche liegt. Android kann das erst ab API 31, die App laeuft ab API 26.
- * Statt den Effekt auf neueren Geraeten anders aussehen zu lassen als auf aelteren, wird
- * er hier einheitlich als halbtransparente Flaeche mit Haarlinie umgesetzt. Das ist der
- * gebraeuchliche Ersatz und bleibt auf jedem Geraet gleich.
+ * Der Schatten ist bewusst nicht grau, sondern ein warmes Braun mit wenig Deckkraft -
+ * graue Schatten wirken auf Creme schmutzig.
  */
-fun Modifier.glassPanel(
+fun Modifier.cardSurface(
+    shape: Shape,
+    elevation: Dp = Tokens.Elevation.Card,
+): Modifier = composed {
+    val accents = RezeptliTheme.accents
+    val shadowColor = accents.cardShadow.copy(alpha = if (RezeptliTheme.isDark) 0.6f else 0.22f)
+    this
+        .shadow(
+            elevation = elevation,
+            shape = shape,
+            clip = false,
+            ambientColor = shadowColor,
+            spotColor = shadowColor,
+        ).clip(shape)
+        .background(accents.cardFill)
+        .border(width = 1.dp, color = accents.hairline, shape = shape)
+}
+
+/**
+ * Eine schwebende Flaeche - etwa die Angaben auf einem Foto oder die Steuerung im
+ * Kochmodus. Deckend statt durchscheinend: Schrift auf einem halb durchsichtigen Grund
+ * ist auf einem bunten Foto nie verlaesslich lesbar.
+ */
+fun Modifier.floatingPanel(
     shape: Shape,
     borderColor: Color? = null,
 ): Modifier = composed {
     val accents = RezeptliTheme.accents
+    val shadowColor = accents.cardShadow.copy(alpha = if (RezeptliTheme.isDark) 0.7f else 0.28f)
     this
-        .clip(shape)
-        .background(accents.glassFill)
+        .shadow(
+            elevation = Tokens.Elevation.Floating,
+            shape = shape,
+            clip = false,
+            ambientColor = shadowColor,
+            spotColor = shadowColor,
+        ).clip(shape)
+        .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = PANEL_OPACITY))
         .border(width = 1.dp, color = borderColor ?: accents.hairline, shape = shape)
 }
 
 /**
- * Der leuchtende Rand einer Karte.
+ * Ein farbiger Rand mit weichem Schein - fuer die aktive Karte oder den laufenden Schritt.
  *
- * [intensity] zwischen 0 und 1 steuert, wie stark die Karte leuchtet - damit laesst sich
- * das Leuchten an eine Geste koppeln, etwa waehrend des Wischens.
+ * [intensity] zwischen 0 und 1 steuert, wie deutlich die Hervorhebung ist. Damit laesst
+ * sie sich an eine Geste koppeln, etwa waehrend des Wischens.
  *
- * [glowColor] ueberschreibt die Akzentfarbe, etwa mit Gruen oder Rot als Rueckmeldung.
+ * [color] ueberschreibt die Akzentfarbe, etwa mit Gruen oder Rot als Rueckmeldung.
  */
-fun Modifier.glowRing(
+fun Modifier.highlightRing(
     shape: Shape,
     intensity: Float = 1f,
-    glowColor: Color? = null,
-    radius: Dp = Tokens.Effect.GlowRadius,
+    color: Color? = null,
+    radius: Dp = Tokens.Elevation.Highlight,
 ): Modifier = composed {
     val accents = RezeptliTheme.accents
-    val colour = glowColor ?: accents.glow
+    val ringColor = color ?: accents.highlight
     val clamped = intensity.coerceIn(0f, 1f)
 
     this
@@ -63,24 +91,14 @@ fun Modifier.glowRing(
             elevation = radius * clamped,
             shape = shape,
             clip = false,
-            ambientColor = colour,
-            spotColor = colour,
+            ambientColor = ringColor,
+            spotColor = ringColor,
         ).border(
-            width = 1.dp,
-            color = colour.copy(alpha = 0.30f + 0.45f * clamped),
+            width = 1.dp + 1.dp * clamped,
+            color = ringColor.copy(alpha = 0.25f + 0.65f * clamped),
             shape = shape,
         )
 }
 
-/** Kartenflaeche mit ruhiger Haarlinie - der Zustand ohne Interaktion. */
-fun Modifier.cardSurface(shape: Shape): Modifier = composed {
-    val accents = RezeptliTheme.accents
-    this
-        .clip(shape)
-        .background(MaterialTheme.colorScheme.surfaceContainer)
-        .border(width = 1.dp, color = accents.hairline, shape = shape)
-}
-
-/** Nur fuer Vorschauen und Tests sinnvoll: die Mesh-Farbe eines Listenplatzes. */
-@Composable
-internal fun meshAccentFor(index: Int): Color = Tokens.Mesh.All[index.mod(Tokens.Mesh.All.size)]
+/** Fast deckend - genug, damit ein Foto darunter nur noch ahnbar ist. */
+private const val PANEL_OPACITY = 0.94f

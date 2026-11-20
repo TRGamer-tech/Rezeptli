@@ -25,8 +25,31 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // Der Startbildschirm bleibt stehen, bis feststeht, wohin die App fuehrt -
         // sonst blitzt die Rezeptliste auf, bevor das Onboarding sie ersetzt.
-        installSplashScreen().setKeepOnScreenCondition {
+        val splash = installSplashScreen()
+        splash.setKeepOnScreenCondition {
             viewModel.startState.value == StartState.Unbekannt
+        }
+        // Statt hart zu verschwinden, waechst der Topf ein wenig, waehrend das Startbild
+        // ausblendet. Der Animator folgt der Android-Animationsskala von selbst; die
+        // App-Einstellung "Bewegung reduzieren" wird hier zusaetzlich beachtet.
+        splash.setOnExitAnimationListener { provider ->
+            if (viewModel.reduceMotion.value) {
+                provider.remove()
+                return@setOnExitAnimationListener
+            }
+            runCatching { provider.iconView }
+                .getOrNull()
+                ?.animate()
+                ?.scaleX(SPLASH_ICON_GROWTH)
+                ?.scaleY(SPLASH_ICON_GROWTH)
+                ?.setDuration(SPLASH_EXIT_MS)
+                ?.start()
+            provider.view
+                .animate()
+                .alpha(0f)
+                .setDuration(SPLASH_EXIT_MS)
+                .withEndAction { provider.remove() }
+                .start()
         }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -36,8 +59,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val startState by viewModel.startState.collectAsStateWithLifecycle()
+            val reduceMotion by viewModel.reduceMotion.collectAsStateWithLifecycle()
 
-            RezeptliTheme {
+            RezeptliTheme(reduceMotion = reduceMotion) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -68,5 +92,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         val WHITESPACE = Regex("\\s+")
+        const val SPLASH_EXIT_MS = 260L
+        const val SPLASH_ICON_GROWTH = 1.12f
     }
 }

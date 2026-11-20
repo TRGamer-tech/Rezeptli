@@ -6,7 +6,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,11 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -50,7 +46,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.RezeptliFilterChip
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.bouncyClickable
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 
@@ -121,10 +120,10 @@ fun WebSearchScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 uiState.sources.forEach { source ->
-                    FilterChip(
+                    RezeptliFilterChip(
                         selected = source.id in uiState.selectedSourceIds,
                         onClick = { onToggleSource(source.id) },
-                        label = { Text(source.name) },
+                        label = source.name,
                     )
                 }
             }
@@ -152,7 +151,12 @@ fun WebSearchScreen(
                     // Treffer erscheinen, sobald ihre Quelle geantwortet hat - der Rest
                     // laedt darunter weiter.
                     items(uiState.results, key = { it.url }) { result ->
-                        WebResultCard(result = result, onClick = { onResultClick(result) })
+                        // Neue Treffer blenden ein und schieben die Platzhalter sanft nach unten.
+                        WebResultCard(
+                            result = result,
+                            onClick = { onResultClick(result) },
+                            modifier = if (RezeptliTheme.motion.reduced) Modifier else Modifier.animateItem(),
+                        )
                     }
 
                     if (uiState.showsSkeleton) {
@@ -203,16 +207,22 @@ private fun SearchProgress(finished: Int, total: Int) {
  */
 @Composable
 private fun SkeletonCard() {
-    val transition = rememberInfiniteTransition(label = "Platzhalter")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(Tokens.Duration.Loader, easing = Tokens.Ease.OutQuad),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "Puls",
-    )
+    // Bei reduzierter Bewegung pulsiert nichts - der Platzhalter steht dann einfach da.
+    val alpha = if (RezeptliTheme.motion.reduced) {
+        SKELETON_ALPHA
+    } else {
+        val transition = rememberInfiniteTransition(label = "Platzhalter")
+        val puls by transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0.7f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(Tokens.Duration.Loader, easing = Tokens.Ease.Standard),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "Puls",
+        )
+        puls
+    }
 
     Column(
         modifier = Modifier
@@ -244,25 +254,24 @@ private fun WebResultCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            .bouncyClickable(onClick = onClick)
+            .cardSurface(Tokens.Radius.LgShape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(text = result.title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = result.sourceName,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(text = result.title, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = result.sourceName,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 /** So viele Platzhalter, wie ohne Scrollen sichtbar sind. */
 private const val SKELETON_COUNT = 3
+
+private const val SKELETON_ALPHA = 0.5f

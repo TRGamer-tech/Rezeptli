@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Das Startbild ab Android 12: derselbe Topf wie im App-Symbol, aber lebendig - der
+  Dampf steigt auf, der Deckel hebt sich zweimal und klappert zurueck.
+
+  Das erste Bild ist das vollstaendige Symbol. Wo nichts abgespielt wird (aeltere
+  Android-Versionen, "Animationen entfernen"), steht deshalb einfach das Symbol da.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+
+            <group android:name="dampf">
+                <path
+                    android:name="dampf_links"
+                    android:pathData="M44.25,40.5 C41.25,36.75 47.25,33 44.25,29.25"
+                    android:strokeColor="#FFF2C14E"
+                    android:strokeWidth="3"
+                    android:strokeLineCap="round" />
+                <path
+                    android:name="dampf_mitte"
+                    android:pathData="M54,40.5 C51,36.75 57,33 54,29.25"
+                    android:strokeColor="#FFF2C14E"
+                    android:strokeWidth="3"
+                    android:strokeLineCap="round" />
+                <path
+                    android:name="dampf_rechts"
+                    android:pathData="M63.75,40.5 C60.75,36.75 66.75,33 63.75,29.25"
+                    android:strokeColor="#FFF2C14E"
+                    android:strokeWidth="3"
+                    android:strokeLineCap="round" />
+            </group>
+
+            <path
+                android:pathData="M28.875,57.75 H34.5 V64.5 H28.875 A3.375,3.375 0 0 1 28.875,57.75 Z"
+                android:fillColor="#FFFBF6EC" />
+            <path
+                android:pathData="M79.125,57.75 H73.5 V64.5 H79.125 A3.375,3.375 0 0 0 79.125,57.75 Z"
+                android:fillColor="#FFFBF6EC" />
+            <path
+                android:pathData="M33.75,54 H74.25 A2.25,2.25 0 0 1 76.5,56.25 V68.25 A10.5,10.5 0 0 1 66,78.75 H42 A10.5,10.5 0 0 1 31.5,68.25 V56.25 A2.25,2.25 0 0 1 33.75,54 Z"
+                android:fillColor="#FFFBF6EC" />
+            <group
+                android:translateX="48"
+                android:translateY="59.9"
+                android:scaleX="0.5"
+                android:scaleY="0.5">
+                <path
+                    android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z"
+                    android:fillColor="#FFE4572E" />
+            </group>
+
+            <group
+                android:name="deckel"
+                android:pivotX="54"
+                android:pivotY="50">
+                <path
+                    android:pathData="M31.5,47.25 H76.5 A3,3 0 0 1 76.5,53.25 H31.5 A3,3 0 0 1 31.5,47.25 Z"
+                    android:fillColor="#FFFBF6EC" />
+                <path
+                    android:pathData="M50.625,43.875 A3.375,3.375 0 1 1 57.375,43.875 A3.375,3.375 0 1 1 50.625,43.875 Z"
+                    android:fillColor="#FFFBF6EC" />
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <!-- Der Dampf steigt auf und kommt wieder - in 900 ms, dem Rahmen des Startbilds. -->
+    <target android:name="dampf">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <objectAnimator
+                    android:duration="450"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"
+                    android:propertyName="translateY"
+                    android:valueFrom="0"
+                    android:valueTo="-5"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="450"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"
+                    android:propertyName="translateY"
+                    android:valueFrom="-5"
+                    android:valueTo="0"
+                    android:valueType="floatType" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="dampf_links">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="1"
+                    android:valueTo="0.2"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="0.2"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="dampf_mitte">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <objectAnimator
+                    android:duration="150"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="1"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="1"
+                    android:valueTo="0.2"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="0.2"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="dampf_rechts">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="1"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="1"
+                    android:valueTo="0.2"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="300"
+                    android:propertyName="strokeAlpha"
+                    android:valueFrom="0.2"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <!-- Der Deckel hebt sich, kippt ein wenig und klappert zurueck. -->
+    <target android:name="deckel">
+        <aapt:attr name="android:animation">
+            <set android:ordering="sequentially">
+                <set android:ordering="together">
+                    <objectAnimator
+                        android:duration="180"
+                        android:interpolator="@android:interpolator/decelerate_quad"
+                        android:propertyName="translateY"
+                        android:valueFrom="0"
+                        android:valueTo="-4"
+                        android:valueType="floatType" />
+                    <objectAnimator
+                        android:duration="180"
+                        android:propertyName="rotation"
+                        android:valueFrom="0"
+                        android:valueTo="-6"
+                        android:valueType="floatType" />
+                </set>
+                <set android:ordering="together">
+                    <objectAnimator
+                        android:duration="160"
+                        android:interpolator="@android:interpolator/accelerate_quad"
+                        android:propertyName="translateY"
+                        android:valueFrom="-4"
+                        android:valueTo="0"
+                        android:valueType="floatType" />
+                    <objectAnimator
+                        android:duration="160"
+                        android:propertyName="rotation"
+                        android:valueFrom="-6"
+                        android:valueTo="0"
+                        android:valueType="floatType" />
+                </set>
+                <set android:ordering="together">
+                    <objectAnimator
+                        android:duration="140"
+                        android:interpolator="@android:interpolator/decelerate_quad"
+                        android:propertyName="translateY"
+                        android:valueFrom="0"
+                        android:valueTo="-2"
+                        android:valueType="floatType" />
+                    <objectAnimator
+                        android:duration="140"
+                        android:propertyName="rotation"
+                        android:valueFrom="0"
+                        android:valueTo="4"
+                        android:valueType="floatType" />
+                </set>
+                <set android:ordering="together">
+                    <objectAnimator
+                        android:duration="140"
+                        android:interpolator="@android:interpolator/accelerate_quad"
+                        android:propertyName="translateY"
+                        android:valueFrom="-2"
+                        android:valueTo="0"
+                        android:valueType="floatType" />
+                    <objectAnimator
+                        android:duration="140"
+                        android:propertyName="rotation"
+                        android:valueFrom="4"
+                        android:valueTo="0"
+                        android:valueType="floatType" />
+                </set>
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

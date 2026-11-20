@@ -3,6 +3,8 @@ package ch.rezeptli.app.presentation.shoppinglist
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
@@ -24,24 +27,22 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
@@ -53,11 +54,21 @@ import ch.rezeptli.app.domain.model.AmountFormatter
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.ShoppingItem
+import ch.rezeptli.app.presentation.common.components.BouncyFilledIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.IconMotion
+import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
+import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.popOnChange
 import ch.rezeptli.app.presentation.common.formatChf
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.shareText
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
+import ch.rezeptli.app.presentation.common.theme.Tokens
 import kotlinx.coroutines.launch
 
 /** Die Einkaufsliste: nach Warengruppen sortiert, zum Abhaken. */
@@ -122,13 +133,13 @@ fun ShoppingListScreen(
                 actions = {
                     if (!uiState.isEmpty) {
                         val context = LocalContext.current
-                        IconButton(onClick = { onCopy(uiState.asText(context)) }) {
+                        BouncyIconButton(onClick = { onCopy(uiState.asText(context)) }) {
                             Icon(
                                 imageVector = Icons.Filled.ContentCopy,
                                 contentDescription = stringResource(R.string.einkauf_kopieren),
                             )
                         }
-                        IconButton(onClick = { onShare(uiState.asText(context)) }) {
+                        BouncyIconButton(onClick = { onShare(uiState.asText(context)) }) {
                             Icon(
                                 imageVector = Icons.Filled.Share,
                                 contentDescription = stringResource(R.string.einkauf_teilen),
@@ -136,7 +147,7 @@ fun ShoppingListScreen(
                         }
                     }
                     if (uiState.checkedCount > 0) {
-                        IconButton(onClick = onRemoveChecked) {
+                        BouncyIconButton(onClick = onRemoveChecked) {
                             Icon(
                                 imageVector = Icons.Filled.DeleteSweep,
                                 contentDescription = stringResource(R.string.shopping_remove_checked),
@@ -144,7 +155,7 @@ fun ShoppingListScreen(
                         }
                     }
                     if (!uiState.isEmpty) {
-                        IconButton(onClick = onClearRequest) {
+                        BouncyIconButton(onClick = onClearRequest) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
                                 contentDescription = stringResource(R.string.shopping_clear),
@@ -162,7 +173,7 @@ fun ShoppingListScreen(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                RezeptliLoader()
             }
 
             uiState.isEmpty -> Column(
@@ -191,35 +202,48 @@ fun ShoppingListScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
+                val motion = RezeptliTheme.motion
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(bottom = 8.dp),
                 ) {
                     item(key = "summary") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = stringResource(
-                                    R.string.shopping_summary,
-                                    uiState.openCount,
-                                    uiState.items.size,
-                                ),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Column {
+                            // Der Balken fuellt sich mit jedem Haken - man sieht, wie weit der Einkauf ist.
+                            RezeptliProgressBar(
+                                progress = if (uiState.items.isEmpty()) {
+                                    0f
+                                } else {
+                                    (uiState.items.size - uiState.openCount).toFloat() / uiState.items.size
+                                },
+                                height = 8.dp,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                             )
-                            if (uiState.estimatedTotal > 0.0) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
                                 Text(
                                     text = stringResource(
-                                        R.string.einkauf_gesamt,
-                                        formatChf(uiState.estimatedTotal),
+                                        R.string.shopping_summary,
+                                        uiState.openCount,
+                                        uiState.items.size,
                                     ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (uiState.estimatedTotal > 0.0) {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.einkauf_gesamt,
+                                            formatChf(uiState.estimatedTotal),
+                                        ),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -229,10 +253,12 @@ fun ShoppingListScreen(
                             CategoryHeader(category)
                         }
                         items(items, key = { it.id }) { item ->
+                            // Abgehaktes rutscht ans Ende der Gruppe - es gleitet dorthin, statt zu springen.
                             ShoppingItemRow(
                                 item = item,
                                 onCheckedChange = { checked -> onCheckedChange(item, checked) },
                                 onDelete = { onDelete(item) },
+                                modifier = if (motion.reduced) Modifier else Modifier.animateItem(),
                             )
                         }
                     }
@@ -257,12 +283,12 @@ fun ShoppingListScreen(
             title = { Text(stringResource(R.string.shopping_clear_title)) },
             text = { Text(stringResource(R.string.shopping_clear_message)) },
             confirmButton = {
-                TextButton(onClick = onClearConfirm) {
+                BouncyTextButton(onClick = onClearConfirm) {
                     Text(stringResource(R.string.shopping_clear))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onClearDismiss) {
+                BouncyTextButton(onClick = onClearDismiss) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -272,12 +298,22 @@ fun ShoppingListScreen(
 
 @Composable
 private fun CategoryHeader(category: IngredientCategory, modifier: Modifier = Modifier) {
-    Text(
-        text = stringResource(category.labelRes()),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-    )
+    Row(
+        modifier = modifier.padding(start = 20.dp, end = 16.dp, top = 18.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+        )
+        Text(
+            text = stringResource(category.labelRes()),
+            style = MaterialTheme.typography.titleLarge,
+        )
+    }
 }
 
 @Composable
@@ -297,6 +333,7 @@ private fun ShoppingItemRow(
         Checkbox(
             checked = item.isChecked,
             onCheckedChange = onCheckedChange,
+            modifier = Modifier.popOnChange(item.isChecked),
         )
         Column(
             modifier = Modifier
@@ -304,15 +341,20 @@ private fun ShoppingItemRow(
                 .padding(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                text = if (item.packText != null) item.name else item.displayText(),
-                style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (item.isChecked) TextDecoration.LineThrough else null,
-                color = if (item.isChecked) {
+            val schrift by animateColorAsState(
+                targetValue = if (item.isChecked) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
+                animationSpec = RezeptliTheme.motion.fade(),
+                label = "posten",
+            )
+            Text(
+                text = if (item.packText != null) item.name else item.displayText(),
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (item.isChecked) TextDecoration.LineThrough else null,
+                color = schrift,
             )
             if (item.packText != null) {
                 val needed = item.displayText().removeSuffix(" " + item.name).takeIf { it != item.name }
@@ -353,7 +395,7 @@ private fun ShoppingItemRow(
                 }
             }
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+        BouncyIconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = stringResource(R.string.shopping_delete_item, item.name),
@@ -380,16 +422,20 @@ private fun NewItemField(
             onValueChange = onValueChange,
             placeholder = { Text(stringResource(R.string.shopping_add_hint)) },
             singleLine = true,
+            shape = Tokens.Radius.PillShape,
             modifier = Modifier.weight(1f),
         )
-        IconButton(
+        BouncyFilledIconButton(
             onClick = onAdd,
             enabled = value.isNotBlank(),
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(52.dp),
         ) {
-            Icon(
+            // Das Plus dreht sich einmal, sobald es etwas hinzuzufuegen gibt.
+            MotionIcon(
                 imageVector = Icons.Filled.Add,
                 contentDescription = stringResource(R.string.shopping_add),
+                motion = IconMotion.SPIN,
+                trigger = if (value.isNotBlank()) true else null,
             )
         }
     }

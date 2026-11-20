@@ -6,17 +6,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SentimentDissatisfied
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -36,9 +34,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.IconMotion
+import ch.rezeptli.app.presentation.common.components.MotionIcon
 import ch.rezeptli.app.presentation.common.components.RecipeListCard
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.entrance
 import kotlinx.coroutines.launch
 
 /** Ergebnis einer Swipe-Session: alles, was es durch die Runde geschafft hat. */
@@ -98,13 +101,13 @@ fun ResultsScreen(
                 title = stringResource(R.string.results_title),
                 onBack = onBackToRecipes,
                 actions = {
-                    IconButton(onClick = onOpenShoppingList) {
+                    BouncyIconButton(onClick = onOpenShoppingList) {
                         Icon(
                             imageVector = Icons.Filled.ShoppingCart,
                             contentDescription = stringResource(R.string.shopping_title),
                         )
                     }
-                    IconButton(onClick = onNewSession) {
+                    BouncyIconButton(onClick = onNewSession) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,
                             contentDescription = stringResource(R.string.results_new_session),
@@ -119,7 +122,12 @@ fun ResultsScreen(
                     onClick = onAddToShoppingList,
                     text = { Text(stringResource(R.string.results_add_to_shopping)) },
                     icon = {
-                        Icon(imageVector = Icons.Filled.AddShoppingCart, contentDescription = null)
+                        MotionIcon(
+                            imageVector = Icons.Filled.AddShoppingCart,
+                            contentDescription = null,
+                            motion = IconMotion.WIGGLE,
+                            playOnAppear = true,
+                        )
                     },
                 )
             }
@@ -132,7 +140,7 @@ fun ResultsScreen(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                RezeptliLoader()
             }
 
             uiState.matches.isEmpty() -> EmptyState(
@@ -161,15 +169,18 @@ fun ResultsScreen(
                 item(key = "header") {
                     Text(
                         text = stringResource(R.string.results_count, uiState.matches.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 4.dp),
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier
+                            .padding(bottom = 4.dp)
+                            .entrance(0),
                     )
                 }
 
-                items(uiState.matches, key = { it.id }) { recipe ->
+                itemsIndexed(uiState.matches, key = { _, recipe -> recipe.id }) { index, recipe ->
                     RecipeListCard(
                         recipe = recipe,
                         onClick = { onRecipeClick(recipe.id) },
+                        modifier = Modifier.entrance(index + 1),
                     )
                 }
             }

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Kochtopf mit Dampf - das Motiv der App. -->
+<!--
+  Kochtopf mit Herz und Dampf - das Motiv der App, in den Marktfarben:
+  cremefarbener Topf, Butter-Dampf, Tomaten-Herz. Alles liegt innerhalb der
+  sicheren Zone von 66 dp, damit keine Maske etwas abschneidet.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -8,40 +12,50 @@
 
     <!-- Dampf -->
     <path
-        android:pathData="M45,32 q5,-5 0,-9"
-        android:strokeColor="#FFFFFF"
+        android:pathData="M44.25,40.5 C41.25,36.75 47.25,33 44.25,29.25"
+        android:strokeColor="#FFF2C14E"
         android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:strokeAlpha="0.85" />
+        android:strokeLineCap="round" />
     <path
-        android:pathData="M63,32 q5,-5 0,-9"
-        android:strokeColor="#FFFFFF"
+        android:pathData="M54,40.5 C51,36.75 57,33 54,29.25"
+        android:strokeColor="#FFF2C14E"
         android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:strokeAlpha="0.85" />
-
-    <!-- Deckelknauf -->
+        android:strokeLineCap="round" />
     <path
-        android:pathData="M54,37 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"
-        android:fillColor="#FFFFFF" />
-
-    <!-- Deckel -->
-    <path
-        android:pathData="M30,42 h48 a4,4 0 0 1 0,8 h-48 a4,4 0 0 1 0,-8 z"
-        android:fillColor="#FFFFFF" />
+        android:pathData="M63.75,40.5 C60.75,36.75 66.75,33 63.75,29.25"
+        android:strokeColor="#FFF2C14E"
+        android:strokeWidth="3"
+        android:strokeLineCap="round" />
 
     <!-- Griffe -->
     <path
-        android:pathData="M24,56 h8 v9 h-8 a4.5,4.5 0 0 1 0,-9 z"
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.85" />
+        android:pathData="M28.875,57.75 H34.5 V64.5 H28.875 A3.375,3.375 0 0 1 28.875,57.75 Z"
+        android:fillColor="#FFFBF6EC" />
     <path
-        android:pathData="M84,56 h-8 v9 h8 a4.5,4.5 0 0 0 0,-9 z"
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.85" />
+        android:pathData="M79.125,57.75 H73.5 V64.5 H79.125 A3.375,3.375 0 0 0 79.125,57.75 Z"
+        android:fillColor="#FFFBF6EC" />
 
     <!-- Topf -->
     <path
-        android:pathData="M32,53 h44 v17 a10,10 0 0 1 -10,10 h-24 a10,10 0 0 1 -10,-10 z"
-        android:fillColor="#FFFFFF" />
+        android:pathData="M33.75,54 H74.25 A2.25,2.25 0 0 1 76.5,56.25 V68.25 A10.5,10.5 0 0 1 66,78.75 H42 A10.5,10.5 0 0 1 31.5,68.25 V56.25 A2.25,2.25 0 0 1 33.75,54 Z"
+        android:fillColor="#FFFBF6EC" />
+
+    <!-- Herz -->
+    <group
+        android:translateX="48"
+        android:translateY="59.9"
+        android:scaleX="0.5"
+        android:scaleY="0.5">
+        <path
+            android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z"
+            android:fillColor="#FFE4572E" />
+    </group>
+
+    <!-- Deckel mit Knauf -->
+    <path
+        android:pathData="M31.5,47.25 H76.5 A3,3 0 0 1 76.5,53.25 H31.5 A3,3 0 0 1 31.5,47.25 Z"
+        android:fillColor="#FFFBF6EC" />
+    <path
+        android:pathData="M50.625,43.875 A3.375,3.375 0 1 1 57.375,43.875 A3.375,3.375 0 1 1 50.625,43.875 Z"
+        android:fillColor="#FFFBF6EC" />
 </vector>

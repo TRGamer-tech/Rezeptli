@@ -3,10 +3,10 @@ package ch.rezeptli.app.presentation.common.theme
 import androidx.compose.material3.Shapes
 
 /**
- * Die Rundungen von Material auf die Radien des UI-Kits abgebildet.
+ * Die Rundungen von Material auf die Radien des Designs abgebildet.
  *
  * Knoepfe und Chips verwenden nicht diese Skala, sondern [Tokens.Radius.PillShape] -
- * Material bezieht die Form von Knoepfen aus `small`, was hier zu wenig waere.
+ * an beiden Enden ganz rund, wie ein Etikett am Marktstand.
  */
 internal val RezeptliShapes = Shapes(
     extraSmall = Tokens.Radius.SmShape,

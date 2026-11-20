@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
 import ch.rezeptli.app.presentation.common.theme.Tokens
@@ -43,16 +43,16 @@ fun PreferencesRoute(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SectionCard(title = stringResource(R.string.vorlieben_laden)) {
+            SectionCard(title = stringResource(R.string.vorlieben_laden), index = 0) {
                 StoreGrid(selected = profile.store, onSelect = viewModel::onStoreSelect)
             }
-            SectionCard(title = stringResource(R.string.setup_personen_titel)) {
+            SectionCard(title = stringResource(R.string.setup_personen_titel), index = 1) {
                 PersonStepper(persons = profile.persons, onChange = viewModel::onPersonsChange)
             }
-            SectionCard(title = stringResource(R.string.setup_tage_titel)) {
+            SectionCard(title = stringResource(R.string.setup_tage_titel), index = 2) {
                 DayPicker(selected = profile.cookDays, onToggle = viewModel::onDayToggle)
             }
-            SectionCard(title = stringResource(R.string.setup_budget_titel)) {
+            SectionCard(title = stringResource(R.string.setup_budget_titel), index = 3) {
                 BudgetSlider(
                     budget = profile.weeklyBudget ?: UserProfile.DEFAULT_BUDGET,
                     persons = profile.persons,
@@ -60,10 +60,10 @@ fun PreferencesRoute(
                     onChange = viewModel::onBudgetChange,
                 )
             }
-            SectionCard(title = stringResource(R.string.setup_stimmung_titel)) {
+            SectionCard(title = stringResource(R.string.setup_stimmung_titel), index = 4) {
                 MoodPicker(selected = profile.moods, onToggle = viewModel::onMoodToggle)
             }
-            SectionCard(title = stringResource(R.string.setup_ernaehrung_titel)) {
+            SectionCard(title = stringResource(R.string.setup_ernaehrung_titel), index = 5) {
                 DietPicker(
                     profile = profile,
                     onMainDiet = viewModel::onMainDiet,
@@ -71,10 +71,10 @@ fun PreferencesRoute(
                     onToggleIntolerance = viewModel::onIntoleranceToggle,
                 )
             }
-            SectionCard(title = stringResource(R.string.setup_geraete_titel)) {
+            SectionCard(title = stringResource(R.string.setup_geraete_titel), index = 6) {
                 AppliancePicker(selected = profile.appliances, onToggle = viewModel::onApplianceToggle)
             }
-            Button(
+            BouncyButton(
                 onClick = onBuildPlan,
                 shape = Tokens.Radius.PillShape,
                 modifier = Modifier

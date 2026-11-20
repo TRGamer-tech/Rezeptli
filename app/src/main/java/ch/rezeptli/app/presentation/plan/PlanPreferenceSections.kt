@@ -1,8 +1,17 @@
 package ch.rezeptli.app.presentation.plan
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -15,12 +24,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,9 +50,13 @@ import ch.rezeptli.app.domain.profile.StoreChain
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.profile.mainDiet
+import ch.rezeptli.app.presentation.common.components.BouncyFilledIconButton
 import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
+import ch.rezeptli.app.presentation.common.components.popOnChange
+import ch.rezeptli.app.presentation.common.components.pressScale
 import ch.rezeptli.app.presentation.common.formatChf
 import ch.rezeptli.app.presentation.common.label
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /*
@@ -52,7 +66,10 @@ import ch.rezeptli.app.presentation.common.theme.Tokens
  * nie auseinanderentwickeln, gibt es jede Frage nur einmal.
  */
 
-/** Eine antippbare Kachel mit Auswahlzustand: Rand und Fuellung zeigen, ob sie gewaehlt ist. */
+/**
+ * Eine antippbare Kachel mit Auswahlzustand: Fuellung und Rand zeigen, ob sie gewaehlt
+ * ist. Sie gibt unter dem Finger nach, und beim Umschalten springt sie kurz auf.
+ */
 @Composable
 private fun SelectableTile(
     selected: Boolean,
@@ -61,18 +78,35 @@ private fun SelectableTile(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = Tokens.Radius.XlShape
+    val motion = RezeptliTheme.motion
     val accent = MaterialTheme.colorScheme.primary
+    val fuellung by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else RezeptliTheme.accents.cardFill,
+        animationSpec = motion.fade(),
+        label = "kachel",
+    )
+    val rand by animateColorAsState(
+        targetValue = if (selected) accent else RezeptliTheme.accents.hairline,
+        animationSpec = motion.fade(),
+        label = "kachel-rand",
+    )
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
+            .pressScale(interaction)
+            .popOnChange(selected)
             .clip(shape)
-            .background(
-                if (selected) accent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainer,
-            ).border(
+            .background(fuellung)
+            .border(
                 width = if (selected) 2.dp else 1.dp,
-                color = if (selected) accent else Tokens.Border.Soft,
+                color = rand,
                 shape = shape,
-            ).clickable(role = Role.Checkbox, onClick = onClick)
-            .semantics { this.selected = selected },
+            ).clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                role = Role.Checkbox,
+                onClick = onClick,
+            ).semantics { this.selected = selected },
         contentAlignment = Alignment.Center,
         content = content,
     )
@@ -120,7 +154,7 @@ fun PersonStepper(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilledIconButton(onClick = { onChange(-1) }, enabled = persons > 1, modifier = Modifier.size(56.dp)) {
+        BouncyFilledIconButton(onClick = { onChange(-1) }, enabled = persons > 1, modifier = Modifier.size(56.dp)) {
             Icon(Icons.Filled.Remove, contentDescription = stringResource(R.string.setup_personen_weniger))
         }
         Column(
@@ -128,11 +162,30 @@ fun PersonStepper(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                text = persons.toString(),
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            // Die Zahl rollt nach oben oder unten, je nachdem, ob es mehr oder weniger werden.
+            val motion = RezeptliTheme.motion
+            AnimatedContent(
+                targetState = persons,
+                transitionSpec = {
+                    if (motion.reduced) {
+                        fadeIn(motion.fade()) togetherWith fadeOut(motion.fade())
+                    } else {
+                        val hoch = targetState > initialState
+                        (slideInVertically(motion.offsetSpring()) { if (hoch) it else -it } + fadeIn(motion.fade()))
+                            .togetherWith(
+                                slideOutVertically(motion.offsetSpring()) { if (hoch) -it else it } +
+                                    fadeOut(motion.fade()),
+                            )
+                    }
+                },
+                label = "personen",
+            ) { anzahl ->
+                Text(
+                    text = anzahl.toString(),
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             Text(
                 text = if (persons == 1) {
                     stringResource(R.string.setup_personen_eine)
@@ -143,7 +196,7 @@ fun PersonStepper(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        FilledIconButton(
+        BouncyFilledIconButton(
             onClick = { onChange(1) },
             enabled = persons < UserProfile.MAX_HOUSEHOLD_SIZE,
             modifier = Modifier.size(56.dp),
@@ -162,37 +215,14 @@ fun DayPicker(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             Weekday.entries.forEach { day ->
-                val isSelected = day in selected
-                Box(
+                DayPill(
+                    label = day.short,
+                    selected = day in selected,
+                    onClick = { onToggle(day) },
                     modifier = Modifier
                         .weight(1f)
-                        .aspectRatio(0.72f)
-                        .clip(Tokens.Radius.PillShape)
-                        .background(
-                            if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainer
-                            },
-                        ).border(
-                            1.dp,
-                            if (isSelected) MaterialTheme.colorScheme.primary else Tokens.Border.Soft,
-                            Tokens.Radius.PillShape,
-                        ).clickable(role = Role.Checkbox) { onToggle(day) }
-                        .semantics { this.selected = isSelected },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = day.short,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
+                        .aspectRatio(0.72f),
+                )
             }
         }
         Text(
@@ -362,3 +392,50 @@ private fun Appliance.emoji(): String = when (this) {
 }
 
 private const val BUDGET_STEP = 10
+
+/** Ein Wochentag als Pille: gewaehlt voll gruen, sonst Papier. Springt beim Umschalten. */
+@Composable
+private fun DayPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val motion = RezeptliTheme.motion
+    val fuellung by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else RezeptliTheme.accents.cardFill,
+        animationSpec = motion.fade(),
+        label = "tag",
+    )
+    val schrift by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        animationSpec = motion.fade(),
+        label = "tag-schrift",
+    )
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier = modifier
+            .pressScale(interaction)
+            .popOnChange(selected)
+            .clip(Tokens.Radius.PillShape)
+            .background(fuellung)
+            .border(
+                1.dp,
+                if (selected) MaterialTheme.colorScheme.primary else RezeptliTheme.accents.hairline,
+                Tokens.Radius.PillShape,
+            ).clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                role = Role.Checkbox,
+                onClick = onClick,
+            ).semantics { this.selected = selected },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = schrift,
+        )
+    }
+}

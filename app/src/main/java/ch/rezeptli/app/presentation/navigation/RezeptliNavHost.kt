@@ -1,11 +1,21 @@
 package ch.rezeptli.app.presentation.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -13,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.cooking.CookingRoute
 import ch.rezeptli.app.presentation.deck.DeckRoute
 import ch.rezeptli.app.presentation.multiplayer.MultiplayerRoute
@@ -46,12 +57,26 @@ fun RezeptliNavHost(
     }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
+    val motion = RezeptliTheme.motion
 
     Scaffold(
         bottomBar = {
-            // Die Leiste steht nur auf den vier Hauptbildschirmen. Beim Wischen einer
+            // Die Leiste steht nur auf den Hauptbildschirmen. Beim Wischen einer
             // gemeinsamen Runde oder im Kochmodus waere sie ein Ausrutscher zu viel.
-            if (zeigtLeiste(backStackEntry?.destination?.route)) {
+            // Sie gleitet hinaus und wieder herein, statt einfach zu verschwinden.
+            AnimatedVisibility(
+                visible = zeigtLeiste(backStackEntry?.destination?.route),
+                enter = if (motion.reduced) {
+                    fadeIn(motion.fade())
+                } else {
+                    slideInVertically(motion.offsetSpring()) { it } + fadeIn(motion.fade())
+                },
+                exit = if (motion.reduced) {
+                    fadeOut(motion.fade())
+                } else {
+                    slideOutVertically(motion.offsetSpring()) { it } + fadeOut(motion.fade())
+                },
+            ) {
                 RezeptliBottomBar(navController = navController)
             }
         },
@@ -60,6 +85,43 @@ fun RezeptliNavHost(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.padding(leistenAbstand),
+            // Vorwaerts schiebt sich der neue Bildschirm von der Seite herein, zurueck
+            // gleitet er wieder hinaus. Zwischen Tabs gibt es keine Richtung - dort
+            // blendet der Inhalt nur weich ueber.
+            enterTransition = {
+                when {
+                    motion.reduced -> fadeIn(motion.fade())
+                    isTabSwitch() -> fadeIn(tween(TAB_FADE_MS, delayMillis = TAB_FADE_DELAY_MS)) +
+                        scaleIn(motion.snappy(), initialScale = TAB_SCALE)
+                    else -> slideIntoContainer(SlideDirection.Start, motion.offsetSpring()) { it / 4 } +
+                        fadeIn(tween(SCREEN_FADE_MS))
+                }
+            },
+            exitTransition = {
+                when {
+                    motion.reduced -> fadeOut(motion.fade())
+                    isTabSwitch() -> fadeOut(tween(TAB_FADE_DELAY_MS))
+                    else -> slideOutOfContainer(SlideDirection.Start, motion.offsetSpring()) { it / 8 } +
+                        fadeOut(tween(SCREEN_FADE_MS))
+                }
+            },
+            popEnterTransition = {
+                when {
+                    motion.reduced -> fadeIn(motion.fade())
+                    isTabSwitch() -> fadeIn(tween(TAB_FADE_MS, delayMillis = TAB_FADE_DELAY_MS)) +
+                        scaleIn(motion.snappy(), initialScale = TAB_SCALE)
+                    else -> slideIntoContainer(SlideDirection.End, motion.offsetSpring()) { it / 8 } +
+                        fadeIn(tween(SCREEN_FADE_MS))
+                }
+            },
+            popExitTransition = {
+                when {
+                    motion.reduced -> fadeOut(motion.fade())
+                    isTabSwitch() -> fadeOut(tween(TAB_FADE_DELAY_MS))
+                    else -> slideOutOfContainer(SlideDirection.End, motion.offsetSpring()) { it / 4 } +
+                        fadeOut(tween(SCREEN_FADE_MS))
+                }
+            },
         ) {
             composable(Destinations.ONBOARDING) {
                 PlanSetupRoute(
@@ -268,3 +330,12 @@ fun RezeptliNavHost(
         }
     }
 }
+
+/** Ein Wechsel zwischen zwei Tabs der unteren Leiste - kein Vor und Zurueck. */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabSwitch(): Boolean =
+    zeigtLeiste(initialState.destination.route) && zeigtLeiste(targetState.destination.route)
+
+private const val TAB_FADE_MS = 220
+private const val TAB_FADE_DELAY_MS = 90
+private const val TAB_SCALE = 0.96f
+private const val SCREEN_FADE_MS = 200

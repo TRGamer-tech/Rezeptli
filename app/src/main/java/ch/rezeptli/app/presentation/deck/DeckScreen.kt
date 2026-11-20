@@ -1,34 +1,34 @@
 package ch.rezeptli.app.presentation.deck
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,20 +36,38 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
+import ch.rezeptli.app.presentation.common.components.ConfettiBurst
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.IconMotion
+import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.RecipeImage
+import ch.rezeptli.app.presentation.common.components.RezeptliFilterChip
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
+import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
+import ch.rezeptli.app.presentation.common.components.entrance
+import ch.rezeptli.app.presentation.common.components.popOnChange
+import ch.rezeptli.app.presentation.common.components.rememberEntranceState
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 import ch.rezeptli.app.presentation.swipe.SwipeCardStack
+import ch.rezeptli.app.presentation.swipe.SwipeDecisionButtons
+import ch.rezeptli.app.presentation.swipe.rememberSwipeCardStackState
 
 /**
  * Der Einstieg in die App: wischen, nicht suchen.
@@ -79,12 +97,12 @@ fun DeckRoute(
             title = { Text(stringResource(R.string.stapel_verlassen_titel)) },
             text = { Text(stringResource(R.string.stapel_verlassen_text)) },
             confirmButton = {
-                TextButton(onClick = { abbrechenFragen = false }) {
+                BouncyTextButton(onClick = { abbrechenFragen = false }) {
                     Text(stringResource(R.string.stapel_weiterwischen))
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
+                BouncyTextButton(onClick = {
                     abbrechenFragen = false
                     viewModel.onRestart()
                     onLeave()
@@ -125,6 +143,7 @@ fun DeckScreen(
     onTogether: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motion = RezeptliTheme.motion
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -132,7 +151,7 @@ fun DeckScreen(
                 title = stringResource(R.string.stapel_titel),
                 actions = {
                     if (uiState.step == DeckStep.WISCHEN && uiState.target != null) {
-                        TextButton(onClick = onFinishEarly) {
+                        BouncyTextButton(onClick = onFinishEarly) {
                             Text(stringResource(R.string.stapel_genug))
                         }
                     }
@@ -140,24 +159,25 @@ fun DeckScreen(
             )
         },
     ) { padding ->
-        Column(
+        // Jeder Schritt der Runde kommt mit einer kleinen Bewegung herein - der Wechsel
+        // von der Frage zum Stapel zur Ausbeute soll sich wie ein Weitergehen anfuehlen.
+        AnimatedContent(
+            targetState = uiState.step,
+            transitionSpec = { motion.enter() togetherWith motion.exit() },
+            contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-        ) {
-            when (uiState.step) {
+            label = "runde",
+        ) { step ->
+            when (step) {
                 DeckStep.ANZAHL -> TargetStep(
                     uiState = uiState,
                     onTargetChange = onTargetChange,
                     onStart = onStart,
                 )
 
-                DeckStep.LADEN -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+                DeckStep.LADEN -> RezeptliLoader(message = stringResource(R.string.laden_stapel))
 
                 DeckStep.WISCHEN -> SwipingStep(
                     uiState = uiState,
@@ -189,30 +209,29 @@ private fun TargetStep(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        SectionCard(title = stringResource(R.string.stapel_anzahl_frage)) {
+        SectionCard(title = stringResource(R.string.stapel_anzahl_frage), index = 0) {
             Text(
                 stringResource(R.string.stapel_anzahl_hinweis),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 TARGET_OPTIONS.forEach { anzahl ->
-                    FilterChip(
+                    RezeptliFilterChip(
                         selected = uiState.target == anzahl,
                         onClick = { onTargetChange(anzahl) },
-                        label = {
-                            Text(pluralStringResource(R.plurals.stapel_gerichte, anzahl, anzahl))
-                        },
-                        modifier = Modifier.heightIn(min = 48.dp),
+                        label = pluralStringResource(R.plurals.stapel_gerichte, anzahl, anzahl),
                     )
                 }
-                FilterChip(
+                RezeptliFilterChip(
                     selected = uiState.target == null,
                     onClick = { onTargetChange(null) },
-                    label = { Text(stringResource(R.string.stapel_endlos)) },
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    label = stringResource(R.string.stapel_endlos),
                 )
             }
         }
@@ -222,16 +241,27 @@ private fun TargetStep(
                 stringResource(R.string.stapel_kein_vorrat),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.entrance(1),
             )
         }
 
-        Button(
+        BouncyButton(
             onClick = onStart,
             modifier = Modifier
+                .entrance(2)
                 .fillMaxWidth()
-                .heightIn(min = 48.dp),
+                .heightIn(min = 56.dp),
         ) {
-            Text(stringResource(R.string.stapel_losgehts))
+            Text(stringResource(R.string.stapel_losgehts), style = MaterialTheme.typography.titleMedium)
+            MotionIcon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                motion = IconMotion.SLIDE,
+                playOnAppear = true,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(20.dp),
+            )
         }
     }
 }
@@ -242,13 +272,13 @@ private fun SwipingStep(
     onSwiped: (DeckEntry, Boolean) -> Unit,
     onFinishEarly: () -> Unit,
 ) {
+    val stapel = rememberSwipeCardStackState()
     Column(modifier = Modifier.fillMaxSize()) {
         DeckProgress(uiState = uiState)
 
         if (uiState.isEmpty) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            // Die naechsten Karten werden noch geprueft oder ihre Bilder geholt.
+            RezeptliLoader(modifier = Modifier.weight(1f))
         } else {
             SwipeCardStack(
                 cards = uiState.remainingCards,
@@ -257,20 +287,31 @@ private fun SwipingStep(
                     val eintrag = uiState.cards.firstOrNull { it.url.hashCode().toLong() == summary.id }
                     if (eintrag != null) onSwiped(eintrag, liked)
                 },
+                state = stapel,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
+
+        SwipeDecisionButtons(
+            onNo = { stapel.swipe(false) },
+            onYes = { stapel.swipe(true) },
+            enabled = !uiState.isEmpty,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+        )
 
         // Ohne Ziel gibt es keine Zahl, bei der die Runde von selbst endet - dafuer
         // dieser eigene, gut sichtbare Knopf statt der kleinen Textschaltflaeche oben.
         if (uiState.target == null) {
-            Button(
+            BouncyOutlinedButton(
                 onClick = onFinishEarly,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
                     .heightIn(min = 48.dp),
             ) {
                 Text(stringResource(R.string.stapel_fertig))
@@ -286,25 +327,31 @@ private fun DeckProgress(uiState: DeckUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val ziel = uiState.target
-        if (ziel != null) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Das Herz springt, sobald etwas Neues gefunden ist.
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = RezeptliTheme.accents.tomato,
+                modifier = Modifier
+                    .size(18.dp)
+                    .popOnChange(uiState.foundCount),
+            )
+            val ziel = uiState.target
             Text(
-                text = stringResource(R.string.stapel_fortschritt, uiState.foundCount, ziel),
+                text = if (ziel != null) {
+                    stringResource(R.string.stapel_fortschritt, uiState.foundCount, ziel)
+                } else {
+                    stringResource(R.string.stapel_fortschritt_endlos, uiState.foundCount)
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            LinearProgressIndicator(
-                progress = { uiState.progress },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            Text(
-                text = stringResource(R.string.stapel_fortschritt_endlos, uiState.foundCount),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        }
+        if (uiState.target != null) {
+            RezeptliProgressBar(progress = uiState.progress, color = RezeptliTheme.accents.tomato)
         }
     }
 }
@@ -329,87 +376,135 @@ private fun ResultStep(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(key = "kopf") {
-            Text(
-                text = pluralStringResource(
-                    R.plurals.stapel_ergebnis_titel,
-                    uiState.liked.size,
-                    uiState.liked.size,
-                ),
-                style = MaterialTheme.typography.headlineSmall,
-            )
-        }
-
-        items(uiState.liked, key = { it.url }) { eintrag ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .cardSurface(Tokens.Radius.MdShape)
-                    .padding(12.dp),
-            ) {
-                Text(eintrag.title, style = MaterialTheme.typography.titleMedium)
+    val eintritt = rememberEntranceState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "kopf") {
                 Text(
-                    eintrag.sourceName,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = pluralStringResource(
+                        R.plurals.stapel_ergebnis_titel,
+                        uiState.liked.size,
+                        uiState.liked.size,
+                    ),
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.entrance(0, eintritt, "kopf"),
                 )
             }
-        }
 
-        item(key = "aktionen") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onKeep,
-                    enabled = !uiState.isSaving,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp),
-                ) {
-                    Text(
-                        if (uiState.isSaving) {
-                            stringResource(
-                                R.string.stapel_speichern_laeuft,
-                                uiState.savedCount,
-                                uiState.liked.size,
-                            )
-                        } else {
-                            stringResource(R.string.stapel_speichern)
-                        },
-                    )
-                }
+            itemsIndexed(uiState.liked, key = { _, eintrag -> eintrag.url }) { index, eintrag ->
+                LikedRow(
+                    eintrag = eintrag,
+                    modifier = Modifier.entrance(index + 1, eintritt, eintrag.url),
+                )
+            }
 
-                // Party-Modus: dieselbe Auswahl, aber zu zweit entschieden.
-                OutlinedButton(
-                    onClick = onTogether,
-                    enabled = !uiState.isSaving,
+            item(key = "aktionen") {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp),
+                        .padding(top = 8.dp)
+                        .entrance(uiState.liked.size + 1, eintritt, "aktionen"),
                 ) {
-                    Icon(imageVector = Icons.Filled.Group, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.stapel_zu_zweit),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
+                    BouncyButton(
+                        onClick = onKeep,
+                        enabled = !uiState.isSaving,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp),
+                    ) {
+                        Text(
+                            if (uiState.isSaving) {
+                                stringResource(
+                                    R.string.stapel_speichern_laeuft,
+                                    uiState.savedCount,
+                                    uiState.liked.size,
+                                )
+                            } else {
+                                stringResource(R.string.stapel_speichern)
+                            },
+                        )
+                    }
 
-                TextButton(
-                    onClick = onRestart,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.stapel_neue_runde),
-                        textAlign = TextAlign.Center,
-                    )
+                    // Party-Modus: dieselbe Auswahl, aber zu zweit entschieden.
+                    BouncyOutlinedButton(
+                        onClick = onTogether,
+                        enabled = !uiState.isSaving,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 52.dp),
+                    ) {
+                        MotionIcon(
+                            imageVector = Icons.Filled.Group,
+                            contentDescription = null,
+                            motion = IconMotion.HOP,
+                            playOnAppear = true,
+                        )
+                        Text(
+                            text = stringResource(R.string.stapel_zu_zweit),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+
+                    BouncyTextButton(
+                        onClick = onRestart,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.stapel_neue_runde),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }
+
+        // Geschafft - ein kurzer Konfettiregen ueber der Ausbeute.
+        ConfettiBurst(trigger = uiState.liked.size, modifier = Modifier.fillMaxSize())
+    }
+}
+
+/** Ein gemochtes Rezept: kleines Foto, Titel, Quelle. */
+@Composable
+private fun LikedRow(eintrag: DeckEntry, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .cardSurface(Tokens.Radius.LgShape)
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RecipeImage(
+            photoUri = eintrag.imageUrl,
+            title = eintrag.title,
+            modifier = Modifier
+                .size(60.dp)
+                .clip(Tokens.Radius.MdShape),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                eintrag.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                eintrag.sourceName,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.Filled.Favorite,
+            contentDescription = null,
+            tint = RezeptliTheme.accents.tomato,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }

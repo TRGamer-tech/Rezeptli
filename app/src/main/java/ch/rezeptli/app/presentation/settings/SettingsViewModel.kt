@@ -8,6 +8,7 @@ import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.repository.UserProfileRepository
+import ch.rezeptli.app.domain.settings.AppearanceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +22,8 @@ import javax.inject.Inject
 data class SettingsUiState(
     val profile: UserProfile = UserProfile.EMPTY,
     val showResetDialog: Boolean = false,
+    /** Die App-Einstellung - ob Android selbst Animationen entfernt hat, weiss nur die Oberflaeche. */
+    val reduceMotion: Boolean = false,
 )
 
 /**
@@ -32,12 +35,17 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val profileRepository: UserProfileRepository,
+    private val appearanceRepository: AppearanceRepository,
 ) : ViewModel() {
     private val dialogVisible = MutableStateFlow(false)
 
     val uiState: StateFlow<SettingsUiState> =
-        combine(profileRepository.profile, dialogVisible.asStateFlow()) { profile, showDialog ->
-            SettingsUiState(profile = profile, showResetDialog = showDialog)
+        combine(
+            profileRepository.profile,
+            dialogVisible.asStateFlow(),
+            appearanceRepository.reduceMotion,
+        ) { profile, showDialog, reduceMotion ->
+            SettingsUiState(profile = profile, showResetDialog = showDialog, reduceMotion = reduceMotion)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -60,6 +68,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onHouseholdSizeChange(size: Int?) = edit {
         it.copy(householdSize = size?.coerceIn(1, UserProfile.MAX_HOUSEHOLD_SIZE))
+    }
+
+    fun onReduceMotionChange(reduce: Boolean) {
+        viewModelScope.launch { appearanceRepository.setReduceMotion(reduce) }
     }
 
     fun onResetRequest() {
