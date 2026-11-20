@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rezeptli – die Woche steht</title>
 <meta name="description" content="Rezeptli plant deine Kochwoche: Wochenplan mit Budget, Einkaufsliste nach Gang sortiert und Rezepte zu zweit wischen. Ohne Konto, ohne Tracking.">
-<meta name="theme-color" content="#1a1a1a">
-<link rel="preload" href="fonts/bricolage-grotesque-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+<meta name="theme-color" content="#FBF6EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1E18" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="img/topf.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/fraunces-latin-full-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/figtree-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 <script>document.documentElement.className = "js";</script>
 </head>
@@ -14,7 +18,16 @@
 <a class="skip" href="#inhalt">Zum Inhalt</a>
 
 <header class="top">
-  <a class="brand" href="./"><i>R</i>Rezeptli</a>
+  <a class="brand" href="./" aria-label="Rezeptli, zur Startseite">
+    <svg class="pot" viewBox="0 0 100 100" aria-hidden="true">
+      <path class="steam s1" d="M37 33 C34 28 40 23 37 18"/><path class="steam s2" d="M50 33 C47 28 53 23 50 18"/><path class="steam s3" d="M63 33 C60 28 66 23 63 18"/>
+      <rect class="body" x="12" y="56" width="12" height="9" rx="4.5"/><rect class="body" x="76" y="56" width="12" height="9" rx="4.5"/>
+      <path class="body" d="M23 51 H77 A3 3 0 0 1 80 54 V70 A14 14 0 0 1 66 84 H34 A14 14 0 0 1 20 70 V54 A3 3 0 0 1 23 51 Z"/>
+      <path class="heart" d="M50 71.7 C42 66.4 46.6 59.5 50 64.4 C53.4 59.5 58 66.4 50 71.7 Z"/>
+      <g class="lid"><rect class="body" x="16" y="42" width="68" height="8" rx="4"/><circle class="body" cx="50" cy="37.5" r="4.5"/></g>
+    </svg>
+    <span>Rezeptli</span>
+  </a>
   <nav class="nav" aria-label="Hauptnavigation">
     <a href="#ablauf">So geht's</a>
     <a href="#quellen">Quellen</a>
@@ -27,13 +40,16 @@
 <section class="hero" aria-labelledby="titel">
   <div class="hero-days" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
   <div class="hero-cards" aria-hidden="true">
-    <div class="fc"><div class="plate p1"></div><b>Linsen-Dal</b><small>25 Min · CHF 3.40</small></div>
-    <div class="fc"><div class="plate p2"></div><b>Pasta al Limone</b><small>20 Min · CHF 2.90</small></div>
-    <div class="fc"><div class="plate p3"></div><b>Rösti mit Spiegelei</b><small>30 Min · CHF 3.10</small></div>
+    <div class="fc"><div class="plate p1"></div><span class="ftag t-herb">Vegetarisch</span><b>Linsen-Dal</b><small>25 Min · CHF 3.40</small></div>
+    <div class="fc"><div class="plate p2"></div><span class="ftag t-butter">Schnell</span><b>Pasta al Limone</b><small>20 Min · CHF 2.90</small></div>
+    <div class="fc"><div class="plate p3"></div><span class="ftag t-apricot">Familie</span><b>Rösti mit Spiegelei</b><small>30 Min · CHF 3.10</small></div>
   </div>
+  <ul class="market-tags" aria-hidden="true">
+    <li class="mt mt1">Rüebli</li><li class="mt mt2">Basilikum</li><li class="mt mt3">Peperoni</li><li class="mt mt4">Bergkäse</li>
+  </ul>
   <div class="wrap">
     <span class="eyebrow">Wochenplaner für die Schweiz</span>
-    <h1 id="titel"><span class="w">Die</span> <span class="w">Woche</span> <em class="w">steht.</em></h1>
+    <h1 id="titel"><span class="w">Die</span> <span class="w">Woche</span> <em class="w">steht.<svg class="swoosh" viewBox="0 0 300 30" preserveAspectRatio="none" aria-hidden="true"><path d="M4 22 C 70 6, 150 4, 296 16"/></svg></em></h1>
     <p class="hero-sub">Sag, wie viele ihr seid, was ihr ausgeben wollt und worauf ihr Lust habt. Rezeptli baut dir den Plan und die Einkaufsliste dazu.</p>
     <div class="hero-cta">
       <a class="btn" href="#laden">Android-App laden</a>
@@ -67,15 +83,16 @@
         <div class="s-hello">Guten Abend,<br>Mara</div>
         <span class="s-chip">Geplant für Migros</span>
         <div class="s-cost"><div><span>Geschätzt</span><span>CHF 84.40 / 100</span></div><div class="bar"><i></i></div></div>
-        <div class="day"><div class="ph p1"></div><div><span class="tag m">Vegetarisch</span><b>Linsen-Dal</b><small>Mo · 25 Min · CHF 3.40</small></div></div>
-        <div class="day"><div class="ph p2"></div><div><span class="tag a">Schnell</span><b>Pasta al Limone</b><small>Di · 20 Min · CHF 2.90</small></div></div>
-        <div class="day"><div class="ph p3"></div><div><span class="tag r">Familie</span><b>Rösti mit Spiegelei</b><small>Mi · 30 Min · CHF 3.10</small></div></div>
+        <div class="day"><div class="ph p1"></div><div><span class="tag t-herb">Vegetarisch</span><b>Linsen-Dal</b><small>Mo · 25 Min · CHF 3.40</small></div></div>
+        <div class="day"><div class="ph p2"></div><div><span class="tag t-butter">Schnell</span><b>Pasta al Limone</b><small>Di · 20 Min · CHF 2.90</small></div></div>
+        <div class="day"><div class="ph p3"></div><div><span class="tag t-apricot">Familie</span><b>Rösti mit Spiegelei</b><small>Mi · 30 Min · CHF 3.10</small></div></div>
         <span class="s-rebuild">Plan neu bauen</span>
       </div>
 
       <div class="screen s-list">
         <div class="s-hello">Einkaufsliste</div>
         <div class="s-count"><span class="cnt">0</span> / 6 gekauft</div>
+        <div class="bar list-bar"><i></i></div>
         <div class="aisle">Gemüse &amp; Früchte</div>
         <div class="item"><span class="cb"></span><span class="n">Zitronen</span><span class="q">3 Stk</span></div>
         <div class="item"><span class="cb"></span><span class="n">Zwiebeln</span><span class="q">1 Netz</span></div>
@@ -92,37 +109,46 @@
         <div class="who"><span><i></i>Mara</span><span><i></i>Jonas</span></div>
         <div class="duo">
           <div class="fc c-back"><div class="plate p4"></div><b>Gemüse-Curry</b><small>35 Min</small></div>
-          <div class="fc c-front"><div class="plate p2"></div><b>Pasta al Limone</b><small>20 Min</small><span class="vote yes">JA</span><span class="vote no">NEIN</span></div>
+          <div class="fc c-front"><div class="plate p2"></div><b>Pasta al Limone</b><small>20 Min</small><span class="vote yes">JA ♥</span><span class="vote no">NEIN ✕</span></div>
         </div>
-        <div class="match"><b>Match!</b><small>Pasta al Limone<br>kommt in die Woche</small></div>
+        <div class="duo-btns"><span class="db no">✕</span><span class="db yes">♥</span></div>
+        <div class="match"><span class="confetti"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><b>Treffer!</b><small>Pasta al Limone<br>kommt in die Woche</small></div>
       </div>
     </div>
   </div>
 </section>
 
 <section class="sources wrap" id="quellen" aria-labelledby="quellen-titel">
+  <span class="eyebrow">Quellen</span>
   <h2 id="quellen-titel">Rezepte aus den Küchen, die du kennst.</h2>
 </section>
-<div class="sources" style="padding-block:0 90px" aria-label="Unterstützte Rezeptquellen">
+<div class="sources bands" aria-label="Unterstützte Rezeptquellen">
   <div class="band" data-dir="-1"><span>Betty Bossi</span><span>Swissmilk</span><span>Gutekueche</span><span>Migusto</span><span>Bettys Küchenschätze</span><span>Einfach Kochen</span><span>ichkoche.at</span><span>Kochrezepte.at</span><span>CuisineAZ</span><span>Ptitchef</span><span>Cookaround</span></div>
   <div class="band alt" data-dir="1"><span>Fooby</span><span>Chefkoch</span><span>Le Menu</span><span>per Link importieren</span><span>Fooby</span><span>Chefkoch</span><span>Le Menu</span><span>per Link importieren</span><span>Fooby</span><span>Chefkoch</span><span>Le Menu</span><span>per Link importieren</span></div>
 </div>
 
 <section class="promise wrap" id="versprechen" aria-labelledby="vers-titel">
   <span class="eyebrow">Datenschutz</span>
-  <h2 id="vers-titel" style="margin-top:16px">Deine Küche bleibt deine.</h2>
+  <h2 id="vers-titel">Deine Küche bleibt deine.</h2>
   <div class="promise-grid">
-    <div class="pcard"><span class="big">0</span><h3>Konten</h3><p>Keine Anmeldung, kein Profil. Rezepte, Plan und Liste liegen nur auf deinem Gerät.</p></div>
-    <div class="pcard"><span class="big">0</span><h3>Tracker</h3><p>Kein Analytics, keine Werbung, kein Absturzbericht-Dienst. Rezeptli kennt dich nicht.</p></div>
-    <div class="pcard"><span class="big">12 h</span><h3>Dann ist's weg</h3><p>Beim Wischen zu zweit gehen nur Rezepttitel an den Pairing-Dienst – und nach zwölf Stunden wird die Runde gelöscht.</p></div>
+    <div class="pcard"><span class="big" data-zahl="0">0</span><h3>Konten</h3><p>Keine Anmeldung, kein Profil. Rezepte, Plan und Liste liegen nur auf deinem Gerät.</p></div>
+    <div class="pcard"><span class="big" data-zahl="0">0</span><h3>Tracker</h3><p>Kein Analytics, keine Werbung, kein Absturzbericht-Dienst. Rezeptli kennt dich nicht.</p></div>
+    <div class="pcard"><span class="big" data-zahl="12" data-einheit=" h">12 h</span><h3>Dann ist's weg</h3><p>Beim Wischen zu zweit gehen nur Rezepttitel an den Pairing-Dienst – und nach zwölf Stunden wird die Runde gelöscht.</p></div>
   </div>
 </section>
 
 <section class="get" id="laden" aria-labelledby="laden-titel">
   <div class="wrap">
+    <svg class="pot big-pot" viewBox="0 0 100 100" aria-hidden="true">
+      <path class="steam s1" d="M37 33 C34 28 40 23 37 18"/><path class="steam s2" d="M50 33 C47 28 53 23 50 18"/><path class="steam s3" d="M63 33 C60 28 66 23 63 18"/>
+      <rect class="body" x="12" y="56" width="12" height="9" rx="4.5"/><rect class="body" x="76" y="56" width="12" height="9" rx="4.5"/>
+      <path class="body" d="M23 51 H77 A3 3 0 0 1 80 54 V70 A14 14 0 0 1 66 84 H34 A14 14 0 0 1 20 70 V54 A3 3 0 0 1 23 51 Z"/>
+      <path class="heart" d="M50 71.7 C42 66.4 46.6 59.5 50 64.4 C53.4 59.5 58 66.4 50 71.7 Z"/>
+      <g class="lid"><rect class="body" x="16" y="42" width="68" height="8" rx="4"/><circle class="body" cx="50" cy="37.5" r="4.5"/></g>
+    </svg>
     <h2 id="laden-titel">Heute noch planen.</h2>
     <p>Rezeptli ist quelloffen (MIT) und läuft auf Android 8 und neuer. Die Vorabversion installierst du direkt als APK.</p>
-    <a class="btn" href="https://github.com/TRGamer-tech/Rezeptli/releases/tag/apk-debug">APK von GitHub laden</a>
+    <a class="btn light" href="https://github.com/TRGamer-tech/Rezeptli/releases/tag/apk-debug">APK von GitHub laden</a>
     <p class="note">Beim Installieren musst du „Aus dieser Quelle installieren“ erlauben. Das ist eine Entwicklerversion (Debug).</p>
   </div>
 </section>
@@ -132,6 +158,7 @@
   <details><summary>Braucht Rezeptli ein Konto?</summary><p>Nein. Es gibt weder Konto noch Cloud-Sync. Alles liegt in einer lokalen Datenbank auf deinem Gerät.</p></details>
   <details><summary>Wie funktioniert „Zu zweit“?</summary><p>Eine Person eröffnet eine Runde und teilt den Code. Alle wischen auf dem eigenen Handy. Erst wenn alle fertig sind, werden die gemeinsamen Treffer sichtbar.</p></details>
   <details><summary>Sind Allergene und Diäten sicher erkannt?</summary><p>Nein, und die App behauptet das auch nie. Hinweise sind Orientierung aus den Zutaten – prüfe bei Allergien immer die Verpackung und das Originalrezept.</p></details>
+  <details><summary>Bewegt sich die App nicht zu viel?</summary><p>Wenn du in Android „Animationen entfernen“ eingeschaltet hast, bleibt Rezeptli von selbst ruhig. Und in den Einstellungen gibt es zusätzlich „Bewegung reduzieren“ – nur für Rezeptli. Diese Seite hält sich übrigens auch an die Einstellung deines Geräts.</p></details>
   <details><summary>Und iPhone?</summary><p>Rezeptli gibt es vorerst nur für Android.</p></details>
 </section>
 </main>
