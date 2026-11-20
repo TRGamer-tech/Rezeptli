@@ -2,9 +2,6 @@ package ch.rezeptli.app.keyboard
 
 import android.os.Build
 import android.view.View
-import android.view.WindowManager
-import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -48,6 +45,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.Dislike
+import ch.rezeptli.app.presentation.MainActivity
 import ch.rezeptli.app.presentation.common.components.KeyboardAwareScaffold
 import ch.rezeptli.app.presentation.common.components.aboveBarsAndKeyboard
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
@@ -59,6 +57,7 @@ import ch.rezeptli.app.presentation.plan.DislikePicker
 import ch.rezeptli.app.presentation.plan.NameField
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListScreen
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListUiState
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -70,14 +69,14 @@ import org.junit.runner.RunWith
  * Die Tastatur darf das Feld nicht verdecken, in das gerade getippt wird.
  *
  * Gemeldet war genau das: beim Vornamen, bei den Abneigungen und beim Code einer gemeinsamen
- * Runde. Hier laeuft die echte Tastatur des Geraets, in einem Fenster, das wie die App bis
- * unter die Systemleisten zeichnet. Gemessen wird, wo das Feld steht, sobald die Tastatur
- * offen ist: Seine Unterkante muss ueber ihrer Oberkante liegen.
+ * Runde. Hier laeuft die echte Tastatur des Geraets im echten Fenster der App ([MainActivity]) -
+ * ein nachgebautes Fenster verhielt sich anders als ihres. Gemessen wird, wo das Feld steht,
+ * sobald die Tastatur offen ist: Seine Unterkante muss ueber ihrer Oberkante liegen.
  */
 @RunWith(AndroidJUnit4::class)
 class KeyboardSpaceTest {
     @get:Rule
-    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+    val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     private fun text(id: Int): String = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
@@ -89,11 +88,8 @@ class KeyboardSpaceTest {
      * so, wie die App vorher gebaut war: Leiste unten, Inhalt darueber, kein Platz fuer die Tastatur.
      */
     private fun zeige(mitPlatz: Boolean = true, inhalt: @Composable () -> Unit) {
-        composeTestRule.activityRule.scenario.onActivity { activity ->
-            activity.enableEdgeToEdge()
-            // Wie im Manifest der App.
-            activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        }
+        // Das Fenster ist das der App: ihr Thema, ihr Eintrag im Manifest, ihr Zeichnen bis unter
+        // die Systemleisten. Nur der Inhalt wird ersetzt.
         composeTestRule.setContent {
             RezeptliTheme(reduceMotion = true) {
                 Abstaende()
@@ -157,6 +153,23 @@ class KeyboardSpaceTest {
         return hoehe
     }
 
+    /**
+     * Tippt ins Feld, bis die Tastatur aufgeht, und gibt ihre Oberkante zurueck.
+     *
+     * Ein Tipp genuegt nicht immer: Gleich nach dem Start kann das Startbild der App noch ueber
+     * dem Fenster liegen und ihn abfangen.
+     */
+    private fun oeffneTastatur(feld: SemanticsNodeInteraction): Int {
+        repeat(VERSUCHE) {
+            feld.performClick()
+            val offen = runCatching {
+                composeTestRule.waitUntil(timeoutMillis = KURZ_MS) { tastatur() > 0 }
+            }.isSuccess
+            if (offen) return oberkanteDerTastatur()
+        }
+        return oberkanteDerTastatur()
+    }
+
     /** Wartet, bis die Tastatur offen ist und nicht mehr waechst, und gibt ihre Oberkante zurueck. */
     private fun oberkanteDerTastatur(): Int {
         composeTestRule.waitUntil(timeoutMillis = WARTEN_MS) { tastatur() > 0 }
@@ -209,8 +222,7 @@ class KeyboardSpaceTest {
 
     /** Tippt in das Feld und prueft, dass es danach ganz ueber der Tastatur steht. */
     private fun pruefeFrei(feld: SemanticsNodeInteraction) {
-        feld.performClick()
-        val oberkante = oberkanteDerTastatur()
+        val oberkante = oeffneTastatur(feld)
         // Das Feld rollt ins Bild, sobald der Platz kleiner wird - das darf einen Augenblick dauern.
         runCatching {
             composeTestRule.waitUntil(timeoutMillis = RUHE_MS) { feld.unterkante() <= oberkante }
@@ -282,6 +294,9 @@ class KeyboardSpaceTest {
         zeige { Einkaufsliste() }
 
         val feld = composeTestRule.onNode(hasSetTextAction())
+        val titel = composeTestRule.onNodeWithText(text(R.string.shopping_title))
+        val titelVorher = titel.fetchSemanticsNode().positionInWindow.y
+        val abstaendeVorher = abstaende
         pruefeFrei(feld)
 
         // Und es sitzt direkt ueber der Tastatur: Der Platz wird einmal gemacht, nicht doppelt.
@@ -293,14 +308,14 @@ class KeyboardSpaceTest {
             luft <= erlaubt,
         )
 
-        // Oben dasselbe: Der Titel bleibt, wo er ohne Tastatur steht - gleich unter der Statusleiste.
-        val titel = composeTestRule.onNodeWithText(text(R.string.shopping_title))
+        // Oben bleibt alles, wo es war: Die Tastatur schiebt den Bildschirm nicht nach oben weg.
         titel.assertIsDisplayed()
-        val titelOben = titel.fetchSemanticsNode().positionInWindow.y
-        val titelGrenze = with(composeTestRule.density) { TITEL_HOECHSTENS.toPx() }
-        assertTrue(
-            "Der Titel beginnt bei $titelOben px, erwartet waren hoechstens $titelGrenze. ${lage(feld)}",
-            titelOben <= titelGrenze,
+        val titelNachher = titel.fetchSemanticsNode().positionInWindow.y
+        assertEquals(
+            "Der Titel hat sich mit der Tastatur bewegt. Vorher sah Compose: $abstaendeVorher. ${lage(feld)}",
+            titelVorher,
+            titelNachher,
+            1f,
         )
     }
 
@@ -323,8 +338,7 @@ class KeyboardSpaceTest {
         zeige(mitPlatz = false) { Einkaufsliste() }
 
         val feld = composeTestRule.onNode(hasSetTextAction())
-        feld.performClick()
-        val oberkante = oberkanteDerTastatur()
+        val oberkante = oeffneTastatur(feld)
 
         val ganzZuSehen = feld.unterkante() > feld.oberkante() &&
             feld.oberkante() >= 0f &&
@@ -360,12 +374,11 @@ class KeyboardSpaceTest {
         /** Der Rand um die Eingabezeile der Einkaufsliste - und etwas Spiel fuer Rundungen. */
         val ZEILENRAND = 16.dp
         val SPIEL = 8.dp
-
-        /** Statusleiste und obere Leiste zusammen sind keine 100 dp hoch - der Titel steht darin. */
-        val TITEL_HOECHSTENS = 100.dp
         const val ANDROID_15 = 35
         const val FUELLZEILEN = 12
         const val WARTEN_MS = 20_000L
+        const val KURZ_MS = 4_000L
+        const val VERSUCHE = 4
         const val RUHE_MS = 5_000L
     }
 }
