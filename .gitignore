@@ -14,5 +14,5 @@ local.properties
 *.aab
 /app/release/
 node_modules/
-package-lock.json__pycache__/
+__pycache__/
 *.pyc
