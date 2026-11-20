@@ -2,9 +2,13 @@ package ch.rezeptli.app.presentation.deck
 
 import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.parser.IngredientTextParser
+import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
+import ch.rezeptli.app.domain.plan.RecipeClassifier
 import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.ranking.SourceOrigin
 import ch.rezeptli.app.domain.repository.DeckPool
@@ -67,10 +71,11 @@ class DeckViewModelTest {
             cardImagesByUrl = mapOf(ohneBildAberNachladbar.url to "https://a.example/nachgeladen.jpg")
         },
         recipeRepository: FakeRecipeRepository = FakeRecipeRepository(),
+        profile: UserProfile = UserProfile(country = Country.SCHWEIZ),
     ) = DeckViewModel(
         buildDeck = BuildSwipeDeckUseCase(
             webRepository = webRepository,
-            profileRepository = FakeUserProfileRepository(UserProfile(country = Country.SCHWEIZ)),
+            profileRepository = FakeUserProfileRepository(profile),
             builder = CuratedDeckBuilder(),
         ),
         selectionHolder = SharedSelectionHolder(),
@@ -82,7 +87,66 @@ class DeckViewModelTest {
             NoTranslation,
         ),
         saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
+        profileRepository = FakeUserProfileRepository(profile),
+        checkCard = CheckRecipeCardUseCase(webRepository, IngredientTextParser(), RecipeClassifier()),
     )
+
+    @Test
+    fun `mit Allergie in den Vorlieben erscheinen nur gepruefte, passende Karten`() = runTest {
+        val mitNuessen = DeckEntry(
+            url = "https://a.example/nusstorte",
+            title = "Nusstorte",
+            imageUrl = "https://a.example/nuss.jpg",
+            sourceId = "a",
+            sourceName = "A",
+        )
+        val ohneNuesse = DeckEntry(
+            url = "https://a.example/roesti",
+            title = "Rösti",
+            imageUrl = "https://a.example/roesti.jpg",
+            sourceId = "a",
+            sourceName = "A",
+        )
+        val unlesbar = DeckEntry(
+            url = "https://a.example/kaputt",
+            title = "Unlesbar",
+            imageUrl = "https://a.example/kaputt.jpg",
+            sourceId = "a",
+            sourceName = "A",
+        )
+        val web = FakeWebRecipeRepository(
+            pool = DeckPool(
+                entriesBySource = mapOf("a" to listOf(mitNuessen, ohneNuesse, unlesbar)),
+                origins = mapOf("a" to SourceOrigin("a", Country.SCHWEIZ)),
+            ),
+            recipeByUrl = mapOf(
+                mitNuessen.url to WebRecipe(
+                    title = "Nusstorte",
+                    ingredientLines = listOf("200 g Haselnüsse", "100 g Zucker"),
+                    instructions = "Backen.",
+                    sourceUrl = mitNuessen.url,
+                    sourceName = "A",
+                ),
+                ohneNuesse.url to WebRecipe(
+                    title = "Rösti",
+                    ingredientLines = listOf("800 g Kartoffeln", "1 EL Bratbutter"),
+                    instructions = "Braten.",
+                    sourceUrl = ohneNuesse.url,
+                    sourceName = "A",
+                ),
+            ),
+        )
+        val viewModel = createViewModel(
+            webRepository = web,
+            profile = UserProfile(country = Country.SCHWEIZ, intolerances = setOf(Intolerance.NUESSE)),
+        )
+
+        viewModel.onStart()
+        val titel = viewModel.uiState.value.remainingCards
+            .map { it.title }
+
+        assertEquals(listOf("Rösti"), titel)
+    }
 
     @Test
     fun `zeigt nur Karten mit Bild - fehlende werden nachgeladen oder fallen heraus`() = runTest {

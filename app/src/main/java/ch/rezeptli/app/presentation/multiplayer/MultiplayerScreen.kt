@@ -1,5 +1,6 @@
 package ch.rezeptli.app.presentation.multiplayer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +13,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +32,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,7 +50,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.multiplayer.PairingError
+import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.presentation.common.components.ChoiceChipGroup
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.shareText
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
@@ -65,19 +76,48 @@ fun MultiplayerRoute(
     viewModel: MultiplayerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var verlassenFragen by remember { mutableStateOf(false) }
+    val laeuft = uiState.step in LAUFENDE_SCHRITTE
+
+    // Mitten in einer Runde fuehrt "Zurueck" nicht einfach hinaus - ein versehentlicher
+    // Wisch vom Rand haette sonst die ganze Runde gekostet.
+    BackHandler(enabled = laeuft) { verlassenFragen = true }
+
+    if (verlassenFragen) {
+        LeaveDialog(
+            code = uiState.code,
+            onPause = {
+                verlassenFragen = false
+                viewModel.onLeave()
+                onBack()
+            },
+            onEnd = {
+                verlassenFragen = false
+                viewModel.onEndRound()
+                onBack()
+            },
+            onDismiss = { verlassenFragen = false },
+        )
+    }
 
     MultiplayerScreen(
         uiState = uiState,
         onBack = {
-            viewModel.onLeave()
-            onBack()
+            if (laeuft) {
+                verlassenFragen = true
+            } else {
+                viewModel.onLeave()
+                onBack()
+            }
         },
         onTargetChange = viewModel::onTargetChange,
         onContinueFromTarget = viewModel::onContinueFromTarget,
         onHost = viewModel::onHost,
         onCodeInputChange = viewModel::onCodeInputChange,
         onJoin = viewModel::onJoin,
-        onStartSwiping = viewModel::onStartSwiping,
+        onResume = viewModel::onResume,
+        onFilterDietToggle = viewModel::onFilterDietToggle,
+        onFilterIntoleranceToggle = viewModel::onFilterIntoleranceToggle,
         onSwiped = viewModel::onSwiped,
         onDismissError = viewModel::onDismissError,
         onKeep = viewModel::onKeepMatches,
@@ -95,11 +135,13 @@ fun MultiplayerScreen(
     onHost: () -> Unit,
     onCodeInputChange: (String) -> Unit,
     onJoin: () -> Unit,
-    onStartSwiping: () -> Unit,
     onSwiped: (Long, Boolean) -> Unit,
     onDismissError: () -> Unit,
     onKeep: () -> Unit = {},
     onAddToPlan: () -> Unit = {},
+    onResume: () -> Unit = {},
+    onFilterDietToggle: (Diet) -> Unit = {},
+    onFilterIntoleranceToggle: (Intolerance) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -120,11 +162,18 @@ fun MultiplayerScreen(
                 ErrorNote(error = error, onDismiss = onDismissError)
             }
 
+            val fortsetzbar = uiState.resumableCode
+            if (fortsetzbar != null && uiState.step in listOf(MultiplayerStep.ANZAHL, MultiplayerStep.START)) {
+                ResumeCard(code = fortsetzbar, isBusy = uiState.isBusy, onResume = onResume)
+            }
+
             when (uiState.step) {
                 MultiplayerStep.ANZAHL -> TargetStep(
                     uiState = uiState,
                     onTargetChange = onTargetChange,
                     onContinue = onContinueFromTarget,
+                    onFilterDietToggle = onFilterDietToggle,
+                    onFilterIntoleranceToggle = onFilterIntoleranceToggle,
                 )
 
                 MultiplayerStep.START -> StartStep(
@@ -134,10 +183,7 @@ fun MultiplayerScreen(
                     onJoin = onJoin,
                 )
 
-                MultiplayerStep.WARTET_AUF_PERSON -> WaitingForPartner(
-                    code = uiState.code,
-                    onStartSwiping = onStartSwiping,
-                )
+                MultiplayerStep.WARTET_AUF_PERSON -> WaitingForPartner(code = uiState.code)
 
                 MultiplayerStep.WISCHEN -> SwipingStep(uiState = uiState, onSwiped = onSwiped)
 
@@ -159,8 +205,13 @@ private fun TargetStep(
     uiState: MultiplayerUiState,
     onTargetChange: (Int) -> Unit,
     onContinue: () -> Unit,
+    onFilterDietToggle: (Diet) -> Unit,
+    onFilterIntoleranceToggle: (Intolerance) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         Text(
             stringResource(R.string.stapel_anzahl_frage),
             style = MaterialTheme.typography.titleMedium,
@@ -183,6 +234,39 @@ private fun TargetStep(
             }
         }
 
+        // Was in dieser Runde nicht auf den Tisch darf. Vorbelegt aus den Vorlieben, fuer
+        // die Runde aenderbar - etwa wenn die andere Person eine Allergie hat.
+        Text(
+            stringResource(R.string.zuzweit_filter_titel),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            stringResource(R.string.zuzweit_filter_text),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        ChoiceChipGroup(
+            options = listOf(Diet.VEGETARISCH, Diet.VEGAN, Diet.PESCETARISCH),
+            selected = uiState.filter.diets,
+            label = { it.label() },
+            onToggle = onFilterDietToggle,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        ChoiceChipGroup(
+            options = Intolerance.entries,
+            selected = uiState.filter.intolerances,
+            label = { it.label() },
+            onToggle = onFilterIntoleranceToggle,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (uiState.filter.isActive) {
+            Text(
+                stringResource(R.string.zuzweit_filter_hinweis),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         Button(
             onClick = onContinue,
             modifier = Modifier
@@ -193,6 +277,59 @@ private fun TargetStep(
         }
     }
 }
+
+/** Eine unterbrochene Runde - ein Tipp, und es geht mit demselben Stapel weiter. */
+@Composable
+private fun ResumeCard(code: String, isBusy: Boolean, onResume: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .glassPanel(Tokens.Radius.LgShape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(stringResource(R.string.zuzweit_fortsetzen_titel, code), style = MaterialTheme.typography.titleMedium)
+        Text(
+            stringResource(R.string.zuzweit_fortsetzen_text),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Button(
+            onClick = onResume,
+            enabled = !isBusy,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+        ) { Text(stringResource(R.string.zuzweit_fortsetzen)) }
+    }
+}
+
+@Composable
+private fun LeaveDialog(code: String, onPause: () -> Unit, onEnd: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.zuzweit_verlassen_titel)) },
+        text = { Text(stringResource(R.string.zuzweit_verlassen_text, code)) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.zuzweit_weiterwischen)) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = onEnd) {
+                    Text(stringResource(R.string.zuzweit_beenden), color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = onPause) { Text(stringResource(R.string.zuzweit_unterbrechen)) }
+            }
+        },
+    )
+}
+
+/** Schritte, in denen eine Runde laeuft - hier fragt "Zurueck" erst nach. */
+private val LAUFENDE_SCHRITTE = setOf(
+    MultiplayerStep.WARTET_AUF_PERSON,
+    MultiplayerStep.WISCHEN,
+    MultiplayerStep.WARTET_AUF_ENTSCHEIDUNGEN,
+)
 
 @Composable
 private fun StartStep(
@@ -262,7 +399,7 @@ private fun StartStep(
 }
 
 @Composable
-private fun WaitingForPartner(code: String, onStartSwiping: () -> Unit) {
+private fun WaitingForPartner(code: String) {
     val context = LocalContext.current
     val shareMessage = stringResource(R.string.mehrspieler_teilen_text, code)
 
@@ -303,9 +440,6 @@ private fun WaitingForPartner(code: String, onStartSwiping: () -> Unit) {
                     text = "  " + stringResource(R.string.mehrspieler_teilen),
                 )
             }
-            Button(onClick = onStartSwiping, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.mehrspieler_schon_loswischen))
-            }
         }
 
         WaitingNote(
@@ -323,7 +457,11 @@ private fun SwipingStep(uiState: MultiplayerUiState, onSwiped: (Long, Boolean) -
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            // Bei aktivem Filter erscheint eine Karte erst nach ihrer Pruefung.
+            if (uiState.remainingCards.isEmpty()) {
+                CircularProgressIndicator()
+            }
             SwipeCardStack(
                 cards = uiState.remainingCards,
                 onSwiped = { card, liked -> onSwiped(card.id, liked) },

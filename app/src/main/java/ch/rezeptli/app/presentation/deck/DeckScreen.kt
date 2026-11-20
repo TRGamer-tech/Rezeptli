@@ -1,5 +1,6 @@
 package ch.rezeptli.app.presentation.deck
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -29,6 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -56,9 +61,39 @@ import ch.rezeptli.app.presentation.swipe.SwipeCardStack
 @Composable
 fun DeckRoute(
     onOpenTogether: () -> Unit,
+    onLeave: () -> Unit = {},
     viewModel: DeckViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var abbrechenFragen by remember { mutableStateOf(false) }
+
+    // Mitten im Wischen fuehrt "Zurueck" nicht einfach hinaus: Ein versehentlicher Wisch
+    // vom Bildschirmrand haette sonst die ganze Runde samt Auswahl gekostet.
+    val etwasZuVerlieren = uiState.step == DeckStep.WISCHEN ||
+        (uiState.step == DeckStep.FERTIG && uiState.liked.isNotEmpty())
+    BackHandler(enabled = etwasZuVerlieren) { abbrechenFragen = true }
+
+    if (abbrechenFragen) {
+        AlertDialog(
+            onDismissRequest = { abbrechenFragen = false },
+            title = { Text(stringResource(R.string.stapel_verlassen_titel)) },
+            text = { Text(stringResource(R.string.stapel_verlassen_text)) },
+            confirmButton = {
+                TextButton(onClick = { abbrechenFragen = false }) {
+                    Text(stringResource(R.string.stapel_weiterwischen))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    abbrechenFragen = false
+                    viewModel.onRestart()
+                    onLeave()
+                }) {
+                    Text(stringResource(R.string.stapel_verlassen), color = MaterialTheme.colorScheme.error)
+                }
+            },
+        )
+    }
 
     DeckScreen(
         uiState = uiState,

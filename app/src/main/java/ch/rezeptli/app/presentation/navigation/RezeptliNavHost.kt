@@ -105,6 +105,7 @@ fun RezeptliNavHost(
             composable(Destinations.DECK) {
                 DeckRoute(
                     onOpenTogether = { navController.navigate(Destinations.MULTIPLAYER) },
+                    onLeave = { navController.popBackStack() },
                 )
             }
 
