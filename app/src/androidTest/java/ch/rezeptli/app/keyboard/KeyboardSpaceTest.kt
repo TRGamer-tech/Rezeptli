@@ -49,6 +49,7 @@ import ch.rezeptli.app.presentation.plan.DislikePicker
 import ch.rezeptli.app.presentation.plan.NameField
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListScreen
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListUiState
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -237,21 +238,34 @@ class KeyboardSpaceTest {
     fun dasFeldDerEinkaufslisteGanzUntenBleibtSichtbar() {
         zeige { Einkaufsliste() }
 
-        pruefeFrei(composeTestRule.onNode(hasSetTextAction()))
+        val feld = composeTestRule.onNode(hasSetTextAction())
+        pruefeFrei(feld)
+
+        // Und es sitzt direkt ueber der Tastatur: Der Platz wird einmal gemacht, nicht doppelt.
+        // Zwischen Feld und Tastatur liegt nur der Rand der Zeile.
+        val luft = oberkanteDerTastatur() - feld.unterkante()
+        val erlaubt = with(composeTestRule.density) { (ZEILENRAND + SPIEL).toPx() }
+        assertTrue(
+            "Zwischen Feld und Tastatur sind $luft px frei, erlaubt sind $erlaubt. ${lage(feld)}",
+            luft <= erlaubt,
+        )
     }
 
     /**
-     * Die Gegenprobe - der gemeldete Fehler, nachgestellt: Ohne den eigens gemachten Platz
-     * liegt die Tastatur ueber dem Feld.
+     * Die Gegenprobe - der gemeldete Fehler, nachgestellt: Ohne den eigens gemachten Platz ist
+     * das Feld bei offener Tastatur nicht zu sehen.
      *
-     * Das gilt ab Android 15. Bis Android 14 schiebt das System in dieser Lage das ganze
-     * Fenster nach oben, bis das Feld mit dem Cursor zu sehen ist (auf dem Emulator gemessen:
-     * um genau die fehlenden Pixel) - dort ist der Fehler nicht nachzustellen, und der Test
-     * wird uebersprungen. Schlaegt er auf einer neueren Version fehl, macht Android den Platz
-     * wieder selbst, und [aboveBarsAndKeyboard] ist zu ueberdenken.
+     * Das gilt ab Android 15. Dort fiel das Feld auf dem Emulator ganz zusammen (Hoehe 0,
+     * nichts sichtbar): Die Abstaende fuer die Tastatur kommen ohne den Platz mehrfach an und
+     * lassen dem Inhalt keinen Raum. Bis Android 14 schiebt das System stattdessen das ganze
+     * Fenster nach oben, bis das Feld mit dem Cursor zu sehen ist - dort ist der Fehler so
+     * nicht nachzustellen, und der Test wird uebersprungen.
+     *
+     * Schlaegt er auf einer neueren Version fehl, macht Android den Platz wieder selbst, und
+     * [aboveBarsAndKeyboard] ist zu ueberdenken.
      */
     @Test
-    fun ohneDenPlatzVerdecktDieTastaturDasFeld() {
+    fun ohneDenPlatzIstDasFeldBeiOffenerTastaturNichtZuSehen() {
         assumeTrue("erst ab Android 15 nachzustellen", Build.VERSION.SDK_INT >= ANDROID_15)
         zeige(mitPlatz = false) { Einkaufsliste() }
 
@@ -259,9 +273,12 @@ class KeyboardSpaceTest {
         feld.performClick()
         val oberkante = oberkanteDerTastatur()
 
-        assertTrue(
-            "Erwartet war ein verdecktes Feld, die Tastatur beginnt bei $oberkante px. ${lage(feld)}",
-            feld.unterkante() > oberkante,
+        val ganzZuSehen = feld.unterkante() > feld.oberkante() &&
+            feld.oberkante() >= 0f &&
+            feld.unterkante() <= oberkante
+        assertFalse(
+            "Erwartet war ein Feld, das man nicht sieht; die Tastatur beginnt bei $oberkante px. ${lage(feld)}",
+            ganzZuSehen,
         )
     }
 
@@ -286,6 +303,10 @@ class KeyboardSpaceTest {
 
     private companion object {
         val LEISTE = 80.dp
+
+        /** Der Rand um die Eingabezeile der Einkaufsliste - und etwas Spiel fuer Rundungen. */
+        val ZEILENRAND = 16.dp
+        val SPIEL = 8.dp
         const val ANDROID_15 = 35
         const val FUELLZEILEN = 12
         const val WARTEN_MS = 20_000L
