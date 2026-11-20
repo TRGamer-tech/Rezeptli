@@ -1179,6 +1179,70 @@ class MultiplayerViewModelTest {
     }
 
     @Test
+    fun `fertig fragt nur nach, solange mit den Treffern nichts geschehen ist`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            // Die Treffer stehen da, aber noch nirgends: Wer jetzt geht, verliert sie.
+            assertTrue(viewModel.state.hasUnusedMatches)
+
+            viewModel.onKeepMatches()
+            runCurrent()
+
+            assertTrue(viewModel.state.import.hasOutcome)
+            assertFalse(viewModel.state.hasUnusedMatches, "nach dem Behalten ist Fertig einfach fertig")
+        }
+    }
+
+    @Test
+    fun `auch der Wochenplan zaehlt als etwas, das mit den Treffern geschehen ist`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+
+            viewModel.onAddToPlan()
+            runCurrent()
+
+            assertFalse(viewModel.state.hasUnusedMatches)
+        }
+    }
+
+    @Test
+    fun `ein Anlauf, bei dem sich nichts holen liess, hat nichts gerettet - es wird weiter nachgefragt`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 1)
+            val risottoKarte = viewModel.kennung("Risotto")
+            pairing.partnerVotesAll { it.recipeId == risottoKarte }
+            viewModel.state.remainingCards.forEach { viewModel.onSwiped(it.id, liked = it.id == risottoKarte) }
+            assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
+            web.unreachable = setOf(risottoUrl)
+
+            viewModel.onKeepMatches()
+            ladenAbwarten()
+
+            assertTrue(viewModel.state.import.keepTried)
+            assertTrue(
+                viewModel.state.import.kept
+                    .isEmpty(),
+            )
+            assertTrue(viewModel.state.hasUnusedMatches)
+        }
+    }
+
+    @Test
+    fun `ohne Treffer und waehrend der Runde gibt es nichts zu verlieren`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel)
+            assertFalse(viewModel.state.hasUnusedMatches, "waehrend des Wischens fragt Zurueck anders nach")
+
+            viewModel.onEndRound()
+            runCurrent()
+
+            assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
+            assertTrue(viewModel.state.matches.isEmpty())
+            assertFalse(viewModel.state.hasUnusedMatches)
+        }
+    }
+
+    @Test
     fun `Treffer in den Wochenplan - ein eigenes Rezept muss dafuer nicht geladen werden`() = runTest {
         mitViewModel { viewModel ->
             dreiTreffer(viewModel)

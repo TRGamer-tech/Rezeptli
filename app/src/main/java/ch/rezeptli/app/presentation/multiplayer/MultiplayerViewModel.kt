@@ -157,6 +157,16 @@ data class MultiplayerUiState(
 
     /** Laeuft eine Runde, die "Zurueck" nicht einfach beenden soll? */
     val isInRound: Boolean get() = step != MultiplayerStep.START && step != MultiplayerStep.TREFFER
+
+    /**
+     * Stehen Treffer da, mit denen auf diesem Telefon noch nichts geschehen ist?
+     *
+     * Die Treffer leben nur auf diesem Bildschirm. Wer geht, ohne sie behalten oder eingeplant
+     * zu haben, verliert sie - davor fragt die App nach. Ist schon etwas geschehen, ist
+     * "Fertig" einfach fertig.
+     */
+    val hasUnusedMatches: Boolean
+        get() = step == MultiplayerStep.TREFFER && matches.isNotEmpty() && !import.hasOutcome
 }
 
 /** Was sich mit den Treffern anfangen laesst. */
@@ -231,6 +241,14 @@ data class MatchImport(
     val isBusy: Boolean get() = running != null
 
     val hasProblems: Boolean get() = notLoaded + notYetShared > 0
+
+    /**
+     * Ist mit den Treffern schon etwas geschehen - in der Sammlung, im Wochenplan, auf der
+     * Einkaufsliste? Gezaehlt wird, was angekommen ist, nicht was versucht wurde: Ein Anlauf,
+     * bei dem sich nichts laden liess, hat nichts gerettet.
+     */
+    val hasOutcome: Boolean
+        get() = kept.isNotEmpty() || (plan?.let { it.placed + it.alreadyPlanned } ?: 0) > 0 || listItems != null
 }
 
 /**
