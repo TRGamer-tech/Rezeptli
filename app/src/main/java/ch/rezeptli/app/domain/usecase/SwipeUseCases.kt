@@ -11,6 +11,7 @@ import ch.rezeptli.app.domain.repository.SwipeSessionRepository
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.swipe.SwipeMatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -45,6 +46,13 @@ class SelectSwipeRecipesUseCase @Inject constructor(
     private val profileRepository: UserProfileRepository,
     private val classifier: RecipeClassifier,
 ) {
+    /**
+     * Die Vorlieben, soweit sie die Auswahl betreffen. Wer die Auswahl anzeigt, rechnet neu,
+     * sobald sich hier etwas aendert - der Bildschirm bleibt liegen, wenn man zum Tab
+     * "Vorlieben" wechselt.
+     */
+    val wishes: Flow<DietaryFilter> = profileRepository.profile.map { DietaryFilter.of(it) }.distinctUntilChanged()
+
     suspend operator fun invoke(filter: RecipeFilter = RecipeFilter.NONE): SwipeSelection {
         val ids = recipeRepository.getFilteredRecipeIds(filter)
         val wishes = DietaryFilter.of(profileRepository.profile.first())

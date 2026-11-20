@@ -10,6 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -48,9 +49,12 @@ class SwipeSetupViewModel @Inject constructor(
             .onEach { tags -> _uiState.update { it.copy(availableTags = tags) } }
             .launchIn(viewModelScope)
 
+        // Neu gezaehlt wird, wenn sich der Filter aendert - oder die Vorlieben: Dieser Bildschirm
+        // bleibt liegen, waehrend man im Tab "Vorlieben" etwas antippt.
         _uiState
             .map { it.filter }
             .distinctUntilChanged()
+            .combine(selectRecipes.wishes) { filter, _ -> filter }
             .onEach { _uiState.update { state -> state.copy(isCounting = true) } }
             .mapLatest { filter -> selectRecipes(filter) }
             .onEach { selection ->
