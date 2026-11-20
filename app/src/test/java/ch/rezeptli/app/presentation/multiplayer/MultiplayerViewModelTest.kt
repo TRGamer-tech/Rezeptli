@@ -42,6 +42,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -371,10 +372,12 @@ class MultiplayerViewModelTest {
             viewModel.onCodeInputChange(FakePairingRepository.CODE)
             viewModel.onJoin()
             viewModel.onSwiped(1L, liked = true)
-            advanceUntilIdle()
+            // runCurrent statt advanceUntilIdle: Die Runde fragt den Dienst laufend ab,
+            // und advanceUntilIdle wuerde die virtuelle Uhr dabei endlos weiterdrehen.
+            runCurrent()
 
             viewModel.onLeave()
-            advanceUntilIdle()
+            runCurrent()
 
             assertNull(pairing.closedCode)
             assertEquals(FakePairingRepository.CODE, viewModel.uiState.value.resumableCode)
@@ -391,11 +394,12 @@ class MultiplayerViewModelTest {
             expiresAt = FakePairingRepository.EXPIRY,
         )
         mitViewModel(createViewModel(webRepository = FakeWebRecipeRepository())) { viewModel ->
-            advanceUntilIdle()
+            runCurrent()
             assertEquals(FakePairingRepository.CODE, viewModel.uiState.value.resumableCode)
 
             viewModel.onResume()
-            advanceUntilIdle()
+            // Nach dem Fortsetzen laeuft die Abfrage des Dienstes - siehe oben.
+            runCurrent()
 
             val state = viewModel.uiState.value
             assertEquals(MultiplayerStep.WISCHEN, state.step)
