@@ -10,18 +10,18 @@
  * Quelladresse falls vorhanden, und ein Bildlink.
  */
 
+import { antwort, codeErzeugen, type Env, fehler, jetzt, SITZUNG_STUNDEN, teilnehmerId, text, veraltet } from "./basis";
 import { TREFFER_QUERY } from "./queries";
+import { v2 } from "./v2";
 
-export interface Env {
-    DB: D1Database;
-}
+export type { Env } from "./basis";
 
-/** So lange lebt eine Sitzung. Danach raeumt der taegliche Auftrag sie weg. */
-const SITZUNG_STUNDEN = 12;
-
-/** Ohne I, O, 0 und 1 - die verwechselt man beim Abtippen. */
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const CODE_LAENGE = 6;
+/*
+ * Ab hier: Fassung 1 der Schnittstelle, unveraendert fuer Apps, die noch nicht aktualisiert
+ * sind. Der Gastgeber schickt beim Eroeffnen seine Rezepte, die Stimmen kommen am Ende
+ * gesammelt. Die neue Runde (Lobby, gemeinsames Ziel, Treffer waehrend des Wischens)
+ * steht in v2.ts und ist unter /v2/ erreichbar.
+ */
 
 const MAX_REZEPTE = 200;
 const MAX_TITEL_LAENGE = 200;
@@ -35,49 +35,12 @@ interface RezeptEingabe {
     zubereitungszeit?: number | null;
 }
 
-function jetzt(): number {
-    return Date.now();
-}
-
-function code_erzeugen(): string {
-    const zufall = new Uint8Array(CODE_LAENGE);
-    crypto.getRandomValues(zufall);
-    return Array.from(zufall)
-        .map((wert) => CODE_ALPHABET[wert % CODE_ALPHABET.length])
-        .join("");
-}
-
-function antwort(daten: unknown, status = 200): Response {
-    return new Response(JSON.stringify(daten), {
-        status,
-        headers: { "content-type": "application/json; charset=utf-8" },
-    });
-}
-
-function fehler(grund: string, status: number): Response {
-    return antwort({ fehler: grund }, status);
-}
-
-/** Kuerzt und saeubert, was von aussen kommt - nichts wird ungeprueft gespeichert. */
-function text(wert: unknown, maxLaenge: number): string | null {
-    if (typeof wert !== "string") return null;
-    const sauber = wert.trim().slice(0, maxLaenge);
-    return sauber.length > 0 ? sauber : null;
-}
-
-function teilnehmerId(wert: unknown): string | null {
-    const kennung = text(wert, 64);
-    if (kennung === null) return null;
-    // Nur harmlose Zeichen - die Kennung erzeugt das Geraet selbst.
-    return /^[A-Za-z0-9_-]+$/.test(kennung) ? kennung : null;
-}
-
 async function sitzungLaden(env: Env, code: string) {
     return env.DB.prepare(
-        "SELECT code, gastgeber, verfaellt_am, max_teilnehmer FROM sitzungen WHERE code = ?1",
+        "SELECT code, gastgeber, verfaellt_am, max_teilnehmer, version FROM sitzungen WHERE code = ?1",
     )
         .bind(code)
-        .first<{ code: string; gastgeber: string; verfaellt_am: number; max_teilnehmer: number }>();
+        .first<{ code: string; gastgeber: string; verfaellt_am: number; max_teilnehmer: number; version: number }>();
 }
 
 /**
@@ -100,7 +63,7 @@ async function sitzungAnlegen(request: Request, env: Env): Promise<Response> {
     const gepruefte = rezeptEingabenLesen(rezepte);
     if (gepruefte.length === 0) return fehler("keine brauchbaren rezepte", 400);
 
-    const code = code_erzeugen();
+    const code = codeErzeugen();
     const zeitpunkt = jetzt();
     const verfall = zeitpunkt + SITZUNG_STUNDEN * 60 * 60 * 1000;
 
@@ -178,6 +141,7 @@ async function beitreten(code: string, request: Request, env: Env): Promise<Resp
     const sitzung = await sitzungLaden(env, code);
     if (sitzung === null) return fehler("sitzung unbekannt", 404);
     if (sitzung.verfaellt_am < jetzt()) return fehler("sitzung abgelaufen", 410);
+    if (sitzung.version !== 1) return veraltet();
 
     const bisher = await env.DB.prepare(
         "SELECT COUNT(*) AS anzahl FROM teilnehmer WHERE code = ?1",
@@ -279,6 +243,7 @@ async function stimmenSenden(code: string, request: Request, env: Env): Promise<
     const sitzung = await sitzungLaden(env, code);
     if (sitzung === null) return fehler("sitzung unbekannt", 404);
     if (sitzung.verfaellt_am < jetzt()) return fehler("sitzung abgelaufen", 410);
+    if (sitzung.version !== 1) return veraltet();
 
     const gehoertDazu = await env.DB.prepare(
         "SELECT 1 FROM teilnehmer WHERE code = ?1 AND teilnehmer_id = ?2",
@@ -336,6 +301,7 @@ async function stand(code: string, env: Env): Promise<Response> {
     const sitzung = await sitzungLaden(env, code);
     if (sitzung === null) return fehler("sitzung unbekannt", 404);
     if (sitzung.verfaellt_am < jetzt()) return fehler("sitzung abgelaufen", 410);
+    if (sitzung.version !== 1) return veraltet();
 
     const teilnehmende = await env.DB.prepare(
         "SELECT teilnehmer_id, fertig_am FROM teilnehmer WHERE code = ?1 ORDER BY beigetreten_am",
@@ -400,6 +366,7 @@ async function schliessen(code: string, request: Request, env: Env): Promise<Res
 
     const sitzung = await sitzungLaden(env, code);
     if (sitzung === null) return fehler("sitzung unbekannt", 404);
+    if (sitzung.version !== 1) return veraltet();
     if (sitzung.gastgeber !== kennung) return fehler("nur der Gastgeber darf schliessen", 403);
 
     // Die Fremdschluessel raeumen Rezepte, Teilnehmer und Stimmen mit weg.
@@ -414,7 +381,13 @@ export default {
         const url = new URL(request.url);
 
         if (url.pathname === "/gesundheit") {
-            return antwort({ bereit: true });
+            // Die App fragt hier nicht nach - die Angabe ist fuer Menschen und fuer die
+            // Pruefung nach dem Veroeffentlichen: Welche Fassungen spricht dieser Dienst?
+            return antwort({ bereit: true, fassungen: [1, 2] });
+        }
+
+        if (url.pathname.startsWith("/v2/")) {
+            return (await v2(request, env)) ?? fehler("nicht gefunden", 404);
         }
 
         if (url.pathname === "/sitzung" && request.method === "POST") {

@@ -38,7 +38,10 @@ def datenbank() -> sqlite3.Connection:
     # hier wuerde der Test das Aufraeumen beim Schliessen gar nicht pruefen.
     con = sqlite3.connect(":memory:", isolation_level=None)
     con.execute("PRAGMA foreign_keys = ON")
-    con.executescript((WURZEL / "migrations" / "0001_sitzungen.sql").read_text(encoding="utf-8"))
+    # Alle Migrationen in ihrer Reihenfolge: Die Abfrage muss gegen das Schema bestehen,
+    # das wirklich ausgerollt ist - nicht gegen einen frueheren Stand davon.
+    for migration in sorted((WURZEL / "migrations").glob("*.sql")):
+        con.executescript(migration.read_text(encoding="utf-8"))
     aktiv = con.execute("PRAGMA foreign_keys").fetchone()[0]
     assert aktiv == 1, "Fremdschluessel muessen fuer diesen Test aktiv sein"
     return con

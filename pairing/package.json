@@ -1,6 +1,6 @@
 {
   "name": "rezeptli-pairing",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Pairing-Dienst fuer den Mehrspieler-Modus von Rezeptli",
   "license": "MIT",
@@ -9,10 +9,13 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "migrate:lokal": "wrangler d1 migrations apply rezeptli-pairing --local",
-    "migrate:live": "wrangler d1 migrations apply rezeptli-pairing --remote"
+    "migrate:live": "wrangler d1 migrations apply rezeptli-pairing --remote",
+    "test": "python3 tests/treffer_test.py && node tests/ablauf_test.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250109.0",
+    "esbuild": "0.17.19",
+    "miniflare": "3.20250718.3",
     "typescript": "^5.7.2",
     "wrangler": "^3.99.0"
   }
