@@ -452,6 +452,48 @@ async function ohneGespeicherte(ruf) {
     );
 }
 
+async function grosseSammlungen(ruf) {
+    console.log("\n-- Grosse Sammlungen: alle gespeicherten Rezepte beider --");
+    const viele = (praefix, anzahl) =>
+        Array.from({ length: anzahl }, (_, nummer) => karte(`u${praefix}${nummer}`, `Rezept ${praefix} ${nummer}`));
+
+    const { code } = await lobby(ruf);
+    await ruf("POST", `/v2/sitzung/${code}/start`, { teilnehmer: ANNA });
+    const annas = await ruf("POST", `/v2/sitzung/${code}/beitrag`, { teilnehmer: ANNA, runde: 0, rezepte: viele("a", 300) });
+    pruefe(annas.status === 200 && annas.daten.zustand === "sammeln", "eine grosse Sammlung wird angenommen", annas.daten);
+    const beats = await ruf("POST", `/v2/sitzung/${code}/beitrag`, {
+        teilnehmer: BEAT,
+        runde: 0,
+        kenntRunde: -1,
+        rezepte: viele("b", 170),
+    });
+    const stapel = beats.daten.stapel ?? [];
+    pruefe(
+        beats.daten.zustand === "laeuft" && beats.daten.karten === 470 && stapel.length === 470,
+        "alle gespeicherten Rezepte beider liegen im Stapel - nicht nur die ersten achtzig",
+        { zustand: beats.daten.zustand, karten: beats.daten.karten, stapel: stapel.length },
+    );
+    pruefe(new Set(stapel.map((eintrag) => eintrag.rezeptId)).size === 470, "jede Karte hat ihre eigene Nummer");
+    pruefe(
+        stapel.slice(0, 4).map((eintrag) => eintrag.titel).join() === "Rezept a 0,Rezept b 0,Rezept a 1,Rezept b 1",
+        "auch ein grosser Stapel mischt die Karten beider abwechselnd",
+        stapel.slice(0, 4).map((eintrag) => eintrag.titel),
+    );
+    pruefe(
+        stapel[stapel.length - 1].titel === "Rezept a 299" && stapel.filter((eintrag) => eintrag.vonMir).length === 170,
+        "was eine Person mehr hat, liegt am Ende",
+    );
+
+    // Die Obergrenze: Mehr als fuenfhundert Karten von einer Person nimmt der Dienst nicht an.
+    const zweite = await lobby(ruf);
+    await ruf("POST", `/v2/sitzung/${zweite.code}/start`, { teilnehmer: ANNA });
+    await ruf("POST", `/v2/sitzung/${zweite.code}/beitrag`, { teilnehmer: BEAT, runde: 0, rezepte: [] });
+    const zuViele = await ruf("POST", `/v2/sitzung/${zweite.code}/beitrag`, { teilnehmer: ANNA, runde: 0, rezepte: viele("c", 620) });
+    pruefe(zuViele.daten.zustand === "laeuft" && zuViele.daten.karten === 500, "bei fünfhundert Karten je Person ist Schluss", {
+        karten: zuViele.daten.karten,
+    });
+}
+
 async function nurNeue(ruf) {
     console.log("\n-- Gleich mit neuen Rezepten beginnen --");
     const { code } = await lobby(ruf);
@@ -731,6 +773,7 @@ async function main() {
         const code = await lobbyUndEinstellungen(ruf);
         await gespeicherteDannNeue(ruf, code);
         await ohneGespeicherte(ruf);
+        await grosseSammlungen(ruf);
         await nurNeue(ruf);
         await verlassenUndSchliessen(ruf, db);
         await fristFuerFehlendeBeitraege(ruf);
