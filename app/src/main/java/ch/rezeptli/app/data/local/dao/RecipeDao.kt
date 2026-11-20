@@ -9,6 +9,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeIdentity
 import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.data.local.entity.RecipeSummaryProjection
 import ch.rezeptli.app.data.local.entity.RecipeTagEntity
@@ -136,9 +137,13 @@ abstract class RecipeDao {
     @Update
     abstract suspend fun updateRecipe(recipe: RecipeEntity)
 
-    /** Das Rezept zu einer Adresse - bevorzugt eines aus der Sammlung, sonst eines aus dem Plan. */
-    @Query("SELECT id FROM recipes WHERE sourceUrl = :url ORDER BY inCollection DESC, id ASC LIMIT 1")
-    abstract suspend fun idBySourceUrl(url: String): Long?
+    /**
+     * Woran sich Rezepte wiedererkennen lassen - von allen, auch den nur fuer den Plan
+     * gespeicherten. Verglichen wird im Code und nicht hier: Adressen gelten auch dann als
+     * gleich, wenn sie leicht verschieden geschrieben sind, und das kann SQL nicht.
+     */
+    @Query("SELECT id, title, sourceUrl, inCollection FROM recipes")
+    abstract suspend fun identities(): List<RecipeIdentity>
 
     @Query("SELECT sourceUrl FROM recipes WHERE inCollection = 1 AND sourceUrl IS NOT NULL")
     abstract suspend fun savedSourceUrls(): List<String>

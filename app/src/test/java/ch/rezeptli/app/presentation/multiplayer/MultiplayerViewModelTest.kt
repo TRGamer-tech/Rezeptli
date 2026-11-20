@@ -26,8 +26,10 @@ import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
 import ch.rezeptli.app.domain.plan.MealLabel
+import ch.rezeptli.app.domain.plan.OverwritePlanUseCase
 import ch.rezeptli.app.domain.plan.PlanGenerator
 import ch.rezeptli.app.domain.plan.PlanPersister
+import ch.rezeptli.app.domain.plan.PlanPlace
 import ch.rezeptli.app.domain.plan.PlanWrite
 import ch.rezeptli.app.domain.plan.ReadRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.RecipeClassifier
@@ -114,7 +116,10 @@ class MultiplayerViewModelTest {
     private val gratin = rezept(4L, "Omas Gratin", "Kartoffeln", "Rahm", url = null)
     private val smoothie = rezept(5L, "Erdbeer-Smoothie", "Erdbeeren", "Joghurt")
 
-    private val sammlung = FakeRecipeRepository(listOf(roesti, lachs, tofu, gratin, smoothie))
+    // Wie die echte Datenbank raeumt der Ersatz weg, was nur fuer den Plan geholt wurde und dort
+    // nicht mehr steht - dafuer muss er den Plan kennen.
+    private val sammlung =
+        FakeRecipeRepository(listOf(roesti, lachs, tofu, gratin, smoothie)).also { it.plan = planRepository }
 
     // ------------------------------------------------------------------ das Rezeptverzeichnis
 
@@ -175,7 +180,7 @@ class MultiplayerViewModelTest {
         sourceUrl = risottoUrl,
         imageUrl = "$risottoUrl.jpg",
     )
-    private val eintopf = RoundOffer(key = "e:gegenueber:7", title = "Beats Eintopf")
+    private val eintopf = RoundOffer(key = RoundKeys.forTitle("Beats Eintopf"), title = "Beats Eintopf")
 
     /** Dasselbe Rezept, das auch in der eigenen Sammlung liegt - nur von der anderen Person beigesteuert. */
     private val ihreRoesti =
@@ -196,7 +201,6 @@ class MultiplayerViewModelTest {
             observeRound = ObserveRoundUseCase(pairing),
             buildContribution = BuildRoundContributionUseCase(
                 recipeRepository = recipes,
-                pairingRepository = pairing,
                 classifier = RecipeClassifier(),
                 buildDeck = BuildSwipeDeckUseCase(
                     webRepository = web,
@@ -218,6 +222,14 @@ class MultiplayerViewModelTest {
             shareOwnMatches = ShareOwnMatchesUseCase(pairing, recipes),
             addToShoppingList = AddRecipesToShoppingListUseCase(recipes, shoppingRepository, ShoppingListAggregator()),
             addToPlan = AddToPlanUseCase(
+                profileRepository = profileRepository,
+                planRepository = planRepository,
+                recipeRepository = recipes,
+                classifier = RecipeClassifier(),
+                generator = generator,
+                persister = PlanPersister(recipes, shoppingRepository, planRepository),
+            ),
+            overwritePlan = OverwritePlanUseCase(
                 profileRepository = profileRepository,
                 planRepository = planRepository,
                 recipeRepository = recipes,
@@ -483,7 +495,8 @@ class MultiplayerViewModelTest {
             // Ein Dateipfad vom eigenen Telefon nuetzt dem anderen nichts.
             assertNull(meinGratin.imageUrl)
             assertNull(meinGratin.sourceUrl)
-            assertEquals(RoundKeys.forOwn(FakePairingRepository.PARTICIPANT, gratin.id), meinGratin.key)
+            // Wiedererkannt wird es am Titel - eine Nummer vom eigenen Telefon steckt nicht darin.
+            assertEquals(RoundKeys.forTitle("Omas Gratin"), meinGratin.key)
 
             val meineRoesti = pairing.myContributions.getValue(0).first { it.title == "Rösti" }
             assertEquals(roesti.sourceUrl, meineRoesti.sourceUrl)
@@ -971,17 +984,26 @@ class MultiplayerViewModelTest {
                     ?.map { it.name },
             )
             assertFalse(viewModel.state.info!!.isPartnersOwn)
+            // Ohne Mengen laesst sich nichts schaetzen - das Blatt sagt das, statt zu schweigen.
+            assertTrue(viewModel.state.info!!.showsNutrition)
+            assertNull(viewModel.state.info!!.nutrition)
 
             // Ein Rezept der anderen Person aus dem Netz: Die Zutaten kommen von der Seite.
             viewModel.onInfoRequest(viewModel.kennung("Risotto"))
             assertEquals(listOf("300 g Risottoreis", "1 l Bouillon"), viewModel.state.info?.lines)
             assertEquals("Quelle B", viewModel.state.info?.sourceName)
             assertEquals(risottoUrl, viewModel.state.info?.sourceUrl)
+            // ... und darunter die Schaetzung pro Portion: 1050 kcal Reis und etwas Bouillon, durch vier.
+            val werte = viewModel.state.info!!
+                .nutrition!!
+            assertTrue(werte.isEstimate)
+            assertTrue(werte.kcal!!.amount in 260..290, "geschaetzt: ${werte.kcal}")
 
             // Ein selbst erfasstes Rezept der anderen Person: Davon wurde nur der Titel geteilt.
             viewModel.onInfoRequest(viewModel.kennung("Beats Eintopf"))
             assertTrue(viewModel.state.info!!.isPartnersOwn)
             assertFalse(viewModel.state.info!!.hasIngredients)
+            assertFalse(viewModel.state.info!!.showsNutrition)
 
             viewModel.onInfoDismiss()
             assertNull(viewModel.state.info)
@@ -1269,6 +1291,263 @@ class MultiplayerViewModelTest {
 
             assertEquals(PlanSummary(added = 1, alreadyPlanned = 1), viewModel.state.import.plan)
             assertEquals(1, planRepository.currentPlan().count { it.recipeId == roesti.id })
+        }
+    }
+
+    // ------------------------------------------------------------------ Woche ueberschreiben
+
+    private fun MultiplayerViewModel.treffer(titel: String) = state.matches.first { it.title == titel }.recipeId
+
+    /**
+     * Legt einen Treffer in der Tageswahl auf [tag].
+     *
+     * Der Vorschlag haengt vom heutigen Wochentag ab; steht der Treffer schon dort, waere ein
+     * weiterer Tipp "weglassen" - also wird nur getippt, wenn es etwas zu aendern gibt.
+     */
+    private fun MultiplayerViewModel.lege(titel: String, tag: Weekday) {
+        val karte = treffer(titel)
+        if (state.import.week
+                ?.placeOf(karte)
+                ?.day != tag
+        ) {
+            onOverwriteDay(karte, tag)
+        }
+    }
+
+    private fun TestScope.tageswahl(viewModel: MultiplayerViewModel) {
+        viewModel.onOverwriteRequest()
+        runCurrent()
+    }
+
+    private suspend fun tageImPlan(): Map<Long, Weekday> = planRepository.currentPlan().associate {
+        it.recipeId to
+            it.day
+    }
+
+    @Test
+    fun `Woche ueberschreiben fragt zuerst nach den Tagen - mit einem Vorschlag fuer jeden Treffer`() = runTest {
+        volleWoche()
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+
+            tageswahl(viewModel)
+
+            val woche = viewModel.state.import.week!!
+            assertEquals(
+                viewModel.state.matches
+                    .map { it.recipeId }
+                    .toSet(),
+                woche.places.keys,
+            )
+            assertEquals(
+                3,
+                woche.places.values
+                    .distinct()
+                    .size,
+            )
+            // Noch ist nichts geschehen: Die Woche steht, und geholt wurde nichts.
+            assertEquals(14, planRepository.currentPlan().size)
+            assertTrue(web.loadCalls.isEmpty())
+            assertFalse(viewModel.state.import.isBusy)
+        }
+    }
+
+    @Test
+    fun `ueberschreiben ersetzt die volle Woche - jeder Treffer steht am gewaehlten Tag`() = runTest {
+        volleWoche(gekocht = setOf(Weekday.MONTAG))
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            pairing.partnerShares(viewModel.treffer("Beats Eintopf"), eintopfInhalt)
+            tageswahl(viewModel)
+            viewModel.lege("Rösti", Weekday.SAMSTAG)
+            viewModel.lege("Risotto", Weekday.SONNTAG)
+            viewModel.lege("Beats Eintopf", Weekday.MONTAG)
+
+            viewModel.onOverwriteConfirm()
+            runCurrent()
+
+            val stand = viewModel.state.import
+            assertNull(stand.week)
+            assertFalse(stand.isBusy)
+            assertEquals(PlanSummary(overwritten = 3), stand.plan)
+            assertFalse(stand.hasProblems)
+            assertNull(stand.retry)
+
+            // Von den vierzehn Mahlzeiten der alten Woche steht keine mehr - auch die gekochten nicht.
+            val plan = planRepository.currentPlan()
+            assertEquals(
+                listOf(Weekday.MONTAG, Weekday.SAMSTAG, Weekday.SONNTAG).map { PlanPlace(it, MealSlot.ABEND) },
+                plan.map { it.place },
+            )
+            assertEquals(Weekday.SAMSTAG, tageImPlan()[roesti.id])
+            assertTrue(plan.none { it.isCooked })
+            // Die Rösti lag schon in der Sammlung und wurde nicht noch einmal geholt oder angelegt.
+            assertFalse(roesti.sourceUrl in web.loadCalls)
+            assertEquals(1, sammlung.everything.count { it.title == "Rösti" })
+            // Wie jeder Plan fuellt auch dieser die Sammlung nicht.
+            assertFalse(sammlung.visible(RecipeFilter()).any { it.title == "Risotto" })
+        }
+    }
+
+    @Test
+    fun `ist ein Tag schon vergeben, tauschen die beiden - und ein Treffer laesst sich weglassen`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            pairing.partnerShares(viewModel.treffer("Beats Eintopf"), eintopfInhalt)
+            tageswahl(viewModel)
+            viewModel.lege("Rösti", Weekday.DIENSTAG)
+            viewModel.lege("Risotto", Weekday.MITTWOCH)
+            viewModel.lege("Beats Eintopf", Weekday.DONNERSTAG)
+
+            // Die Rösti soll auf den Mittwoch - dort steht das Risotto.
+            viewModel.onOverwriteDay(viewModel.treffer("Rösti"), Weekday.MITTWOCH)
+            val woche = viewModel.state.import.week!!
+            assertEquals(Weekday.MITTWOCH, woche.placeOf(viewModel.treffer("Rösti"))?.day)
+            assertEquals(Weekday.DIENSTAG, woche.placeOf(viewModel.treffer("Risotto"))?.day)
+
+            // Den Eintopf gibt es diese Woche nicht: derselbe Tag noch einmal.
+            viewModel.onOverwriteDay(viewModel.treffer("Beats Eintopf"), Weekday.DONNERSTAG)
+            viewModel.onOverwriteConfirm()
+            runCurrent()
+
+            assertEquals(PlanSummary(overwritten = 2), viewModel.state.import.plan)
+            assertEquals(listOf(Weekday.DIENSTAG, Weekday.MITTWOCH), planRepository.currentPlan().map { it.day })
+            assertEquals(Weekday.MITTWOCH, tageImPlan()[roesti.id])
+            // Was nicht in den Plan soll, wird auch nicht geholt.
+            assertTrue(pairing.contentRequests.isEmpty())
+        }
+    }
+
+    @Test
+    fun `laesst sich ein Rezept nicht holen, wird mit dem Rest ueberschrieben - und es kommt spaeter dazu`() = runTest {
+        volleWoche()
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            tageswahl(viewModel)
+            viewModel.lege("Rösti", Weekday.MONTAG)
+            viewModel.lege("Risotto", Weekday.DIENSTAG)
+            viewModel.lege("Beats Eintopf", Weekday.MITTWOCH)
+
+            // Der Eintopf ist ein selbst erfasstes Rezept der anderen Person und noch nicht hinterlegt.
+            viewModel.onOverwriteConfirm()
+            runCurrent()
+
+            val stand = viewModel.state.import
+            assertEquals(PlanSummary(overwritten = 2), stand.plan)
+            assertEquals(1, stand.notYetShared)
+            assertEquals(MatchAction.OVERWRITE, stand.retry)
+            assertEquals(listOf(Weekday.MONTAG, Weekday.DIENSTAG), planRepository.currentPlan().map { it.day })
+
+            pairing.partnerShares(viewModel.treffer("Beats Eintopf"), eintopfInhalt)
+            viewModel.onRetryImport()
+            runCurrent()
+
+            // Der zweite Anlauf holt nur den Eintopf und legt ihn auf seinen Tag - der Rest bleibt stehen.
+            assertEquals(1, viewModel.state.import.total)
+            assertEquals(PlanSummary(overwritten = 3), viewModel.state.import.plan)
+            assertFalse(viewModel.state.import.hasProblems)
+            assertNull(viewModel.state.import.retry)
+            val plan = planRepository.currentPlan()
+            assertEquals(listOf(Weekday.MONTAG, Weekday.DIENSTAG, Weekday.MITTWOCH), plan.map { it.day })
+            assertEquals(Weekday.MONTAG, tageImPlan()[roesti.id])
+            assertEquals("Beats Eintopf", sammlung.getRecipe(plan.last().recipeId)?.title)
+        }
+    }
+
+    @Test
+    fun `laesst sich gar nichts holen, bleibt die Woche stehen - ein leerer Plan ist kein Ersatz`() = runTest {
+        volleWoche()
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            web.unreachable = setOf(risottoUrl)
+            tageswahl(viewModel)
+            viewModel.lege("Risotto", Weekday.FREITAG)
+            viewModel.lege("Beats Eintopf", Weekday.SAMSTAG)
+            // Die Rösti - das einzige Rezept, das schon auf dem Telefon liegt - bleibt diesmal draussen.
+            val roestiKarte = viewModel.treffer("Rösti")
+            viewModel.onOverwriteDay(
+                roestiKarte,
+                viewModel.state.import.week!!
+                    .placeOf(roestiKarte)!!
+                    .day,
+            )
+
+            viewModel.onOverwriteConfirm()
+            ladenAbwarten()
+
+            val stand = viewModel.state.import
+            assertNull(stand.plan)
+            assertEquals(1, stand.notLoaded)
+            assertEquals(1, stand.notYetShared)
+            assertEquals(MatchAction.OVERWRITE, stand.retry)
+            assertEquals(14, planRepository.currentPlan().size)
+
+            // Sobald es klappt, ersetzt der zweite Anlauf die Woche - sie war ja noch die alte.
+            web.unreachable = emptySet()
+            pairing.partnerShares(viewModel.treffer("Beats Eintopf"), eintopfInhalt)
+            viewModel.onRetryImport()
+            runCurrent()
+
+            assertEquals(PlanSummary(overwritten = 2), viewModel.state.import.plan)
+            assertEquals(listOf(Weekday.FREITAG, Weekday.SAMSTAG), planRepository.currentPlan().map { it.day })
+        }
+    }
+
+    @Test
+    fun `die Tageswahl laesst sich schliessen, ohne dass etwas geschieht - die Wahl bleibt fuer spaeter`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            tageswahl(viewModel)
+            viewModel.lege("Rösti", Weekday.SONNTAG)
+            val gewaehlt = viewModel.state.import.week
+
+            viewModel.onOverwriteDismiss()
+            runCurrent()
+
+            assertNull(viewModel.state.import.week)
+            assertNull(viewModel.state.import.plan)
+            assertTrue(planRepository.currentPlan().isEmpty())
+
+            tageswahl(viewModel)
+            assertEquals(gewaehlt, viewModel.state.import.week)
+        }
+    }
+
+    @Test
+    fun `nach dem Ueberschreiben laesst sich neu verteilen - ohne die Rezepte noch einmal zu laden`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            // Erst der uebliche Weg: Rösti und Risotto kommen auf freie Plaetze.
+            viewModel.onAddToPlan()
+            runCurrent()
+            assertEquals(PlanSummary(added = 2), viewModel.state.import.plan)
+
+            tageswahl(viewModel)
+            viewModel.lege("Rösti", Weekday.MONTAG)
+            viewModel.lege("Risotto", Weekday.DIENSTAG)
+            viewModel.lege("Beats Eintopf", Weekday.MITTWOCH)
+            viewModel.onOverwriteConfirm()
+            runCurrent()
+            // Was vorher gezaehlt wurde, stand im alten Plan - jetzt zaehlt nur noch die neue Woche.
+            assertEquals(PlanSummary(overwritten = 2), viewModel.state.import.plan)
+
+            // Doch lieber andersherum: Das Blatt geht mit der letzten Wahl wieder auf.
+            tageswahl(viewModel)
+            assertEquals(
+                Weekday.MONTAG,
+                viewModel.state.import.week
+                    ?.placeOf(viewModel.treffer("Rösti"))
+                    ?.day,
+            )
+            viewModel.lege("Rösti", Weekday.DIENSTAG)
+            viewModel.onOverwriteConfirm()
+            runCurrent()
+
+            assertEquals(PlanSummary(overwritten = 2), viewModel.state.import.plan)
+            assertEquals(Weekday.DIENSTAG, tageImPlan()[roesti.id])
+            assertEquals(listOf(Weekday.MONTAG, Weekday.DIENSTAG), planRepository.currentPlan().map { it.day })
+            // Das Risotto lag vom ersten Mal noch auf dem Telefon.
+            assertEquals(1, web.loadCalls.count { it == risottoUrl })
         }
     }
 

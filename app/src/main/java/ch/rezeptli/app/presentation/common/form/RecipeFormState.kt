@@ -81,6 +81,14 @@ data class RecipeFormState(
     val sourceUrl: String? = null,
     val sourceName: String? = null,
     /**
+     * Was das Formular nicht zeigt, aber nicht verlieren darf: fuer wie viele das Rezept
+     * gedacht ist und welche Naehrwerte die Quelle nennt. Frueher fehlte die Portionszahl
+     * hier - nach jedem Bearbeiten und nach jedem Import ueber das Formular war sie weg.
+     */
+    val servings: Int? = null,
+    val kcalPerServing: Int? = null,
+    val proteinPerServing: Double? = null,
+    /**
      * Die vom Anbieter gegliederten Schritte eines importierten Rezepts.
      *
      * Sie werden unveraendert weitergereicht, solange der Zubereitungstext nicht
@@ -106,6 +114,9 @@ data class RecipeFormState(
             .mapIndexed { index, draft -> draft.toIngredient(index) },
         tags = tags,
         prepTimeMinutes = prepTimeMinutes,
+        servings = servings,
+        kcalPerServing = kcalPerServing,
+        proteinPerServing = proteinPerServing,
         photoUri = photoUri,
         createdAt = createdAt,
         lastCookedAt = lastCookedAt,
@@ -170,6 +181,9 @@ data class RecipeFormState(
             lastCookedAt = recipe.lastCookedAt,
             sourceUrl = recipe.sourceUrl,
             sourceName = recipe.sourceName,
+            servings = recipe.servings,
+            kcalPerServing = recipe.kcalPerServing,
+            proteinPerServing = recipe.proteinPerServing,
             importedSteps = recipe.steps,
         )
     }

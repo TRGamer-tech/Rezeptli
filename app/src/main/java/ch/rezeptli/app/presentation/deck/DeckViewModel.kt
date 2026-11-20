@@ -310,6 +310,7 @@ class DeckViewModel @Inject constructor(
                             servings = seite.servings,
                             lines = seite.ingredientLines,
                             isForeign = seite.isForeign,
+                            nutrition = seite.nutrition,
                         )
                     },
                 )

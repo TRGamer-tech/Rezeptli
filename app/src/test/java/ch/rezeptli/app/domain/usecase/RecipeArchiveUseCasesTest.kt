@@ -7,9 +7,28 @@ import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
+import ch.rezeptli.app.domain.plan.AdjustPlanUseCase
+import ch.rezeptli.app.domain.plan.MealLabel
+import ch.rezeptli.app.domain.plan.PlanGenerator
+import ch.rezeptli.app.domain.plan.PlanPersister
+import ch.rezeptli.app.domain.plan.PlanWrite
+import ch.rezeptli.app.domain.plan.RecipeClassifier
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.MealSlot
+import ch.rezeptli.app.domain.profile.StoreChain
+import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.domain.profile.Weekday
+import ch.rezeptli.app.domain.settings.ThemeChoice
+import ch.rezeptli.app.domain.shopping.ShoppingListAggregator
+import ch.rezeptli.app.fake.FakeAppearanceRepository
 import ch.rezeptli.app.fake.FakeDocuments
 import ch.rezeptli.app.fake.FakePhotoFiles
+import ch.rezeptli.app.fake.FakePlanRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
+import ch.rezeptli.app.fake.FakeShoppingListRepository
+import ch.rezeptli.app.fake.FakeUserProfileRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -52,18 +71,49 @@ class RecipeArchiveUseCasesTest {
         inCollection = false,
     )
 
-    /** Ein Telefon: seine Rezepte, seine Fotos und was im Dateidialog zu sehen ist. */
+    /** Ein Telefon: seine Rezepte, seine Fotos, seine Vorlieben und was im Dateidialog zu sehen ist. */
     private inner class Telefon(
         rezepte: List<Recipe> = emptyList(),
         fotos: Map<String, ByteArray> = emptyMap(),
         val dokumente: FakeDocuments = FakeDocuments(),
+        profil: UserProfile = UserProfile(onboardingCompleted = true),
+        aussehen: ThemeChoice = ThemeChoice.SYSTEM,
     ) {
         val sammlung = FakeRecipeRepository(rezepte)
         val fotos = FakePhotoFiles(fotos)
-        val exportieren =
-            ExportRecipesUseCase(sammlung, this.fotos, dokumente, RecipeArchiveWriter(), UnconfinedTestDispatcher())
-        val importieren =
-            ImportRecipesUseCase(sammlung, this.fotos, dokumente, RecipeArchiveReader(), UnconfinedTestDispatcher())
+        val profil = FakeUserProfileRepository(profil)
+        val aussehen = FakeAppearanceRepository(theme = aussehen)
+        val plan = FakePlanRepository()
+        val exportieren = ExportRecipesUseCase(
+            sammlung,
+            this.fotos,
+            dokumente,
+            RecipeArchiveWriter(),
+            this.profil,
+            this.aussehen,
+            UnconfinedTestDispatcher(),
+        )
+        val importieren = ImportRecipesUseCase(
+            sammlung,
+            this.fotos,
+            dokumente,
+            RecipeArchiveReader(),
+            this.profil,
+            this.aussehen,
+            UnconfinedTestDispatcher(),
+        )
+        val vorliebenUebernehmen = ApplyPreferencesUseCase(
+            profileRepository = this.profil,
+            appearanceRepository = this.aussehen,
+            adjustPlan = AdjustPlanUseCase(
+                profileRepository = this.profil,
+                planRepository = plan,
+                recipeRepository = sammlung,
+                classifier = RecipeClassifier(),
+                generator = PlanGenerator(ShoppingListAggregator()),
+                persister = PlanPersister(sammlung, FakeShoppingListRepository(), plan),
+            ),
+        )
 
         suspend fun rezepte(): List<Recipe> =
             sammlung.getFilteredRecipeIds(RecipeFilter()).mapNotNull { sammlung.getRecipe(it) }.sortedBy { it.title }
@@ -78,7 +128,7 @@ class RecipeArchiveUseCasesTest {
     @Test
     fun `die Sammlung zieht mit einer Datei auf ein neues Telefon um`() = runTest {
         val alt = altesTelefon()
-        assertEquals(ExportResult.Done(recipes = 2, photos = 1), alt.exportieren(datei))
+        assertEquals(ExportResult.Done(recipes = 2, photos = 1, preferences = true), alt.exportieren(datei))
 
         val neu = Telefon(dokumente = alt.dokumente)
         assertEquals(ImportResult.Done(imported = 2, skipped = 0), neu.importieren(datei))
@@ -168,14 +218,160 @@ class RecipeArchiveUseCasesTest {
     }
 
     @Test
-    fun `ohne Rezepte entsteht keine leere Datei`() = runTest {
+    fun `ohne Rezepte und ohne Vorlieben entsteht keine leere Datei`() = runTest {
         val leer = Telefon(rezepte = listOf(nurImPlan))
         leer.dokumente.files[datei] = ByteArray(0)
 
-        assertEquals(ExportResult.Nothing, leer.exportieren(datei))
+        assertEquals(ExportResult.Nothing, leer.exportieren(datei, includePreferences = false))
 
         assertEquals(listOf(datei), leer.dokumente.discarded)
         assertNull(leer.dokumente.files[datei])
+    }
+
+    // ------------------------------------------------------------------ Vorlieben
+
+    private val lenasProfil = UserProfile(
+        firstName = "Lena",
+        country = Country.SCHWEIZ,
+        diets = setOf(Diet.VEGETARISCH),
+        intolerances = setOf(Intolerance.NUESSE),
+        customDislikes = listOf("Rosinen"),
+        householdSize = 4,
+        stores = listOf(StoreChain.COOP),
+        cookDays = setOf(Weekday.MONTAG, Weekday.DONNERSTAG),
+        mealSlots = setOf(MealSlot.ABEND),
+        weeklyBudget = 180,
+        onboardingCompleted = true,
+    )
+
+    private fun lenasTelefon() = Telefon(
+        rezepte = listOf(hackbraten, roesti),
+        fotos = mapOf("file:///fotos/hackbraten.jpg" to jpeg),
+        profil = lenasProfil,
+        aussehen = ThemeChoice.DUNKEL,
+    )
+
+    @Test
+    fun `die Vorlieben ziehen mit um - gelten aber erst, wenn man es will`() = runTest {
+        val alt = lenasTelefon()
+        alt.exportieren(datei)
+        // Das neue Telefon ist frisch eingerichtet, mit irgendwelchen ersten Antworten.
+        val neu = Telefon(dokumente = alt.dokumente, profil = UserProfile(firstName = "L", onboardingCompleted = true))
+
+        val ergebnis = neu.importieren(datei) as ImportResult.Done
+
+        assertEquals(2, ergebnis.imported)
+        val angeboten = ergebnis.preferences!!
+        assertEquals("Lena", angeboten.profile.firstName)
+        assertEquals(ThemeChoice.DUNKEL, angeboten.theme)
+        // Noch gilt, was auf dem neuen Telefon stand.
+        assertEquals("L", neu.profil.current.firstName)
+        assertTrue(
+            neu.profil.current.intolerances
+                .isEmpty(),
+        )
+        assertEquals(ThemeChoice.SYSTEM, neu.aussehen.theme.value)
+
+        neu.vorliebenUebernehmen(angeboten)
+
+        assertEquals(lenasProfil, neu.profil.current)
+        assertEquals(ThemeChoice.DUNKEL, neu.aussehen.theme.value)
+    }
+
+    @Test
+    fun `fremde Vorlieben ersetzen die eigenen nie von selbst`() = runTest {
+        val alt = lenasTelefon()
+        alt.exportieren(datei)
+        // Wer selbst keine Eier vertraegt, liest Lenas Rezepte ein - und will ihre Vorlieben nicht.
+        val meins = UserProfile(firstName = "Beat", intolerances = setOf(Intolerance.EIER), onboardingCompleted = true)
+        val neu = Telefon(dokumente = alt.dokumente, profil = meins)
+
+        val ergebnis = neu.importieren(datei) as ImportResult.Done
+
+        assertEquals(2, ergebnis.imported)
+        // Die Rezepte sind da, die Frage steht - und solange niemand Ja sagt, bleibt alles beim Alten.
+        assertTrue(ergebnis.preferences != null)
+        assertEquals(meins, neu.profil.current)
+    }
+
+    @Test
+    fun `gleichen die Vorlieben der Datei den eigenen, gibt es nichts zu fragen`() = runTest {
+        val alt = lenasTelefon()
+        alt.exportieren(datei)
+
+        // Dasselbe Telefon - oder ein zweites, das schon gleich eingestellt ist.
+        assertNull((alt.importieren(datei) as ImportResult.Done).preferences)
+    }
+
+    @Test
+    fun `ob die Einrichtung gelaufen ist, bleibt Sache des Telefons`() = runTest {
+        val alt = lenasTelefon()
+        alt.exportieren(datei)
+        val neu = Telefon(dokumente = alt.dokumente, profil = UserProfile(onboardingCompleted = true))
+
+        neu.vorliebenUebernehmen((neu.importieren(datei) as ImportResult.Done).preferences!!)
+
+        assertTrue(neu.profil.current.onboardingCompleted)
+    }
+
+    @Test
+    fun `wer die Vorlieben weglaesst, gibt nichts Persoenliches weiter`() = runTest {
+        val alt = lenasTelefon()
+
+        assertEquals(
+            ExportResult.Done(recipes = 2, photos = 1, preferences = false),
+            alt.exportieren(datei, includePreferences = false),
+        )
+
+        val neu = Telefon(dokumente = alt.dokumente)
+        val ergebnis = neu.importieren(datei) as ImportResult.Done
+        assertEquals(2, ergebnis.imported)
+        assertNull(ergebnis.preferences)
+    }
+
+    @Test
+    fun `auch ohne ein einziges Rezept lassen sich die Vorlieben sichern und zurueckholen`() = runTest {
+        // Wer nur mit dem Wochenplan kocht, hat vielleicht nie ein Rezept in die Sammlung gelegt.
+        val alt = Telefon(rezepte = listOf(nurImPlan), profil = lenasProfil)
+
+        assertEquals(ExportResult.Done(recipes = 0, photos = 0, preferences = true), alt.exportieren(datei))
+
+        val neu = Telefon(dokumente = alt.dokumente)
+        val ergebnis = neu.importieren(datei) as ImportResult.Done
+        assertEquals(0, ergebnis.imported)
+        assertEquals("Lena", ergebnis.preferences?.profile?.firstName)
+    }
+
+    @Test
+    fun `mit den Vorlieben folgt der bestehende Wochenplan - die Gerichte bleiben`() = runTest {
+        val alt = lenasTelefon()
+        alt.exportieren(datei)
+        val gericht = roesti.copy(id = 9L, servings = 4)
+        val neu = Telefon(rezepte = listOf(gericht), dokumente = alt.dokumente)
+        neu.plan.savePlan(
+            listOf(PlanWrite(Weekday.MONTAG, MealSlot.ABEND, gericht.id, 2, 5.0, MealLabel.ALLTAG)),
+            emptyList(),
+        )
+
+        neu.vorliebenUebernehmen((neu.importieren(datei) as ImportResult.Done).preferences!!)
+
+        // Lena kocht fuer vier - der Plan rechnet jetzt damit, das Gericht ist dasselbe.
+        val eintrag = neu.plan.currentPlan().single()
+        assertEquals(gericht.id, eintrag.recipeId)
+        assertEquals(4, eintrag.servings)
+    }
+
+    @Test
+    fun `eine Datei ohne Vorlieben stellt keine Frage`() = runTest {
+        val neu = Telefon(profil = lenasProfil)
+        neu.dokumente.files[datei] =
+            """{"format":"rezeptli-rezepte","version":1,"rezepte":[{"titel":"Rösti"}]}""".toByteArray()
+
+        val ergebnis = neu.importieren(datei) as ImportResult.Done
+
+        assertEquals(1, ergebnis.imported)
+        assertNull(ergebnis.preferences)
+        assertEquals(lenasProfil, neu.profil.current)
     }
 
     @Test

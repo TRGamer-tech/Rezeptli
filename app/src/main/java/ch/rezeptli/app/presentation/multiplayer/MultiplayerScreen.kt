@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,9 +39,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,9 +73,13 @@ import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.plan.PlanPlace
+import ch.rezeptli.app.domain.plan.WeekAssignment
 import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.MealSlot
+import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyFilledTonalButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
@@ -98,6 +105,7 @@ import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 import ch.rezeptli.app.presentation.common.theme.highlightRing
 import ch.rezeptli.app.presentation.deck.TARGET_OPTIONS
+import ch.rezeptli.app.presentation.plan.DayPill
 import ch.rezeptli.app.presentation.plan.DietPicker
 import ch.rezeptli.app.presentation.plan.DislikePicker
 import ch.rezeptli.app.presentation.plan.IntolerancePicker
@@ -134,6 +142,11 @@ data class MultiplayerActions(
     val onRetryImport: () -> Unit = {},
     val onReplaceInPlan: () -> Unit = {},
     val onKeepPlanAsIs: () -> Unit = {},
+    val onOverwriteRequest: () -> Unit = {},
+    val onOverwriteDay: (Long, Weekday) -> Unit = { _, _ -> },
+    val onOverwriteSlot: (Long, MealSlot) -> Unit = { _, _ -> },
+    val onOverwriteConfirm: () -> Unit = {},
+    val onOverwriteDismiss: () -> Unit = {},
     val onListRequest: () -> Unit = {},
     val onListDismiss: () -> Unit = {},
     val onAddToShoppingList: (Int) -> Unit = {},
@@ -216,6 +229,11 @@ fun MultiplayerRoute(
             onRetryImport = viewModel::onRetryImport,
             onReplaceInPlan = viewModel::onReplaceInPlan,
             onKeepPlanAsIs = viewModel::onKeepPlanAsIs,
+            onOverwriteRequest = viewModel::onOverwriteRequest,
+            onOverwriteDay = viewModel::onOverwriteDay,
+            onOverwriteSlot = viewModel::onOverwriteSlot,
+            onOverwriteConfirm = viewModel::onOverwriteConfirm,
+            onOverwriteDismiss = viewModel::onOverwriteDismiss,
             onListRequest = viewModel::onListRequest,
             onListDismiss = viewModel::onListDismiss,
             onAddToShoppingList = viewModel::onAddToShoppingList,
@@ -235,6 +253,7 @@ fun MultiplayerScreen(
     val motion = RezeptliTheme.motion
 
     uiState.info?.let { info -> RecipeInfoSheet(info = info, onDismiss = actions.onInfoDismiss) }
+    uiState.import.week?.let { week -> WeekSheet(matches = uiState.matches, week = week, actions = actions) }
 
     Scaffold(
         topBar = {
@@ -1127,7 +1146,7 @@ private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerAction
             ) {
                 Text(
                     if (stand.running == MatchAction.PLAN) {
-                        stringResource(R.string.zuzweit_holt, stand.progress, treffer)
+                        stringResource(R.string.zuzweit_holt, stand.progress, stand.total)
                     } else {
                         stringResource(R.string.zuzweit_in_plan)
                     },
@@ -1135,6 +1154,24 @@ private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerAction
             }
         } else {
             PlanNotes(plan = plan, noRoom = stand.noRoom)
+        }
+
+        // Die Woche ganz den Treffern ueberlassen - mit der Wahl, was an welchem Tag auf den
+        // Tisch kommt. Der Knopf bleibt: Wer die Tage noch einmal anders will, verteilt neu.
+        BouncyOutlinedButton(
+            onClick = actions.onOverwriteRequest,
+            enabled = !stand.isBusy,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+        ) {
+            Text(
+                if (stand.running == MatchAction.OVERWRITE) {
+                    stringResource(R.string.zuzweit_holt, stand.progress, stand.total)
+                } else {
+                    stringResource(R.string.zuzweit_ueberschreiben)
+                },
+            )
         }
 
         // Bis hierhin waren die Treffer nur Titel. Ein Griff bringt sie in die Sammlung -
@@ -1149,7 +1186,7 @@ private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerAction
             ) {
                 Text(
                     if (stand.running == MatchAction.KEEP) {
-                        stringResource(R.string.zuzweit_holt, stand.progress, treffer)
+                        stringResource(R.string.zuzweit_holt, stand.progress, stand.total)
                     } else {
                         stringResource(R.string.mehrspieler_uebernehmen)
                     },
@@ -1235,6 +1272,9 @@ private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerAction
 /** Was beim Einplanen herauskam - jede Zeile nur, wenn sie etwas zu sagen hat. */
 @Composable
 private fun PlanNotes(plan: PlanSummary, noRoom: Int) {
+    if (plan.overwritten > 0) {
+        ResultNote(pluralStringResource(R.plurals.zuzweit_ueberschrieben, plan.overwritten, plan.overwritten))
+    }
     if (plan.added > 0) ResultNote(pluralStringResource(R.plurals.zuzweit_plan_dazu, plan.added, plan.added))
     if (plan.replaced >
         0
@@ -1246,6 +1286,154 @@ private fun PlanNotes(plan: PlanSummary, noRoom: Int) {
     }
     if (noRoom > 0) ResultNote(pluralStringResource(R.plurals.zuzweit_plan_kein_platz, noRoom, noRoom))
     if (plan.placed > 0) ResultNote(stringResource(R.string.zuzweit_plan_einkauf))
+}
+
+/**
+ * Die Tageswahl von "Woche ueberschreiben": jeder Treffer mit den sieben Tagen darunter.
+ *
+ * Ein Tipp auf einen Tag legt das Gericht dorthin; ist der Tag vergeben, tauschen die beiden
+ * (siehe [WeekAssignment]). Die Liste rollt, der Knopf zum Bestaetigen bleibt stehen - bei
+ * zehn Treffern soll niemand erst ans Ende blaettern muessen, um ihn zu finden.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeekSheet(matches: List<SharedRecipe>, week: WeekAssignment, actions: MultiplayerActions) {
+    ModalBottomSheet(
+        onDismissRequest = actions.onOverwriteDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(R.string.zuzweit_ueberschreiben), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stringResource(R.string.zuzweit_ueberschreiben_text),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                matches.forEach { match ->
+                    WeekRow(
+                        match = match,
+                        place = week.placeOf(match.recipeId),
+                        slots = week.slots.takeIf { week.asksForSlot }.orEmpty(),
+                        onDay = { day -> actions.onOverwriteDay(match.recipeId, day) },
+                        onSlot = { slot -> actions.onOverwriteSlot(match.recipeId, slot) },
+                    )
+                }
+                Text(
+                    stringResource(R.string.zuzweit_ueberschreiben_weglassen),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Text(
+                stringResource(R.string.zuzweit_ueberschreiben_warnung),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            BouncyButton(
+                onClick = actions.onOverwriteConfirm,
+                enabled = week.plannedCount > 0,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) { Text(stringResource(R.string.zuzweit_ueberschreiben)) }
+            BouncyTextButton(
+                onClick = actions.onOverwriteDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.action_cancel)) }
+        }
+    }
+}
+
+/** Ein Treffer in der Tageswahl: Bild, Titel, wo er gerade steht - und darunter die Tage. */
+@Composable
+private fun WeekRow(
+    match: SharedRecipe,
+    place: PlanPlace?,
+    /** Die Mahlzeiten zur Wahl - leer, wenn ohnehin nur eine geplant wird. */
+    slots: List<MealSlot>,
+    onDay: (Weekday) -> Unit,
+    onSlot: (MealSlot) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RecipeImage(
+                photoUri = match.imageUrl,
+                title = match.title,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(Tokens.Radius.MdShape),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    match.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = when {
+                        place == null -> stringResource(R.string.zuzweit_ueberschreiben_ohne_tag)
+                        slots.isEmpty() -> place.day.label
+                        else -> stringResource(
+                            R.string.zuzweit_ueberschreiben_tag_mahlzeit,
+                            place.day.label,
+                            place.slot.label,
+                        )
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            Weekday.entries.forEach { day ->
+                DayPill(
+                    label = day.short,
+                    selected = place?.day == day,
+                    onClick = { onDay(day) },
+                    description = day.label,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                )
+            }
+        }
+
+        // Mittag oder Abend fragt sich erst, wenn der Tag feststeht.
+        if (place != null && slots.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                slots.forEach { slot ->
+                    DayPill(
+                        label = slot.label,
+                        selected = place.slot == slot,
+                        onClick = { onSlot(slot) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

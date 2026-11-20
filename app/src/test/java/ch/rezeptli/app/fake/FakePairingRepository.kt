@@ -67,6 +67,9 @@ class FakePairingRepository(
     /** Was die App an Rezeptinhalten hinterlegt hat - nur selbst erfasste Treffer gehoeren hierher. */
     val sharedContents = linkedMapOf<Long, SharedContent>()
 
+    /** Zu welchen Karten die App einen Inhalt holen wollte - in der Reihenfolge der Anfragen. */
+    val contentRequests = mutableListOf<Long>()
+
     /** So viele der naechsten Versuche, einen Inhalt zu hinterlegen oder zu holen, scheitern am Netz. */
     var failNextContentCalls = 0
 
@@ -299,6 +302,7 @@ class FakePairingRepository(
     }
 
     override suspend fun fetchContent(code: String, recipeId: Long): PairingResult<SharedContent?> {
+        contentRequests += recipeId
         failWith?.let { return PairingResult.Failure(it) }
         if (failNextContentCalls > 0) {
             failNextContentCalls -= 1

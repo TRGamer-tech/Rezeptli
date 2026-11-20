@@ -334,4 +334,33 @@
         <item quantity="one">Die Zutaten stehen auf der Einkaufsliste – sie hat jetzt einen Posten.</item>
         <item quantity="other">Die Zutaten stehen auf der Einkaufsliste – sie hat jetzt %1$d Posten.</item>
     </plurals>
+
+    <!-- Zu zweit: die Woche mit den Treffern ueberschreiben -->
+    <string name="zuzweit_ueberschreiben">Woche überschreiben</string>
+    <string name="zuzweit_ueberschreiben_text">Wähle für jedes Gericht den Tag. Ist der Tag schon vergeben, tauschen die beiden die Plätze.</string>
+    <string name="zuzweit_ueberschreiben_warnung">Dein bisheriger Wochenplan wird ersetzt – auch was schon gekocht ist.</string>
+    <string name="zuzweit_ueberschreiben_ohne_tag">Ohne Tag – kommt nicht in den Plan</string>
+    <string name="zuzweit_ueberschreiben_tag_mahlzeit">%1$s, %2$s</string>
+    <string name="zuzweit_ueberschreiben_weglassen">Den gewählten Tag nochmals antippen lässt ein Gericht weg.</string>
+    <plurals name="zuzweit_ueberschrieben">
+        <item quantity="one">Die Woche ist überschrieben: %1$d Gericht steht im Plan.</item>
+        <item quantity="other">Die Woche ist überschrieben: %1$d Gerichte stehen im Plan.</item>
+    </plurals>
+
+    <!-- Naehrwerte: Kalorien und Eiweiss unter der Zutatenliste -->
+    <string name="naehrwerte_pro_portion">Nährwerte pro Portion</string>
+    <string name="naehrwerte_ganzes_rezept">Nährwerte für das ganze Rezept</string>
+    <string name="naehrwerte_kalorien">Kalorien</string>
+    <string name="naehrwerte_eiweiss">Eiweiss</string>
+    <string name="naehrwerte_kcal">%1$d kcal</string>
+    <string name="naehrwerte_kcal_ca">ca. %1$d kcal</string>
+    <string name="naehrwerte_gramm">%1$d g</string>
+    <string name="naehrwerte_gramm_ca">ca. %1$d g</string>
+    <string name="naehrwerte_geschaetzt">Geschätzt aus den Zutaten.</string>
+    <string name="naehrwerte_geschaetzt_ganz">Geschätzt aus den Zutaten. Das Rezept sagt nicht, für wie viele es reicht.</string>
+    <string name="naehrwerte_quelle">Angaben der Quelle.</string>
+    <string name="naehrwerte_quelle_name">Angaben von %1$s.</string>
+    <string name="naehrwerte_kalorien_quelle">Kalorien laut Quelle, Eiweiss aus den Zutaten geschätzt.</string>
+    <string name="naehrwerte_eiweiss_quelle">Eiweiss laut Quelle, Kalorien aus den Zutaten geschätzt.</string>
+    <string name="naehrwerte_unbekannt">Für eine Schätzung von Kalorien und Eiweiss reichen die Angaben nicht.</string>
 </resources>

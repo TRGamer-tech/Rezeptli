@@ -15,7 +15,21 @@ object UrlKey {
             .substringBefore('#')
             .substringBefore('?')
             .substringAfter("://")
+            // Erst klein schreiben, dann das "www." abnehmen - sonst bliebe ein "WWW." stehen.
+            .lowercase()
             .removePrefix("www.")
             .trimEnd('/')
-            .lowercase()
+}
+
+/**
+ * Macht aus einem Titel einen Vergleichsschluessel.
+ *
+ * Ein selbst erfasstes Rezept hat keine Adresse - wiedererkennen laesst es sich nur an seinem
+ * Titel. Gross- und Kleinschreibung und ueberzaehlige Leerzeichen spielen dabei keine Rolle:
+ * "Omas  Gratin" und "omas gratin" sind dasselbe Rezept.
+ */
+object TitleKey {
+    private val SPACES = Regex("\\s+")
+
+    fun of(title: String): String = title.trim().lowercase().replace(SPACES, " ")
 }

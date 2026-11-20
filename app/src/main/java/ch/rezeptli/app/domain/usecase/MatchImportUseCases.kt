@@ -1,10 +1,8 @@
 package ch.rezeptli.app.domain.usecase
 
 import ch.rezeptli.app.domain.model.Recipe
-import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.RecipeSharing
-import ch.rezeptli.app.domain.multiplayer.RoundKeys
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.repository.PairingRepository
 import ch.rezeptli.app.domain.repository.RecipeRepository
@@ -68,20 +66,20 @@ class FetchMatchesUseCase @Inject constructor(
         matches: List<SharedRecipe>,
         onProgress: (done: Int) -> Unit = {},
     ): List<FetchedMatch> = coroutineScope {
-        val participant = pairing.participantId()
         val gate = Semaphore(PARALLEL)
         val done = AtomicInteger()
         matches
             .map { match ->
                 async {
-                    gate.withPermit { fetch(code, match, participant) }.also { onProgress(done.incrementAndGet()) }
+                    gate.withPermit { fetch(code, match) }.also { onProgress(done.incrementAndGet()) }
                 }
             }.awaitAll()
     }
 
-    private suspend fun fetch(code: String, match: SharedRecipe, participant: String): FetchedMatch {
-        val localId = RoundKeys.ownRecipeId(match.key, participant)
-            ?: match.sourceUrl?.let { recipeRepository.findIdBySourceUrl(it) }
+    private suspend fun fetch(code: String, match: SharedRecipe): FetchedMatch {
+        // Wiedererkannt wird an der Adresse (auch leicht anders geschrieben) oder, ohne Adresse,
+        // am Titel - nicht an der Nummer des Dienstes, die sagt darueber nichts.
+        val localId = recipeRepository.findExisting(match.sourceUrl, match.title)
         if (localId != null) {
             recipeRepository.getRecipe(localId)?.let { return FetchedMatch.Ready(match, it, localId) }
         }
@@ -115,13 +113,14 @@ class FetchMatchesUseCase @Inject constructor(
 }
 
 /**
- * Nimmt geholte Treffer in die eigene Sammlung auf.
+ * Nimmt geholte Treffer in die eigene Sammlung auf - und legt dabei nichts doppelt an.
  *
- * Was schon auf dem Geraet liegt, wird nur (wieder) zur Sammlung gezaehlt. Ein Rezept von
- * einer Adresse legt [SaveRecipeUseCase] kein zweites Mal an. Ein selbst erfasstes Rezept
- * der anderen Person hat keine Adresse, an der es sich wiedererkennen liesse - hier zaehlt
- * der Titel: Wer dasselbe Rezept in einer spaeteren Runde noch einmal trifft, soll es nicht
- * doppelt in der Liste haben.
+ * Was schon auf dem Geraet liegt, wird nur (wieder) zur Sammlung gezaehlt. Wiedererkannt wird
+ * ein Rezept an seiner Adresse, auch wenn das andere Telefon sie leicht anders geschrieben
+ * kennt ("www.", Schraegstrich am Ende) - genau daran entstanden frueher Dubletten. Ein selbst
+ * erfasstes Rezept hat keine Adresse; hier zaehlt der Titel. Geprueft wird unmittelbar vor
+ * dem Speichern noch einmal: Zwischen Holen und Behalten kann dasselbe Rezept auf anderem Weg
+ * dazugekommen sein, etwa ueber den Wochenplan.
  *
  * Gibt zu jeder Karte (Nummer des Dienstes) die Nummer des gespeicherten Rezepts zurueck.
  */
@@ -131,32 +130,17 @@ class KeepMatchesUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(ready: List<FetchedMatch.Ready>): Map<Long, Long> = buildMap {
         ready.forEach { fetched ->
-            val known = fetched.localId ?: sameHandwritten(fetched.recipe)
+            val known = fetched.localId?.takeIf { recipeRepository.getRecipe(it) != null }
+                ?: recipeRepository.findExisting(fetched.recipe.sourceUrl, fetched.recipe.title)
             if (known != null) {
                 // Es kann bisher nur fuer den Wochenplan gespeichert gewesen sein.
                 recipeRepository.setInCollection(known, inCollection = true)
                 put(fetched.match.recipeId, known)
             } else {
-                (
-                    saveRecipe(
-                        fetched.recipe,
-                    ) as? SaveRecipeResult.Saved
-                )?.let { put(fetched.match.recipeId, it.recipeId) }
+                val saved = saveRecipe(fetched.recipe.copy(id = 0L)) as? SaveRecipeResult.Saved
+                saved?.let { put(fetched.match.recipeId, it.recipeId) }
             }
         }
-    }
-
-    private suspend fun sameHandwritten(recipe: Recipe): Long? {
-        if (recipe.sourceUrl != null) return null
-        val title = recipe.title.trim()
-        return recipeRepository
-            .getFilteredRecipeIds(RecipeFilter(query = title))
-            .firstOrNull { id ->
-                val candidate = recipeRepository.getRecipe(id)
-                candidate != null &&
-                    candidate.sourceUrl == null &&
-                    candidate.title.trim().equals(title, ignoreCase = true)
-            }
     }
 }
 
@@ -173,7 +157,6 @@ class ShareOwnMatchesUseCase @Inject constructor(
 ) {
     /** Gibt die Karten zurueck, deren Inhalt jetzt beim Dienst liegt. */
     suspend operator fun invoke(code: String, matches: List<SharedRecipe>): Set<Long> {
-        val participant = pairing.participantId()
         val shared = mutableSetOf<Long>()
         for (match in matches) {
             if (!match.isMine || !match.isHandwritten) continue
@@ -181,7 +164,7 @@ class ShareOwnMatchesUseCase @Inject constructor(
                 shared += match.recipeId
                 continue
             }
-            val localId = RoundKeys.ownRecipeId(match.key, participant) ?: continue
+            val localId = recipeRepository.findHandwrittenIdByTitle(match.title) ?: continue
             val recipe = recipeRepository.getRecipe(localId) ?: continue
             val result = pairing.shareContent(code, match.recipeId, RecipeSharing.contentOf(recipe))
             if (result is PairingResult.Success) shared += match.recipeId

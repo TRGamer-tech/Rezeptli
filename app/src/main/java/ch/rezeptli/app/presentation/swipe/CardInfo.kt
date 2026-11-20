@@ -1,6 +1,7 @@
 package ch.rezeptli.app.presentation.swipe
 
 import ch.rezeptli.app.domain.model.Ingredient
+import ch.rezeptli.app.domain.nutrition.NutritionFacts
 
 /**
  * Was ein Antippen der Wischkarte zeigt: woher das Rezept kommt und was hineingehoert.
@@ -25,6 +26,11 @@ data class CardInfo(
     val isForeign: Boolean = false,
     /** Ein eigenes Rezept der anderen Person: Mehr als Titel und Bild hat sie nicht geteilt. */
     val isPartnersOwn: Boolean = false,
+    /** Kalorien und Eiweiss: was die Quelle nennt, sonst aus den Zutaten geschaetzt. */
+    val nutrition: NutritionFacts? = null,
 ) {
     val hasIngredients: Boolean get() = lines.isNotEmpty() || ingredients.isNotEmpty()
+
+    /** Unter den Zutaten stehen die Naehrwerte - oder der Satz, dass sie sich nicht schaetzen liessen. */
+    val showsNutrition: Boolean get() = !isLoading && !failed && (hasIngredients || nutrition != null)
 }

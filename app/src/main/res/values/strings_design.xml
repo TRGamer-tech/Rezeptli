@@ -21,7 +21,7 @@
 
     <!-- Rezepte sichern und übertragen -->
     <string name="sichern_titel">Rezepte sichern und übertragen</string>
-    <string name="sichern_text">Alle Rezepte deiner Sammlung samt eigenen Fotos in einer Datei – zum Aufbewahren oder für ein anderes Telefon. Wochenplan, Einkaufsliste und Vorlieben gehören nicht dazu.</string>
+    <string name="sichern_text">Alle Rezepte deiner Sammlung samt eigenen Fotos in einer Datei – zum Aufbewahren oder für ein anderes Telefon. Deine Vorlieben gehen mit, wenn du willst. Wochenplan und Einkaufsliste gehören nicht dazu.</string>
     <string name="sichern_export">Exportieren</string>
     <string name="sichern_import">Importieren</string>
     <string name="sichern_laeuft">Einen Moment …</string>
@@ -31,7 +31,7 @@
     <string name="sichern_fehler_format">Das ist keine Exportdatei von Rezeptli.</string>
     <string name="sichern_fehler_neuer">Diese Datei stammt aus einer neueren Version von Rezeptli. Aktualisiere die App und versuche es noch einmal.</string>
     <string name="sichern_fehler_gross">Diese Datei ist zu gross für eine Rezeptsammlung.</string>
-    <string name="sichern_fehler_leer">In dieser Datei stehen keine Rezepte.</string>
+    <string name="sichern_fehler_leer">In dieser Datei stehen weder Rezepte noch Vorlieben.</string>
     <plurals name="sichern_exportiert">
         <item quantity="one">%d Rezept exportiert.</item>
         <item quantity="other">%d Rezepte exportiert.</item>
@@ -69,4 +69,20 @@
     <string name="ueberblick_einrichten">Einrichten</string>
     <string name="setup_design_titel">Wie soll Rezeptli aussehen?</string>
     <string name="setup_design_text">Tipp eines an – du siehst es sofort. Ändern kannst du es jederzeit unter «Vorlieben».</string>
+
+    <string name="sichern_vorlieben">Vorlieben mit in die Datei</string>
+    <string name="sichern_vorlieben_text">Ernährung, Unverträglichkeiten, Abneigungen, Haushalt, Läden, Budget und Aussehen. Schalte es aus, wenn du die Datei weitergibst.</string>
+    <string name="sichern_nur_vorlieben_exportiert">Deine Vorlieben sind exportiert.</string>
+    <string name="sichern_vorlieben_frage_titel">Auch die Vorlieben übernehmen?</string>
+    <string name="sichern_vorlieben_frage_text">In der Datei stehen auch Vorlieben: Ernährung, Unverträglichkeiten, Abneigungen, Haushalt, Kochtage, Läden, Budget und Aussehen. Übernimmst du sie, ersetzen sie deine jetzigen.</string>
+    <string name="sichern_vorlieben_frage_von">Sie gehören zu %1$s.</string>
+    <string name="sichern_vorlieben_uebernehmen">Übernehmen</string>
+    <string name="sichern_vorlieben_behalten">Meine behalten</string>
+    <string name="sichern_vorlieben_uebernommen">Die Vorlieben aus der Datei gelten jetzt.</string>
+    <string name="sichern_vorlieben_geblieben">Deine Vorlieben sind geblieben, wie sie waren.</string>
+    <string name="sichern_vorlieben_gleich">In der Datei stehen nur Vorlieben, und sie gleichen deinen.</string>
+    <plurals name="sichern_exportiert_mit_vorlieben">
+        <item quantity="one">%d Rezept und deine Vorlieben exportiert.</item>
+        <item quantity="other">%d Rezepte und deine Vorlieben exportiert.</item>
+    </plurals>
 </resources>

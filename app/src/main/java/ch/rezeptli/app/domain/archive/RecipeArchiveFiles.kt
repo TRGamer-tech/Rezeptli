@@ -19,16 +19,29 @@ data class ArchiveSummary(
     val photos: Int,
 )
 
+/** Was aus einer Exportdatei gelesen wurde - die Fotos der Rezepte sind dann schon abgelegt. */
+data class ReadArchive(
+    val recipes: List<Recipe>,
+    /** Die Vorlieben aus der Datei - `null`, wenn sie ohne geschrieben wurde. */
+    val preferences: ArchivedPreferences? = null,
+)
+
 /** Schreibt die Sammlung als eine Datei: ein ZIP mit den Fotos und `rezepte.json`. */
 class RecipeArchiveWriter @Inject constructor() {
     /**
-     * Schreibt [recipes] nach [out] und schliesst [out].
+     * Schreibt [recipes] und, wenn gewuenscht, die [preferences] nach [out] und schliesst [out].
      *
      * Eigene Fotos wandern als Dateien ins Archiv. Fotos, die im Netz liegen (bei Rezepten aus
      * dem Web), bleiben eine Adresse - sie mitzunehmen hiesse, fremde Bilder zu kopieren.
      * Laesst sich ein Foto nicht lesen, geht das Rezept ohne Foto mit, statt den Export zu kippen.
      */
-    fun write(out: OutputStream, recipes: List<Recipe>, exportedAt: Long, photos: PhotoFiles): ArchiveSummary {
+    fun write(
+        out: OutputStream,
+        recipes: List<Recipe>,
+        exportedAt: Long,
+        photos: PhotoFiles,
+        preferences: ArchivedPreferences? = null,
+    ): ArchiveSummary {
         var photoCount = 0
         ZipOutputStream(out.buffered()).use { zip ->
             val archived = recipes.mapIndexed { index, recipe ->
@@ -49,7 +62,7 @@ class RecipeArchiveWriter @Inject constructor() {
             }
             // Der Text kommt zuletzt: Erst jetzt steht fest, welche Fotos wirklich dabei sind.
             zip.putNextEntry(ZipEntry(RecipeArchive.JSON_ENTRY))
-            zip.write(RecipeArchive.encode(archived, exportedAt).toByteArray(Charsets.UTF_8))
+            zip.write(RecipeArchive.encode(archived, exportedAt, preferences).toByteArray(Charsets.UTF_8))
             zip.closeEntry()
         }
         return ArchiveSummary(recipes = recipes.size, photos = photoCount)
@@ -65,12 +78,12 @@ class RecipeArchiveWriter @Inject constructor() {
  */
 class RecipeArchiveReader @Inject constructor() {
     /**
-     * Liefert die Rezepte aus [input] - ihre Fotos sind dann schon ueber [photos] abgelegt.
+     * Liefert, was in [input] steht - die Fotos der Rezepte sind dann schon ueber [photos] abgelegt.
      *
      * Wirft [ArchiveException], wenn die Datei keine Exportdatei ist. Was bis dahin an Fotos
      * abgelegt wurde, ist dann wieder weggeraeumt.
      */
-    fun read(input: InputStream, photos: PhotoFiles): List<Recipe> {
+    fun read(input: InputStream, photos: PhotoFiles): ReadArchive {
         val buffered = BufferedInputStream(input)
         buffered.mark(ZIP_MAGIC.size)
         val start = ByteArray(ZIP_MAGIC.size)
@@ -80,7 +93,8 @@ class RecipeArchiveReader @Inject constructor() {
         // Auch die blosse Textdatei wird angenommen: Wer das Archiv ausgepackt hat, soll die
         // Rezepte trotzdem einlesen koennen - dann eben ohne die eigenen Fotos.
         if (count < ZIP_MAGIC.size || !start.contentEquals(ZIP_MAGIC)) {
-            return RecipeArchive.decode(buffered.readText(MAX_JSON_BYTES)).map { it.withPhoto(emptyMap()) }
+            val content = RecipeArchive.decode(buffered.readText(MAX_JSON_BYTES))
+            return ReadArchive(content.recipes.map { it.withPhoto(emptyMap()) }, content.preferences)
         }
 
         val saved = mutableMapOf<String, String>()
@@ -118,13 +132,12 @@ class RecipeArchiveReader @Inject constructor() {
                 }
             }
 
-            val recipes = RecipeArchive
-                .decode(text ?: throw ArchiveException(ArchiveError.NOT_AN_ARCHIVE))
-                .map { it.withPhoto(saved) }
+            val content = RecipeArchive.decode(text ?: throw ArchiveException(ArchiveError.NOT_AN_ARCHIVE))
+            val recipes = content.recipes.map { it.withPhoto(saved) }
             // Fotos, auf die kein Rezept zeigt, haben auf dem Telefon nichts verloren.
             val used = recipes.mapNotNullTo(mutableSetOf()) { it.photoUri }
             saved.values.filterNot { it in used }.forEach(photos::delete)
-            return recipes
+            return ReadArchive(recipes, content.preferences)
         } catch (e: ArchiveException) {
             saved.values.forEach(photos::delete)
             throw e

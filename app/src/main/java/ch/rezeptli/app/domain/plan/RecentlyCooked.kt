@@ -1,5 +1,7 @@
 package ch.rezeptli.app.domain.plan
 
+import ch.rezeptli.app.domain.deck.TitleKey
+import ch.rezeptli.app.domain.deck.UrlKey
 import ch.rezeptli.app.domain.model.Recipe
 
 /**
@@ -48,14 +50,12 @@ class RecentlyCooked(
 
         private const val FADE_POINTS = 4.0
         private const val DAY_MS = 24 * 60 * 60 * 1_000L
-        private val SPACES = Regex("\\s+")
 
         /** Niemand hat gekocht - etwa beim allerersten Plan. */
         val NONE = RecentlyCooked(emptyMap(), 0L)
 
         /** Woran ein Gericht wiedererkannt wird: an seiner Adresse und an seinem Titel. */
-        fun keysOf(recipe: Recipe): List<String> = listOfNotNull(recipe.sourceUrl, titleKey(recipe.title))
-
-        private fun titleKey(title: String): String = title.trim().lowercase().replace(SPACES, " ")
+        fun keysOf(recipe: Recipe): List<String> =
+            listOfNotNull(recipe.sourceUrl?.let(UrlKey::of), TitleKey.of(recipe.title))
     }
 }

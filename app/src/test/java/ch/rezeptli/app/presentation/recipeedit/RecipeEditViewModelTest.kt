@@ -37,6 +37,11 @@ class RecipeEditViewModelTest {
         ),
         tags = listOf("vegetarisch"),
         prepTimeMinutes = 30,
+        servings = 4,
+        kcalPerServing = 310,
+        proteinPerServing = 6.5,
+        sourceUrl = "https://beispiel.ch/roesti",
+        sourceName = "Beispiel",
     )
 
     private val repository = FakeRecipeRepository(listOf(existingRecipe))
@@ -114,6 +119,24 @@ class RecipeEditViewModelTest {
             assertEquals(listOf("Kartoffeln", "Speck"), saved.ingredients.map { it.name })
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `bearbeiten laesst stehen, was das Formular nicht zeigt - Portionen, Quelle und ihre Naehrwerte`() = runTest {
+        val viewModel = createViewModel(existingRecipe.id)
+        advanceUntilIdle()
+
+        viewModel.onTitleChange("Berner Rösti")
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        // Frueher ging die Portionszahl bei jedem Speichern verloren - und mit ihr die Umrechnung.
+        val saved = repository.savedRecipes.single()
+        assertEquals("Berner Rösti", saved.title)
+        assertEquals(4, saved.servings)
+        assertEquals(310, saved.kcalPerServing)
+        assertEquals(6.5, saved.proteinPerServing)
+        assertEquals("https://beispiel.ch/roesti", saved.sourceUrl)
     }
 
     @Test

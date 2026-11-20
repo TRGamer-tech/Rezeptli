@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.nutrition.NutritionFacts
+import ch.rezeptli.app.domain.nutrition.RecipeNutrition
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.usecase.AddRecipesToShoppingListUseCase
 import ch.rezeptli.app.domain.usecase.DeleteRecipeUseCase
@@ -27,6 +29,8 @@ import javax.inject.Inject
 data class RecipeDetailUiState(
     val isLoading: Boolean = true,
     val recipe: Recipe? = null,
+    /** Kalorien und Eiweiss - von der Quelle genannt oder aus den Zutaten geschaetzt. */
+    val nutrition: NutritionFacts? = null,
     val isDeleteDialogVisible: Boolean = false,
     val isCookedDialogVisible: Boolean = false,
     /** Fuer so viele wird gekocht - Einkaufsliste und Bring rechnen die Zutaten darauf um. */
@@ -73,8 +77,11 @@ class RecipeDetailViewModel @Inject constructor(
 
     init {
         observeRecipe(recipeId)
-            .onEach { recipe -> _uiState.update { it.copy(recipe = recipe, isLoading = false) } }
-            .launchIn(viewModelScope)
+            .onEach { recipe ->
+                _uiState.update {
+                    it.copy(recipe = recipe, nutrition = recipe?.let(RecipeNutrition::of), isLoading = false)
+                }
+            }.launchIn(viewModelScope)
         profileRepository.profile
             .onEach { profile -> _uiState.update { it.copy(persons = profile.persons) } }
             .launchIn(viewModelScope)

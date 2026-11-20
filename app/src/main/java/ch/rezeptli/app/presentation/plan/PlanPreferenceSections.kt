@@ -56,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -819,13 +821,18 @@ fun MotionSetting(
 private const val BUDGET_STEP = 10
 private const val DISABLED_ALPHA = 0.38f
 
-/** Ein Wochentag als Pille: gewaehlt voll gruen, sonst Papier. Springt beim Umschalten. */
+/**
+ * Ein Wochentag als Pille: gewaehlt voll gruen, sonst Papier. Springt beim Umschalten.
+ *
+ * [description] ist, was vorgelesen wird - "Montag" statt des gezeigten "Mo".
+ */
 @Composable
-private fun DayPill(
+fun DayPill(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    description: String? = null,
 ) {
     val motion = RezeptliTheme.motion
     val fuellung by animateColorAsState(
@@ -854,7 +861,10 @@ private fun DayPill(
                 indication = LocalIndication.current,
                 role = Role.Checkbox,
                 onClick = onClick,
-            ).semantics { this.selected = selected },
+            ).semantics {
+                this.selected = selected
+                if (description != null) contentDescription = description
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -862,6 +872,9 @@ private fun DayPill(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = schrift,
+            maxLines = 1,
+            // Mit einer Beschreibung wird die vorgelesen - das Kuerzel dazu waere doppelt.
+            modifier = if (description != null) Modifier.clearAndSetSemantics {} else Modifier,
         )
     }
 }

@@ -9,7 +9,9 @@ import ch.rezeptli.app.data.local.dao.RecipeDao
 import ch.rezeptli.app.data.local.entity.IngredientEntity
 import ch.rezeptli.app.data.local.entity.PlanEntryEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
+import ch.rezeptli.app.data.local.entity.RecipeIdentity
 import ch.rezeptli.app.data.local.entity.RecipeStepEntity
+import ch.rezeptli.app.data.mapper.toDomain
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.Weekday
@@ -81,6 +83,38 @@ class RecipeDaoTest {
             RecipeStepEntity(recipeId = 0L, position = index, text = text, timerMinutes = null)
         },
     )
+
+    @Test
+    fun merktSichWasDieQuelleAnNaehrwertenNennt() = runTest {
+        val mitAngabe = dao.upsertRecipe(
+            recipe = RecipeEntity(
+                title = "Risotto",
+                instructions = "",
+                prepTimeMinutes = null,
+                photoUri = null,
+                createdAt = 0L,
+                updatedAt = 0L,
+                lastCookedAt = null,
+                servings = 4,
+                kcalPerServing = 512,
+                proteinPerServing = 23.5,
+            ),
+            ingredients = emptyList(),
+            tags = emptyList(),
+            steps = emptyList(),
+        )
+        val ohneAngabe = insertRecipe(title = "Omas Gratin")
+
+        val risotto = dao.recipeWithDetails(mitAngabe)!!.toDomain()
+        assertEquals(512, risotto.kcalPerServing)
+        assertEquals(23.5, risotto.proteinPerServing!!, 0.001)
+        assertEquals(4, risotto.servings)
+
+        // Ein selbst erfasstes Rezept hat keine Angabe - dafuer schaetzt die App.
+        val gratin = dao.recipeWithDetails(ohneAngabe)!!.toDomain()
+        assertNull(gratin.kcalPerServing)
+        assertNull(gratin.proteinPerServing)
+    }
 
     @Test
     fun speichertRezeptMitZutatenUndTags() = runTest {
@@ -252,13 +286,21 @@ class RecipeDaoTest {
     }
 
     @Test
-    fun zuEinerAdresseKommtZuerstDasRezeptAusDerSammlung() = runTest {
+    fun zumWiedererkennenNenntDieDatenbankAdresseTitelUndSammlung() = runTest {
         val url = "https://beispiel.ch/roesti"
-        insertRecipe(title = "Rösti (Plan)", sourceUrl = url, inCollection = false)
+        val imPlan = insertRecipe(title = "Rösti (Plan)", sourceUrl = url, inCollection = false)
         val gespeichert = insertRecipe(title = "Rösti", sourceUrl = url)
+        val eigenes = insertRecipe(title = "Omas Gratin")
 
-        assertEquals(gespeichert, dao.idBySourceUrl(url))
-        assertNull(dao.idBySourceUrl("https://beispiel.ch/unbekannt"))
+        // Alle Rezepte, auch die nur fuer den Plan gespeicherten - verglichen wird im Code.
+        assertEquals(
+            listOf(
+                RecipeIdentity(imPlan, "Rösti (Plan)", url, inCollection = false),
+                RecipeIdentity(gespeichert, "Rösti", url, inCollection = true),
+                RecipeIdentity(eigenes, "Omas Gratin", null, inCollection = true),
+            ),
+            dao.identities().sortedBy { it.id },
+        )
     }
 
     @Test

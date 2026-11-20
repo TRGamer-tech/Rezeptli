@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -58,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.BringLink
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.nutrition.NutritionFacts
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.BouncyButton
@@ -68,6 +70,7 @@ import ch.rezeptli.app.presentation.common.components.CookedDialog
 import ch.rezeptli.app.presentation.common.components.CookedLabel
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.NutritionNote
 import ch.rezeptli.app.presentation.common.components.PortionDialog
 import ch.rezeptli.app.presentation.common.components.RecipeImage
 import ch.rezeptli.app.presentation.common.components.RemoveRecipeDialog
@@ -282,6 +285,7 @@ fun RecipeDetailScreen(
 
             else -> RecipeDetailContent(
                 recipe = recipe,
+                nutrition = uiState.nutrition,
                 persons = uiState.persons,
                 isAddingToList = uiState.isAddingToList,
                 onKeep = onKeep,
@@ -310,6 +314,7 @@ fun RecipeDetailScreen(
 @Composable
 private fun RecipeDetailContent(
     recipe: Recipe,
+    nutrition: NutritionFacts?,
     persons: Int,
     isAddingToList: Boolean,
     onKeep: () -> Unit,
@@ -511,6 +516,14 @@ private fun RecipeDetailContent(
                             )
                         }
                     }
+
+                    // Unter den Zutaten: was eine Portion an Kalorien und Eiweiss bringt -
+                    // von der Quelle genannt oder aus genau diesen Zutaten geschaetzt.
+                    HorizontalDivider(
+                        color = RezeptliTheme.accents.hairline,
+                        modifier = Modifier.padding(vertical = 6.dp),
+                    )
+                    NutritionNote(facts = nutrition, sourceName = recipe.sourceName)
                 }
             }
         }

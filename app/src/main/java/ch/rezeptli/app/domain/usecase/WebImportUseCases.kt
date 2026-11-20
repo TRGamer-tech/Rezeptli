@@ -129,6 +129,9 @@ class LoadWebRecipeUseCase @Inject constructor(
         tags = (keywords + listOfNotNull(sourceName)).distinctBy { it.lowercase() },
         prepTimeMinutes = totalMinutes,
         servings = ServingsParser.parse(servings),
+        // Was die Quelle an Naehrwerten nennt, bleibt beim Rezept - es gilt vor jeder Schaetzung.
+        kcalPerServing = nutrition?.kcal,
+        proteinPerServing = nutrition?.proteinGrams,
         photoUri = imageUrl,
         sourceUrl = sourceUrl,
         sourceName = sourceName,

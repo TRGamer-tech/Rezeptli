@@ -3,6 +3,20 @@ package ch.rezeptli.app.domain.archive
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.profile.Appliance
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.Cuisine
+import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Dislike
+import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.Market
+import ch.rezeptli.app.domain.profile.MealSlot
+import ch.rezeptli.app.domain.profile.Mood
+import ch.rezeptli.app.domain.profile.ProfileEdits
+import ch.rezeptli.app.domain.profile.StoreChain
+import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.domain.profile.Weekday
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.domain.timer.CookingTimer
 import kotlinx.serialization.SerializationException
@@ -49,6 +63,25 @@ data class ArchivedRecipe(
 )
 
 /**
+ * Die Vorlieben, wie sie in einer Exportdatei stehen: das Profil und wie die App aussieht.
+ *
+ * [theme] und [reduceMotion] sind `null`, wenn die Datei dazu nichts sagt. Ob die Einrichtung
+ * schon durchlaufen wurde, reist nicht mit - das ist eine Sache des Telefons, nicht der Person.
+ */
+data class ArchivedPreferences(
+    val profile: UserProfile,
+    val theme: ThemeChoice? = null,
+    val reduceMotion: Boolean? = null,
+)
+
+/** Alles, was in einer Exportdatei steht. */
+data class ArchiveContent(
+    val recipes: List<ArchivedRecipe>,
+    /** `null`, wenn die Datei ohne Vorlieben geschrieben wurde. */
+    val preferences: ArchivedPreferences? = null,
+)
+
+/**
  * Das Format der Exportdatei.
  *
  * Eine Exportdatei ist ein ZIP mit `rezepte.json` und den Fotos im Ordner `fotos/`. Der
@@ -73,14 +106,38 @@ object RecipeArchive {
 
     // ------------------------------------------------------------------------------ schreiben
 
-    fun encode(recipes: List<ArchivedRecipe>, exportedAt: Long): String {
+    fun encode(recipes: List<ArchivedRecipe>, exportedAt: Long, preferences: ArchivedPreferences? = null): String {
         val root = buildJsonObject {
             put("format", FORMAT)
             put("version", VERSION)
             put("exportiert", exportedAt)
+            // Ein neues Feld, keine neue Version: Wer es nicht kennt, ueberliest es und bekommt die Rezepte.
+            preferences?.let { put("vorlieben", it.toJson()) }
             put("rezepte", buildJsonArray { recipes.forEach { add(it.toJson()) } })
         }
         return json.encodeToString(JsonObject.serializer(), root)
+    }
+
+    private fun ArchivedPreferences.toJson(): JsonObject = buildJsonObject {
+        fun list(values: Iterable<String>) = buildJsonArray { values.forEach { add(it) } }
+
+        if (profile.firstName.isNotBlank()) put("vorname", profile.firstName)
+        profile.country?.let { put("land", it.code) }
+        put("kuechen", list(profile.cuisines.map { it.name }))
+        put("ernaehrung", list(profile.diets.map { it.name }))
+        put("unvertraeglichkeiten", list(profile.intolerances.map { it.name }))
+        put("abneigungen", list(profile.dislikes.map { it.name }))
+        put("eigeneAbneigungen", list(profile.customDislikes))
+        profile.householdSize?.let { put("personen", it) }
+        // Die Reihenfolge zaehlt: Der erste Laden ist der Hauptladen.
+        put("laeden", list(profile.stores.map { it.name }))
+        put("kochtage", list(profile.cookDays.sortedBy { it.ordinal }.map { it.name }))
+        put("mahlzeiten", list(profile.mealSlots.sortedBy { it.ordinal }.map { it.name }))
+        profile.weeklyBudget?.let { put("wochenbudget", it) }
+        put("stimmungen", list(profile.moods.map { it.name }))
+        put("geraete", list(profile.appliances.map { it.name }))
+        theme?.let { put("aussehen", it.name) }
+        reduceMotion?.let { put("wenigerBewegung", it) }
     }
 
     private fun ArchivedRecipe.toJson(): JsonObject = buildJsonObject {
@@ -118,6 +175,9 @@ object RecipeArchive {
         put("tags", buildJsonArray { recipe.tags.forEach { add(it) } })
         recipe.prepTimeMinutes?.let { put("zeitMinuten", it) }
         recipe.servings?.let { put("portionen", it) }
+        // Nur, was die Quelle genannt hat - was die App schaetzt, rechnet sie nach dem Einlesen neu.
+        recipe.kcalPerServing?.let { put("kcalProPortion", it) }
+        recipe.proteinPerServing?.let { put("eiweissProPortion", it) }
         photo?.let { put("foto", it) }
         recipe.sourceUrl?.let { put("quelleUrl", it) }
         recipe.sourceName?.let { put("quelleName", it) }
@@ -127,8 +187,8 @@ object RecipeArchive {
 
     // --------------------------------------------------------------------------------- lesen
 
-    /** Wirft [ArchiveException], wenn [text] keine Rezeptsammlung ist. */
-    fun decode(text: String): List<ArchivedRecipe> {
+    /** Wirft [ArchiveException], wenn [text] keine Exportdatei ist. */
+    fun decode(text: String): ArchiveContent {
         val root = try {
             json.parseToJsonElement(text) as? JsonObject
         } catch (_: SerializationException) {
@@ -139,10 +199,55 @@ object RecipeArchive {
         val version = root.int("version") ?: throw ArchiveException(ArchiveError.NOT_AN_ARCHIVE)
         if (version > VERSION) throw ArchiveException(ArchiveError.NEWER_VERSION)
 
-        return root
-            .objects("rezepte")
-            .take(MAX_RECIPES)
-            .mapNotNull { it.toRecipe() }
+        return ArchiveContent(
+            recipes = root
+                .objects("rezepte")
+                .take(MAX_RECIPES)
+                .mapNotNull { it.toRecipe() },
+            preferences = (root["vorlieben"] as? JsonObject)?.toPreferences(),
+        )
+    }
+
+    /**
+     * Liest die Vorlieben - mit denselben Grenzen, die beim Antippen in der App gelten.
+     *
+     * Was die App nicht kennt (eine Kueche aus einer neueren Version, ein Laden aus einem
+     * anderen Land), faellt weg, statt etwas Unsinniges zu hinterlassen: hoechstens eine
+     * Ernaehrungsform, hoechstens drei Laeden und nur solche, die es im Land gibt.
+     */
+    private fun JsonObject.toPreferences(): ArchivedPreferences {
+        val country = Country.fromCode(string("land"))
+        val market = Market.of(country)
+        val diets = names("ernaehrung").mapNotNull(Diet::fromName)
+        val mainDiet = diets.firstOrNull { it in ProfileEdits.MAIN_DIETS }
+
+        var profile = UserProfile(
+            country = country,
+            cuisines = names("kuechen").mapNotNullTo(linkedSetOf(), Cuisine::fromName),
+            diets = diets.filterTo(linkedSetOf()) { it !in ProfileEdits.MAIN_DIETS || it == mainDiet },
+            intolerances = names("unvertraeglichkeiten").mapNotNullTo(linkedSetOf(), Intolerance::fromName),
+            dislikes = names("abneigungen").mapNotNullTo(linkedSetOf(), Dislike::fromName),
+            householdSize = int("personen")?.takeIf { it in 1..UserProfile.MAX_HOUSEHOLD_SIZE },
+            stores = names("laeden")
+                .mapNotNull(StoreChain::fromName)
+                .distinct()
+                .filter { it in market.stores }
+                .take(UserProfile.MAX_STORES),
+            cookDays = names("kochtage").mapNotNullTo(linkedSetOf(), Weekday::fromName),
+            mealSlots = names("mahlzeiten").mapNotNullTo(linkedSetOf(), MealSlot::fromName),
+            weeklyBudget = int("wochenbudget")?.takeIf { it in UserProfile.MIN_BUDGET..UserProfile.MAX_BUDGET },
+            moods = names("stimmungen").mapNotNull(Mood::fromName).take(UserProfile.MAX_MOODS).toSet(),
+            appliances = names("geraete").mapNotNullTo(linkedSetOf(), Appliance::fromName),
+        )
+        profile = ProfileEdits.name(profile, string("vorname").orEmpty().trim())
+        // Eigene Stichworte laufen durch dieselbe Pruefung wie beim Eintippen: Laenge, Anzahl, keine Dubletten.
+        names("eigeneAbneigungen").take(MAX_WORDS).forEach { profile = ProfileEdits.addCustomDislike(profile, it) }
+
+        return ArchivedPreferences(
+            profile = profile,
+            theme = string("aussehen")?.let { name -> ThemeChoice.entries.firstOrNull { it.name == name } },
+            reduceMotion = this["wenigerBewegung"].primitive()?.content?.toBooleanStrictOrNull(),
+        )
     }
 
     private fun JsonObject.toRecipe(): ArchivedRecipe? {
@@ -179,6 +284,8 @@ object RecipeArchive {
             tags = names("tags").map { it.take(MAX_TAG) }.distinct().take(MAX_TAGS),
             prepTimeMinutes = int("zeitMinuten")?.takeIf { it in 1..MAX_PREP_MINUTES },
             servings = int("portionen")?.takeIf { it in 1..MAX_SERVINGS },
+            kcalPerServing = int("kcalProPortion")?.takeIf { it in 1..MAX_KCAL },
+            proteinPerServing = double("eiweissProPortion")?.takeIf { it <= MAX_PROTEIN },
             sourceUrl = string("quelleUrl")?.takeIf { isWebAddress(it) }?.take(MAX_ADDRESS),
             sourceName = string("quelleName")?.take(MAX_NAME),
             createdAt = long("erstellt")?.takeIf { it > 0 } ?: 0L,
@@ -224,4 +331,7 @@ object RecipeArchive {
     private const val MAX_ADDRESS = 2_000
     private const val MAX_PREP_MINUTES = 24 * 60
     private const val MAX_SERVINGS = 100
+    private const val MAX_KCAL = 4_000
+    private const val MAX_PROTEIN = 300.0
+    private const val MAX_WORDS = 100
 }

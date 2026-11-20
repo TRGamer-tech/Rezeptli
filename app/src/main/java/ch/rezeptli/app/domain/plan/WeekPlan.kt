@@ -1,5 +1,7 @@
 package ch.rezeptli.app.domain.plan
 
+import ch.rezeptli.app.domain.deck.TitleKey
+import ch.rezeptli.app.domain.deck.UrlKey
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.ShoppingItem
 import ch.rezeptli.app.domain.profile.MealSlot
@@ -14,7 +16,11 @@ data class PlanCandidate(
     val key: String get() = keyOf(recipe)
 
     companion object {
-        fun keyOf(recipe: Recipe): String = recipe.sourceUrl ?: recipe.title.trim().lowercase()
+        /**
+         * Verglichen wird nicht Zeichen fuer Zeichen: Dieselbe Seite ist mit und ohne "www."
+         * oder Schraegstrich am Ende dasselbe Rezept - siehe [UrlKey] und [TitleKey].
+         */
+        fun keyOf(recipe: Recipe): String = recipe.sourceUrl?.let(UrlKey::of) ?: TitleKey.of(recipe.title)
     }
 }
 

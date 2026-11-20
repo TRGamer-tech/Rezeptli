@@ -9,7 +9,6 @@ import ch.rezeptli.app.domain.multiplayer.ActiveRoundRepository
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.PairingResult
 import ch.rezeptli.app.domain.multiplayer.RoundEnd
-import ch.rezeptli.app.domain.multiplayer.RoundKeys
 import ch.rezeptli.app.domain.multiplayer.RoundOffer
 import ch.rezeptli.app.domain.multiplayer.RoundPhase
 import ch.rezeptli.app.domain.multiplayer.RoundPoll
@@ -18,17 +17,24 @@ import ch.rezeptli.app.domain.multiplayer.RoundState
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedVote
+import ch.rezeptli.app.domain.nutrition.RecipeNutrition
 import ch.rezeptli.app.domain.plan.AddToPlanUseCase
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.plan.OverwritePlanUseCase
+import ch.rezeptli.app.domain.plan.PlacedRecipe
 import ch.rezeptli.app.domain.plan.PlanAddMode
 import ch.rezeptli.app.domain.plan.PlanAddition
+import ch.rezeptli.app.domain.plan.PlanPlace
 import ch.rezeptli.app.domain.plan.ReadRecipeCardUseCase
+import ch.rezeptli.app.domain.plan.WeekAssignment
 import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.ProfileEdits
 import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.domain.repository.PairingRepository
 import ch.rezeptli.app.domain.repository.PairingRepository.Companion.NO_ROUND
 import ch.rezeptli.app.domain.repository.RecipeRepository
@@ -160,6 +166,9 @@ enum class MatchAction {
 
     /** Auf Plaetze des Wochenplans legen. */
     PLAN,
+
+    /** Den Wochenplan durch die Treffer ersetzen - jeder an dem Tag, der fuer ihn gewaehlt wurde. */
+    OVERWRITE,
 }
 
 /** Was beim Einplanen der Treffer herauskam - ueber alle Anlaeufe zusammengezaehlt. */
@@ -167,10 +176,12 @@ data class PlanSummary(
     val added: Int = 0,
     val replaced: Int = 0,
     val alreadyPlanned: Int = 0,
+    /** So viele Treffer stehen im Plan, seit sie die Woche ueberschrieben haben. */
+    val overwritten: Int = 0,
 ) {
-    val placed: Int get() = added + replaced
+    val placed: Int get() = added + replaced + overwritten
 
-    operator fun plus(more: PlanAddition): PlanSummary = PlanSummary(
+    operator fun plus(more: PlanAddition): PlanSummary = copy(
         added = added + more.added,
         replaced = replaced + more.replaced,
         alreadyPlanned = alreadyPlanned + more.alreadyPlanned,
@@ -189,6 +200,8 @@ data class MatchImport(
     val running: MatchAction? = null,
     /** Wie viele Treffer beim laufenden Holen schon erledigt sind. */
     val progress: Int = 0,
+    /** Wie viele Treffer der laufende Anlauf holt - beim zweiten Versuch nur noch die fehlenden. */
+    val total: Int = 0,
     /** Treffer in der Sammlung: Karte (Nummer des Dienstes) zu Rezept (Nummer auf diesem Geraet). */
     val kept: Map<Long, Long> = emptyMap(),
     /** Wurde "behalten" schon einmal versucht? */
@@ -209,6 +222,11 @@ data class MatchImport(
     val askPortions: Boolean = false,
     /** Wie viele Posten die Einkaufsliste hat, nachdem die Zutaten der behaltenen Treffer dazukamen. */
     val listItems: Int? = null,
+    /**
+     * Die offene Tageswahl von "Woche ueberschreiben": welcher Treffer an welchem Tag auf den
+     * Tisch kommt. `null`, solange das Blatt zu ist.
+     */
+    val week: WeekAssignment? = null,
 ) {
     val isBusy: Boolean get() = running != null
 
@@ -249,6 +267,7 @@ class MultiplayerViewModel @Inject constructor(
     private val shareOwnMatches: ShareOwnMatchesUseCase,
     private val addToShoppingList: AddRecipesToShoppingListUseCase,
     private val addToPlan: AddToPlanUseCase,
+    private val overwritePlan: OverwritePlanUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(MultiplayerUiState(selectionCount = selectionHolder.peek().size))
     val uiState: StateFlow<MultiplayerUiState> = _uiState.asStateFlow()
@@ -298,6 +317,18 @@ class MultiplayerViewModel @Inject constructor(
 
     /** Geholte Treffer, fuer die die Woche keinen freien Platz hatte - sie warten auf die Antwort. */
     private var waitingForRoom: List<Recipe> = emptyList()
+
+    /** Die zuletzt gewaehlte Verteilung - wer das Blatt noch einmal oeffnet, faengt nicht von vorn an. */
+    private var chosenWeek: WeekAssignment? = null
+
+    /** Die bestaetigte Verteilung, nach der gerade ueberschrieben wird: Karte zu Platz. */
+    private var overwritePlaces: Map<Long, PlanPlace> = emptyMap()
+
+    /**
+     * Hat diese Verteilung den alten Plan schon ersetzt? Dann raeumt ein zweiter Anlauf (fuer
+     * ein Rezept, das sich nicht laden liess) die Woche nicht noch einmal leer.
+     */
+    private var weekReplaced = false
 
     private data class Prepared(val round: Int, val offers: Deferred<List<RoundOffer>>)
 
@@ -403,6 +434,9 @@ class MultiplayerViewModel @Inject constructor(
         lastState = null
         contributingRound = NO_ROUND
         settingsInFlight = 0
+        chosenWeek = null
+        overwritePlaces = emptyMap()
+        weekReplaced = false
         selection = selectionHolder.take()
 
         viewModelScope.launch {
@@ -590,6 +624,9 @@ class MultiplayerViewModel @Inject constructor(
         shared.clear()
         failedMatches = emptyList()
         waitingForRoom = emptyList()
+        chosenWeek = null
+        overwritePlaces = emptyMap()
+        weekReplaced = false
         if (resumable == null) viewModelScope.launch { activeRounds.clear() }
 
         _uiState.update {
@@ -916,6 +953,7 @@ class MultiplayerViewModel @Inject constructor(
                     minutes = eigenes.prepTimeMinutes ?: karte.prepTimeMinutes,
                     servings = eigenes.servings?.toString(),
                     ingredients = eigenes.ingredients,
+                    nutrition = RecipeNutrition.of(eigenes),
                 )
 
                 url != null -> when (val seite = readCard(url)) {
@@ -927,6 +965,7 @@ class MultiplayerViewModel @Inject constructor(
                         servings = seite.servings,
                         lines = seite.ingredientLines,
                         isForeign = seite.isForeign,
+                        nutrition = seite.nutrition,
                     )
                 }
 
@@ -944,13 +983,10 @@ class MultiplayerViewModel @Inject constructor(
     /**
      * Die Nummer, unter der eine Karte in der eigenen Sammlung liegt - falls sie dort liegt.
      *
-     * Die Nummer des Dienstes sagt darueber nichts; wiedererkannt wird am Schluessel (ein
-     * selbst erfasstes Rezept dieses Geraets) oder an der Adresse.
+     * Die Nummer des Dienstes sagt darueber nichts; wiedererkannt wird an der Adresse oder,
+     * bei einem selbst erfassten Rezept, am Titel.
      */
-    private suspend fun ownIdOf(card: SharedRecipe): Long? {
-        RoundKeys.ownRecipeId(card.key, pairing.participantId())?.let { return it }
-        return card.sourceUrl?.let { recipeRepository.findIdBySourceUrl(it) }
-    }
+    private suspend fun ownIdOf(card: SharedRecipe): Long? = recipeRepository.findExisting(card.sourceUrl, card.title)
 
     // ------------------------------------------------------------------ Treffer uebernehmen
 
@@ -994,7 +1030,14 @@ class MultiplayerViewModel @Inject constructor(
         val besuch = visit
         _uiState.update {
             it.copy(
-                import = it.import.copy(running = action, progress = 0, retry = null, notLoaded = 0, notYetShared = 0),
+                import = it.import.copy(
+                    running = action,
+                    progress = 0,
+                    total = offen.size,
+                    retry = null,
+                    notLoaded = 0,
+                    notYetShared = 0,
+                ),
             )
         }
         viewModelScope.launch {
@@ -1013,6 +1056,7 @@ class MultiplayerViewModel @Inject constructor(
             when (action) {
                 MatchAction.KEEP -> keep(bereit, probleme)
                 MatchAction.PLAN -> plan(bereit, probleme)
+                MatchAction.OVERWRITE -> overwrite(bereit, probleme, besuch)
             }
         }
     }
@@ -1090,6 +1134,108 @@ class MultiplayerViewModel @Inject constructor(
         val uebrig = waitingForRoom.size
         waitingForRoom = emptyList()
         _uiState.update { it.copy(import = it.import.copy(askToReplace = 0, noRoom = uebrig)) }
+    }
+
+    // ------------------------------------------------------------------ Woche ueberschreiben
+
+    /**
+     * Oeffnet die Tageswahl: Die Treffer sollen den Wochenplan ersetzen, und fuer jeden
+     * laesst sich sagen, an welchem Tag er auf den Tisch kommt.
+     *
+     * Das ist die Antwort auf eine volle Woche, die [onAddToPlan] nicht geben kann: Dort wird
+     * hoechstens ersetzt, was gerade im Weg steht - hier ist die Woche danach die der Runde.
+     * Vorgeschlagen wird eine Verteilung ab heute; wer schon einmal gewaehlt hat, bekommt
+     * seine Wahl zurueck.
+     */
+    fun onOverwriteRequest() {
+        val state = _uiState.value
+        if (state.import.isBusy || state.matches.isEmpty() || state.import.week != null) return
+
+        val besuch = visit
+        viewModelScope.launch {
+            val karten = state.matches.map { it.recipeId }
+            val woche = chosenWeek ?: WeekAssignment.suggest(karten, profileRepository.profile.first(), Weekday.today())
+            if (besuch != visit) return@launch
+            _uiState.update { it.copy(import = it.import.copy(week = woche)) }
+        }
+    }
+
+    /** Ein Treffer bekommt seinen Tag - oder verliert ihn, wenn es derselbe noch einmal ist. */
+    fun onOverwriteDay(recipeId: Long, day: Weekday) = editWeek { it.toggleDay(recipeId, day) }
+
+    fun onOverwriteSlot(recipeId: Long, slot: MealSlot) = editWeek { it.withSlot(recipeId, slot) }
+
+    private fun editWeek(change: (WeekAssignment) -> WeekAssignment) {
+        _uiState.update { state ->
+            val woche = state.import.week ?: return@update state
+            state.copy(import = state.import.copy(week = change(woche)))
+        }
+    }
+
+    /** Schliesst die Tageswahl, ohne etwas zu aendern. Was gewaehlt war, bleibt fuer das naechste Mal. */
+    fun onOverwriteDismiss() {
+        chosenWeek = _uiState.value.import.week ?: chosenWeek
+        _uiState.update { it.copy(import = it.import.copy(week = null)) }
+    }
+
+    /**
+     * Ersetzt den Wochenplan durch die verteilten Treffer.
+     *
+     * Erst werden die Rezepte geholt, dann wird ueberschrieben - mit dem, was sich holen
+     * liess. Liess sich gar nichts holen, bleibt die Woche, wie sie ist: Ein leerer Plan ist
+     * kein Ersatz fuer einen vollen.
+     */
+    fun onOverwriteConfirm() {
+        val state = _uiState.value
+        val woche = state.import.week ?: return
+        if (state.import.isBusy || woche.places.isEmpty()) return
+
+        chosenWeek = woche
+        overwritePlaces = woche.places
+        weekReplaced = false
+        _uiState.update { it.copy(import = it.import.copy(week = null)) }
+        importMatches(MatchAction.OVERWRITE, state.matches.filter { it.recipeId in woche.places })
+    }
+
+    private suspend fun overwrite(ready: List<FetchedMatch.Ready>, problems: MatchProblems, besuch: Int) {
+        // Wie beim Einplanen: Was in der Sammlung liegt, kommt von dort - mit seiner Nummer.
+        val behalten = _uiState.value.import.kept
+        val gerichte = ready.mapNotNull { treffer ->
+            val platz = overwritePlaces[treffer.match.recipeId] ?: return@mapNotNull null
+            val rezept = behalten[treffer.match.recipeId]?.let { recipeRepository.getRecipe(it) } ?: treffer.recipe
+            PlacedRecipe(rezept, platz)
+        }
+
+        // Der erste Anlauf ersetzt den Plan, jeder weitere ergaenzt, was dabei noch fehlte.
+        val ergaenzt = weekReplaced
+        val gelegt = if (gerichte.isEmpty()) 0 else overwritePlan(gerichte, keepOthers = ergaenzt)
+        if (besuch != visit) return
+        if (gelegt > 0) {
+            weekReplaced = true
+            waitingForRoom = emptyList()
+        }
+
+        _uiState.update {
+            val bisher = it.import.plan
+            it.copy(
+                import = it.import.copy(
+                    running = null,
+                    plan = when {
+                        gelegt == 0 -> bisher
+                        ergaenzt -> (bisher ?: PlanSummary()).let { plan ->
+                            plan.copy(overwritten = plan.overwritten + gelegt)
+                        }
+                        // Was vorher eingeplant wurde, stand im alten Plan - den gibt es nicht mehr.
+                        else -> PlanSummary(overwritten = gelegt)
+                    },
+                    askToReplace = if (gelegt > 0) 0 else it.import.askToReplace,
+                    noRoom = if (gelegt > 0) 0 else it.import.noRoom,
+                    notLoaded = problems.notLoaded,
+                    notYetShared = problems.notYetShared,
+                    retry = MatchAction.OVERWRITE.takeIf { problems.any },
+                ),
+            )
+        }
     }
 
     // ------------------------------------------------------------------ Einkaufsliste

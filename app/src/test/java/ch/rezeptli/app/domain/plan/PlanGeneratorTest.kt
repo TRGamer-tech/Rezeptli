@@ -449,7 +449,8 @@ class PlanGeneratorTest {
         }
         val gekocht = RecentlyCooked(RecentlyCooked.keysOf(pool.first().recipe).associateWith { heute - tag }, heute)
 
-        assertEquals(listOf("https://beispiel.ch/gulasch", "gulasch"), RecentlyCooked.keysOf(pool.first().recipe))
+        // Die Adresse ohne Beiwerk: Mit oder ohne "https://www." ist es dieselbe Seite.
+        assertEquals(listOf("beispiel.ch/gulasch", "gulasch"), RecentlyCooked.keysOf(pool.first().recipe))
         assertTrue(gekocht.isRecent(anderswo.recipe))
         assertEquals(1, gekocht.daysSince(anderswo.recipe))
         // Ein anderes Gericht derselben Seite ist damit nicht gemeint.
@@ -549,11 +550,9 @@ class PlanGeneratorTest {
     @Test
     fun `reicht das Neue nicht, fuellen Gerichte des alten Plans auf - vor allem, was kuerzlich gekocht wurde`() {
         val profil = profile(tage = 6)
-        val eben = setOf(
-            "Gulasch",
-            "Gemüsecurry",
-            "Omelette",
-        ).mapTo(mutableSetOf()) { "https://beispiel.ch/${it.lowercase()}" }
+        val eben = pool
+            .filter { it.recipe.title in setOf("Gulasch", "Gemüsecurry", "Omelette") }
+            .mapTo(mutableSetOf()) { it.key }
         val gekocht = gekocht("Gratin" to 2)
 
         repeat(10) { startwert ->

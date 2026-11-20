@@ -1,5 +1,6 @@
 package ch.rezeptli.app.domain.multiplayer
 
+import ch.rezeptli.app.domain.deck.TitleKey
 import ch.rezeptli.app.domain.deck.UrlKey
 import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.domain.plan.DietaryFilter
@@ -177,25 +178,17 @@ sealed interface RoundPoll {
 /**
  * Woran ein Rezept in einer Runde wiedererkannt wird.
  *
- * Ein Rezept aus dem Netz traegt den Fingerabdruck seiner Adresse: Kennen beide es, ist es
- * auf beiden Telefonen dasselbe und liegt nur einmal im Stapel. Ein selbst erfasstes Rezept
- * hat keine Adresse - sein Schluessel nennt das Geraet und die dortige Nummer, damit "Rezept
- * 7" der einen Person nicht mit "Rezept 7" der anderen verwechselt wird.
+ * Ein Rezept aus dem Netz traegt den Fingerabdruck seiner Adresse, ein selbst erfasstes den
+ * seines Titels. Kennen beide ein Rezept, hat es deshalb auf beiden Telefonen denselben
+ * Schluessel und liegt nur einmal im Stapel - auch ein selbst erfasstes, das die eine Person
+ * in einer frueheren Runde von der anderen uebernommen hat. Frueher nannte der Schluessel
+ * eines selbst erfassten Rezepts das Geraet und die dortige Nummer; dasselbe Gericht lag dann
+ * zweimal im Stapel, sobald beide es hatten.
  */
 object RoundKeys {
     fun forUrl(url: String): String = "u" + fingerprint(UrlKey.of(url))
 
-    fun forOwn(participantId: String, recipeId: Long): String = "e:${deviceTag(participantId)}:$recipeId"
-
-    /** Die Nummer des eigenen Rezepts hinter einem Schluessel - `null`, wenn es nicht von diesem Geraet stammt. */
-    fun ownRecipeId(key: String, participantId: String): Long? {
-        val prefix = "e:${deviceTag(participantId)}:"
-        return if (key.startsWith(prefix)) key.removePrefix(prefix).toLongOrNull() else null
-    }
-
-    /** Der Dienst laesst im Schluessel nur Buchstaben, Ziffern, Doppelpunkt, Binde- und Unterstrich zu. */
-    private fun deviceTag(participantId: String): String =
-        participantId.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.take(DEVICE_TAG_LENGTH)
+    fun forTitle(title: String): String = "t" + fingerprint(TitleKey.of(title))
 
     /**
      * FNV-1a ueber 64 Bit. Kein Geheimnis und keine Sicherheit - nur ein kurzer, auf beiden
@@ -212,7 +205,6 @@ object RoundKeys {
             .padStart(HEX_LENGTH, '0')
     }
 
-    private const val DEVICE_TAG_LENGTH = 10
     private const val HEX_LENGTH = 16
     private const val BYTE_MASK = 0xffL
     private const val FNV_PRIME = 0x100000001b3L

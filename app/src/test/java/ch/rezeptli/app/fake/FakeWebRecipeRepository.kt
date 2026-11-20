@@ -8,6 +8,7 @@ import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
 import ch.rezeptli.app.domain.repository.WebSearchUpdate
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -66,8 +67,31 @@ class FakeWebRecipeRepository(
     /** Jede Adresse, die geladen werden sollte - auch die, bei denen es nicht klappte. */
     val loadCalls: MutableList<String> = mutableListOf()
 
+    /** Wie lange eine Seite auf sich warten laesst (Millisekunden) - in Tests zaehlt das als gedachte Zeit. */
+    var latencyMs: (String) -> Long = { 0L }
+
+    /** Wie viele Seiten desselben Anbieters (erster Teil der Adresse) gerade gleichzeitig geladen werden. */
+    private val loading = mutableMapOf<String, Int>()
+
+    /** Der hoechste Stand von [loading] je Anbieter - und ueber alle zusammen. */
+    val peakLoadsByHost: MutableMap<String, Int> = mutableMapOf()
+    var peakLoads: Int = 0
+        private set
+
     override suspend fun loadRecipe(url: String): WebRecipeResult {
         loadCalls += url
+        val wait = latencyMs(url)
+        if (wait > 0L) {
+            val host = url.substringAfter("://").substringBefore('/')
+            loading[host] = (loading[host] ?: 0) + 1
+            peakLoadsByHost[host] = maxOf(peakLoadsByHost[host] ?: 0, loading.getValue(host))
+            peakLoads = maxOf(peakLoads, loading.values.sum())
+            try {
+                delay(wait)
+            } finally {
+                loading[host] = loading.getValue(host) - 1
+            }
+        }
         error?.let { return WebRecipeResult.Failed(it) }
         if (url in unreachable) return WebRecipeResult.Failed(WebImportError.NO_CONNECTION)
         val recipe = recipeByUrl[url] ?: return WebRecipeResult.Failed(WebImportError.NO_RECIPE_FOUND)

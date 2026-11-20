@@ -23,7 +23,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
-import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -140,7 +139,7 @@ class PlanPersister @Inject constructor(
 ) {
     suspend fun idOf(recipe: Recipe): Long =
         recipe.id.takeIf { it != 0L }
-            ?: recipe.sourceUrl?.let { recipeRepository.findIdBySourceUrl(it) }
+            ?: recipeRepository.findExisting(recipe.sourceUrl, recipe.title)
             ?: recipeRepository.saveRecipe(recipe.copy(inCollection = false))
 
     /**
@@ -379,10 +378,12 @@ class AddToPlanUseCase @Inject constructor(
     private val generator: PlanGenerator,
     private val persister: PlanPersister,
 ) {
+    private val meals = PlanMeals(classifier, generator)
+
     suspend operator fun invoke(
         recipes: List<Recipe>,
         mode: PlanAddMode = PlanAddMode.FREE_ONLY,
-        today: Weekday = currentWeekday(),
+        today: Weekday = Weekday.today(),
     ): PlanAddition {
         if (recipes.isEmpty()) return PlanAddition()
 
@@ -424,24 +425,12 @@ class AddToPlanUseCase @Inject constructor(
         }
 
         val taken = onReplaced.mapTo(mutableSetOf()) { (_, place) -> place }
-        val kept = planned.filterNot { (entry, _) -> entry.place in taken }.map { (entry, recipe) ->
-            PlannedMeal(
-                day = entry.day,
-                slot = entry.slot,
-                candidate = PlanCandidate(recipe, classifier.classify(recipe)),
-                servings = entry.servings,
-                cost = entry.cost,
-            )
-        }
-        val added = (onFree + onReplaced).map { (recipe, place) ->
-            val candidate = PlanCandidate(recipe, classifier.classify(recipe))
-            val scaled = generator.scaledRecipe(recipe, profile.persons)
-            PlannedMeal(place.day, place.slot, candidate, profile.persons, generator.mealCostOf(scaled, profile))
-        }
+        val kept = planned
+            .filterNot { (entry, _) -> entry.place in taken }
+            .map { (entry, recipe) -> meals.kept(entry, recipe) }
+        val added = (onFree + onReplaced).map { (recipe, place) -> meals.fresh(recipe, place, profile) }
 
-        val meals = (kept + added).sortedWith(compareBy({ it.day.ordinal }, { it.slot.ordinal }))
-        val basket = generator.basketFor(meals.map { it.candidate to it.cost }, profile.persons, profile)
-        persister.save(PlanDraft(meals, basket, profile.budget), keep = true)
+        persister.save(meals.draft(kept + added, profile), keep = true)
         return PlanAddition(
             added = onFree.size,
             replaced = onReplaced.size,
@@ -452,7 +441,96 @@ class AddToPlanUseCase @Inject constructor(
 
     private companion object {
         const val DAYS = 7
+    }
+}
 
-        fun currentWeekday(): Weekday = Weekday.entries[LocalDate.now().dayOfWeek.value - 1]
+/** Ein Rezept und der Platz der Woche, auf den es soll. */
+data class PlacedRecipe(
+    val recipe: Recipe,
+    val place: PlanPlace,
+)
+
+/**
+ * Ersetzt den Wochenplan durch von Hand verteilte Gerichte - etwa die Treffer einer
+ * gemeinsamen Runde, fuer die jemand "Woche ueberschreiben" gewaehlt hat.
+ *
+ * Anders als bei [AddToPlanUseCase] sucht hier niemand nach freien Plaetzen und fragt nach:
+ * Wer die Woche ueberschreibt, hat gesagt, was an welchem Tag auf den Tisch kommt, und dass
+ * der bisherige Plan dafuer weicht - auch das, was schon gekocht ist. Der Einkauf wird neu
+ * gerechnet; was auf der Liste schon abgehakt war und wieder gebraucht wird, bleibt abgehakt.
+ *
+ * Mit [keepOthers] bleibt stehen, was sonst im Plan ist. Das braucht der zweite Anlauf: Liess
+ * sich ein Rezept beim Ueberschreiben nicht laden, kommt es spaeter allein auf seinen Platz -
+ * die Woche soll dabei nicht noch einmal leer geraeumt werden.
+ */
+class OverwritePlanUseCase @Inject constructor(
+    private val profileRepository: UserProfileRepository,
+    private val planRepository: PlanRepository,
+    private val recipeRepository: RecipeRepository,
+    private val classifier: RecipeClassifier,
+    private val generator: PlanGenerator,
+    private val persister: PlanPersister,
+) {
+    private val meals = PlanMeals(classifier, generator)
+
+    /** Gibt zurueck, wie viele Gerichte damit neu im Plan stehen. */
+    suspend operator fun invoke(dishes: List<PlacedRecipe>, keepOthers: Boolean = false): Int {
+        // Ein Platz traegt ein Gericht, und ein Gericht steht nur einmal in der Woche.
+        val wanted = dishes.distinctBy { it.place }.distinctBy { PlanCandidate.keyOf(it.recipe) }
+        if (wanted.isEmpty()) return 0
+
+        val profile = profileRepository.profile.first()
+        val kept = if (keepOthers) {
+            val taken = wanted.mapTo(mutableSetOf()) { it.place }
+            val moving = wanted.mapTo(mutableSetOf()) { PlanCandidate.keyOf(it.recipe) }
+            planRepository.currentPlan().mapNotNull { entry ->
+                val recipe = recipeRepository.getRecipe(entry.recipeId) ?: return@mapNotNull null
+                // Der Platz wird neu belegt - oder das Gericht zieht auf seinen neuen Platz um.
+                val gone = entry.place in taken || PlanCandidate.keyOf(recipe) in moving
+                if (gone) null else meals.kept(entry, recipe)
+            }
+        } else {
+            emptyList()
+        }
+        val fresh = wanted.map { (recipe, place) -> meals.fresh(recipe, place, profile) }
+
+        persister.save(meals.draft(kept + fresh, profile), keep = true)
+        return fresh.size
+    }
+}
+
+/**
+ * Was die Anwendungsfaelle teilen, die Gerichte von aussen in den Plan bringen: aus einem
+ * Rezept eine Mahlzeit fuer den Haushalt machen, und aus den Mahlzeiten Plan und Einkauf.
+ */
+private class PlanMeals(
+    private val classifier: RecipeClassifier,
+    private val generator: PlanGenerator,
+) {
+    /** Eine Mahlzeit, die schon im Plan steht - mit den Portionen und Kosten, die dort gelten. */
+    fun kept(entry: PlanEntry, recipe: Recipe) = PlannedMeal(
+        day = entry.day,
+        slot = entry.slot,
+        candidate = PlanCandidate(recipe, classifier.classify(recipe)),
+        servings = entry.servings,
+        cost = entry.cost,
+    )
+
+    /** Eine neue Mahlzeit - gerechnet fuer so viele Personen, wie im Haushalt essen. */
+    fun fresh(recipe: Recipe, place: PlanPlace, profile: UserProfile): PlannedMeal {
+        val scaled = generator.scaledRecipe(recipe, profile.persons)
+        return PlannedMeal(
+            day = place.day,
+            slot = place.slot,
+            candidate = PlanCandidate(recipe, classifier.classify(recipe)),
+            servings = profile.persons,
+            cost = generator.mealCostOf(scaled, profile),
+        )
+    }
+
+    fun draft(meals: List<PlannedMeal>, profile: UserProfile): PlanDraft {
+        val sorted = meals.sortedWith(compareBy({ it.day.ordinal }, { it.slot.ordinal }))
+        val basket = generator.basketFor(sorted.map { it.candidate to it.cost }, profile.persons, profile)
+        return PlanDraft(sorted, basket, profile.budget)
     }
 }

@@ -3,6 +3,19 @@ package ch.rezeptli.app.domain.archive
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.profile.Appliance
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.Cuisine
+import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Dislike
+import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.Market
+import ch.rezeptli.app.domain.profile.MealSlot
+import ch.rezeptli.app.domain.profile.Mood
+import ch.rezeptli.app.domain.profile.StoreChain
+import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.domain.profile.Weekday
+import ch.rezeptli.app.domain.settings.ThemeChoice
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.fake.FakePhotoFiles
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -62,6 +75,10 @@ class RecipeArchiveTest {
         title = "Rösti",
         instructions = "Raffeln und braten.",
         ingredients = listOf(Ingredient(name = "Kartoffeln", amount = 1.0, unit = IngredientUnit.KILOGRAMM)),
+        servings = 4,
+        // Was die Quelle an Naehrwerten nennt, gehoert zum Rezept und reist mit.
+        kcalPerServing = 310,
+        proteinPerServing = 6.5,
         photoUri = "https://beispiel.ch/roesti.jpg",
         sourceUrl = "https://beispiel.ch/roesti",
         sourceName = "Beispiel",
@@ -78,7 +95,10 @@ class RecipeArchiveTest {
     }
 
     private fun gelesen(datei: ByteArray, ziel: FakePhotoFiles = FakePhotoFiles()): List<Recipe> =
-        RecipeArchiveReader().read(ByteArrayInputStream(datei), ziel)
+        RecipeArchiveReader().read(ByteArrayInputStream(datei), ziel).recipes
+
+    private fun vorliebenAus(datei: ByteArray): ArchivedPreferences? =
+        RecipeArchiveReader().read(ByteArrayInputStream(datei), FakePhotoFiles()).preferences
 
     private fun zip(vararg eintraege: Pair<String, ByteArray>): ByteArray {
         val out = ByteArrayOutputStream()
@@ -293,6 +313,7 @@ class RecipeArchiveTest {
             {"titel":"   "},
             "kein Rezept",
             {"titel":"Seltsam","zeitMinuten":-5,"portionen":9999,"quelleUrl":"javascript:alert(1)",
+             "kcalProPortion":999999,"eiweissProPortion":-4,
              "foto":"file:///data/data/geheim","erstellt":-1,"zuletztGekocht":"gestern",
              "schritte":[{"text":"Rühren","timerMinuten":100000},{"timerMinuten":5},"nichts"],
              "zutaten":[{"name":"Mehl","menge":-3,"einheit":"FASS"},{"menge":2},{"name":"Zucker","menge":"viel"}],
@@ -304,6 +325,8 @@ class RecipeArchiveTest {
         assertEquals("Seltsam", seltsam.title)
         assertNull(seltsam.prepTimeMinutes)
         assertNull(seltsam.servings)
+        assertNull(seltsam.kcalPerServing)
+        assertNull(seltsam.proteinPerServing)
         assertNull(seltsam.sourceUrl)
         assertNull(seltsam.photoUri)
         assertEquals(0L, seltsam.createdAt)
@@ -316,6 +339,119 @@ class RecipeArchiveTest {
             seltsam.ingredients,
         )
         assertEquals(listOf("a", "7"), seltsam.tags)
+    }
+
+    // ------------------------------------------------------------------ Vorlieben
+
+    private val vorlieben = ArchivedPreferences(
+        profile = UserProfile(
+            firstName = "Lena",
+            country = Country.SCHWEIZ,
+            cuisines = setOf(Cuisine.ITALIENISCH, Cuisine.ASIATISCH),
+            diets = setOf(Diet.VEGETARISCH, Diet.KOHLENHYDRATARM),
+            intolerances = setOf(Intolerance.NUESSE),
+            dislikes = setOf(Dislike.PILZE, Dislike.KORIANDER),
+            customDislikes = listOf("Rosinen", "Sellerie"),
+            householdSize = 3,
+            stores = listOf(StoreChain.COOP, StoreChain.MIGROS),
+            cookDays = setOf(Weekday.MONTAG, Weekday.MITTWOCH, Weekday.SAMSTAG),
+            mealSlots = setOf(MealSlot.ABEND),
+            weeklyBudget = 180,
+            moods = setOf(Mood.SCHNELL),
+            appliances = setOf(Appliance.HERD, Appliance.BACKOFEN),
+        ),
+        theme = ThemeChoice.DUNKEL,
+        reduceMotion = true,
+    )
+
+    private fun mitVorlieben(vorlieben: ArchivedPreferences?, vararg rezepte: Recipe): ByteArray {
+        val out = ByteArrayOutputStream()
+        RecipeArchiveWriter().write(out, rezepte.toList(), exportedAt = 1L, photos = telefon, preferences = vorlieben)
+        return out.toByteArray()
+    }
+
+    @Test
+    fun `die Vorlieben kommen so wieder heraus, wie sie hineingingen`() {
+        val datei = mitVorlieben(vorlieben, roesti)
+
+        assertEquals(vorlieben, vorliebenAus(datei))
+        // Die Reihenfolge der Laeden zaehlt: Der erste ist der Hauptladen.
+        assertEquals(StoreChain.COOP, vorliebenAus(datei)?.profile?.store)
+        assertEquals(listOf("Rösti"), gelesen(datei).map { it.title })
+    }
+
+    @Test
+    fun `eine Datei kann auch nur Vorlieben enthalten`() {
+        val datei = mitVorlieben(vorlieben)
+
+        assertEquals(vorlieben, vorliebenAus(datei))
+        assertTrue(gelesen(datei).isEmpty())
+    }
+
+    @Test
+    fun `ohne Vorlieben geschrieben, steht nichts davon in der Datei`() {
+        val datei = mitVorlieben(null, roesti)
+
+        assertNull(vorliebenAus(datei))
+        val text = ZipInputStream(ByteArrayInputStream(datei)).use { zip ->
+            generateSequence { zip.nextEntry }
+                .first { it.name == RecipeArchive.JSON_ENTRY }
+                .let { zip.readBytes().decodeToString() }
+        }
+        assertFalse(text.contains("vorlieben"))
+    }
+
+    @Test
+    fun `ob die Einrichtung schon gelaufen ist, reist nicht mit`() {
+        val eingerichtet = vorlieben.copy(profile = vorlieben.profile.copy(onboardingCompleted = true))
+
+        assertEquals(false, vorliebenAus(mitVorlieben(eingerichtet))?.profile?.onboardingCompleted)
+    }
+
+    @Test
+    fun `Vorlieben aus einer fremden Datei werden zurechtgestutzt wie beim Antippen in der App`() {
+        val json = """{"format":"rezeptli-rezepte","version":1,"rezepte":[],"vorlieben":{
+            "vorname":"  Ein sehr, sehr langer Name, der in kein Feld der App passen wuerde  ",
+            "land":"DE",
+            "kuechen":["ITALIENISCH","MARSIANISCH",7],
+            "ernaehrung":["VEGAN","VEGETARISCH","KOHLENHYDRATARM","PESCETARISCH"],
+            "unvertraeglichkeiten":["NUESSE","STEINE"],
+            "abneigungen":"PILZE",
+            "eigeneAbneigungen":["Rosinen","rosinen","ei","Sellerie"],
+            "personen":400,
+            "laeden":["MIGROS","DE_ALDI","DE_ALDI","DE_REWE","DE_EDEKA","DE_LIDL"],
+            "kochtage":["MONTAG","FEIERTAG"],
+            "mahlzeiten":["ABEND","FRUEHSTUECK"],
+            "wochenbudget":5,
+            "stimmungen":["SCHNELL","LEICHT","FAMILIE","COMFORT","PROTEIN"],
+            "geraete":["HERD","WARPANTRIEB"],
+            "aussehen":"NEON",
+            "wenigerBewegung":"vielleicht"
+        }}"""
+
+        val gelesen = vorliebenAus(json.toByteArray())!!
+        val profil = gelesen.profile
+
+        assertEquals(40, profil.firstName.length)
+        assertEquals(Country.DEUTSCHLAND, profil.country)
+        assertEquals(setOf(Cuisine.ITALIENISCH), profil.cuisines)
+        // Hoechstens eine Ernaehrungsform - die erste -, "kohlenhydratarm" ist unabhaengig davon.
+        assertEquals(setOf(Diet.VEGAN, Diet.KOHLENHYDRATARM), profil.diets)
+        assertEquals(setOf(Intolerance.NUESSE), profil.intolerances)
+        assertTrue(profil.dislikes.isEmpty())
+        // Keine Dubletten, nichts unter drei Buchstaben.
+        assertEquals(listOf("Rosinen", "Sellerie"), profil.customDislikes)
+        assertNull(profil.householdSize)
+        // Nur Laeden, die es im Land gibt, jeder einmal und hoechstens drei - der erste bleibt der Hauptladen.
+        assertEquals(listOf(StoreChain.DE_ALDI, StoreChain.DE_REWE, StoreChain.DE_EDEKA), profil.stores)
+        assertTrue(profil.stores.all { it in Market.of(Country.DEUTSCHLAND).stores })
+        assertEquals(setOf(Weekday.MONTAG), profil.cookDays)
+        assertEquals(setOf(MealSlot.ABEND), profil.mealSlots)
+        assertNull(profil.weeklyBudget)
+        assertEquals(setOf(Mood.SCHNELL, Mood.LEICHT, Mood.FAMILIE), profil.moods)
+        assertEquals(setOf(Appliance.HERD), profil.appliances)
+        assertNull(gelesen.theme)
+        assertNull(gelesen.reduceMotion)
     }
 
     @Test

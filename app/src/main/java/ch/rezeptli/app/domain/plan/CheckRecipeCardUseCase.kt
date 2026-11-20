@@ -1,6 +1,8 @@
 package ch.rezeptli.app.domain.plan
 
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.nutrition.NutritionFacts
+import ch.rezeptli.app.domain.nutrition.RecipeNutrition
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.repository.WebRecipeResult
@@ -30,6 +32,8 @@ data class CardDetails(
     val traits: RecipeTraits?,
     /** Die Seite ist nicht auf Deutsch - die Zutaten stehen in der Sprache der Quelle. */
     val isForeign: Boolean,
+    /** Kalorien und Eiweiss: was die Seite nennt, sonst aus den Zutaten geschaetzt. */
+    val nutrition: NutritionFacts? = null,
 )
 
 /**
@@ -79,6 +83,13 @@ class ReadRecipeCardUseCase @Inject constructor(
             servings = web.servings,
             traits = if (pruefbar) classifier.classify(rezept) else null,
             isForeign = fremd,
+            nutrition = RecipeNutrition.of(
+                // Fremdsprachige Zutaten wuerden an den deutschen Stichworten vorbei gelesen -
+                // dort zaehlt nur, was die Seite selbst nennt.
+                ingredients = if (fremd) emptyList() else rezept.ingredients,
+                servings = ServingsParser.parse(web.servings),
+                source = web.nutrition,
+            ),
         ).also { gelesen[url] = it }
     }
 }
