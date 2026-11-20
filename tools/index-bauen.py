@@ -22,6 +22,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -88,14 +89,30 @@ def laden(url: str, timeout: int = 60) -> str:
     return roh.decode("utf-8", "replace")
 
 
-def titel_aus_adresse(url: str) -> str:
-    teil = url.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
-    teil = PAGE_SUFFIX.sub("", teil)
-    teil = TRAILING_ID.sub("", teil)
-    teil = TRAILING_NOISE.sub("", teil)
+RUBRIKEN = {"de", "fr", "it", "en", "rezepte", "rezept", "recipes", "recipe", "recettes", "recette",
+            "ricette", "ricetta", "kochen", "www"}
 
-    woerter = [w for w in re.split(r"[-_]", teil) if w and not w.isdigit()]
-    return " ".join(w[:1].upper() + w[1:] for w in woerter) or url
+
+def titel_aus_adresse(url: str) -> str:
+    """Der Titel aus dem letzten brauchbaren Abschnitt der Adresse.
+
+    Endet eine Adresse auf einer Nummer (Migusto), bliebe vom letzten Abschnitt nichts
+    uebrig - dann zaehlt der Abschnitt davor. Die rohe Adresse kommt nie als Titel heraus;
+    gibt es keinen brauchbaren Abschnitt, bleibt der Titel leer, und die App setzt den
+    Namen der Quelle ein. Dieselbe Regel steht in der App in RecipeTitles.
+    """
+    pfad = urllib.parse.urlsplit(url).path
+    for teil in reversed(pfad.split("/")):
+        teil = urllib.parse.unquote(teil)
+        teil = PAGE_SUFFIX.sub("", teil)
+        teil = TRAILING_ID.sub("", teil)
+        teil = TRAILING_NOISE.sub("", teil)
+        woerter = [w for w in re.split(r"[-_ +]", teil) if w and not w.isdigit()]
+        if len(woerter) == 1 and woerter[0].lower() in RUBRIKEN:
+            continue
+        if woerter:
+            return " ".join(w[:1].upper() + w[1:] for w in woerter)
+    return ""
 
 
 def eintraege(quelle: dict) -> list[tuple[str, str, str]]:

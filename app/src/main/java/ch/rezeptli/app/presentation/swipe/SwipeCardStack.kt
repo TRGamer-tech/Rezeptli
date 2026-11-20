@@ -285,7 +285,8 @@ private fun SwipeCardContent(
         ) {
             Text(
                 text = card.title,
-                style = MaterialTheme.typography.headlineSmall,
+                // Titel aus Verzeichnissen sind oft lang - kleiner gesetzt passen sie in zwei Zeilen.
+                style = MaterialTheme.typography.titleLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
