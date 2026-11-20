@@ -1,6 +1,7 @@
 package ch.rezeptli.app.di
 
 import ch.rezeptli.app.data.local.AppearanceStore
+import ch.rezeptli.app.data.local.PlanMemoryStore
 import ch.rezeptli.app.data.local.UserProfileStore
 import ch.rezeptli.app.data.pairing.ActiveRoundStore
 import ch.rezeptli.app.data.pairing.PairingRepositoryImpl
@@ -11,6 +12,7 @@ import ch.rezeptli.app.data.repository.SwipeSessionRepositoryImpl
 import ch.rezeptli.app.data.repository.WebRecipeRepositoryImpl
 import ch.rezeptli.app.data.translate.MlKitRecipeTranslator
 import ch.rezeptli.app.domain.multiplayer.ActiveRoundRepository
+import ch.rezeptli.app.domain.plan.PlanMemory
 import ch.rezeptli.app.domain.plan.PlanRepository
 import ch.rezeptli.app.domain.repository.PairingRepository
 import ch.rezeptli.app.domain.repository.RecipeRepository
@@ -52,6 +54,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPlanRepository(impl: PlanRepositoryImpl): PlanRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPlanMemory(impl: PlanMemoryStore): PlanMemory
 
     @Binds
     @Singleton

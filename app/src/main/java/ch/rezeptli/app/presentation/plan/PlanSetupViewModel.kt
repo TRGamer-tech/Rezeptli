@@ -3,8 +3,12 @@ package ch.rezeptli.app.presentation.plan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.profile.Appliance
+import ch.rezeptli.app.domain.profile.Country
+import ch.rezeptli.app.domain.profile.Cuisine
 import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.Mood
 import ch.rezeptli.app.domain.profile.ProfileEdits
 import ch.rezeptli.app.domain.profile.StoreChain
@@ -23,13 +27,16 @@ import javax.inject.Inject
 
 /** Die Fragen der Einrichtung, in der Reihenfolge, in der sie erscheinen. */
 enum class SetupStep {
-    POSTLEITZAHL,
-    LADEN,
+    NAME,
+    LAND,
+    KUECHEN,
+    ERNAEHRUNG,
+    ABNEIGUNGEN,
     PERSONEN,
     TAGE,
+    LADEN,
     BUDGET,
     STIMMUNG,
-    ERNAEHRUNG,
     GERAETE,
     ;
 
@@ -38,10 +45,9 @@ enum class SetupStep {
 }
 
 data class PlanSetupUiState(
-    val step: SetupStep = SetupStep.POSTLEITZAHL,
+    val step: SetupStep = SetupStep.NAME,
     val profile: UserProfile = UserProfile(
         householdSize = 2,
-        weeklyBudget = UserProfile.DEFAULT_BUDGET,
         cookDays = Weekday.entries.take(UserProfile.DEFAULT_COOK_DAYS).toSet(),
         appliances = setOf(Appliance.HERD, Appliance.BACKOFEN),
     ),
@@ -58,11 +64,12 @@ sealed interface PlanSetupEvent {
 }
 
 /**
- * Fuehrt durch die Fragen, aus denen der Wochenplan entsteht.
+ * Fuehrt durch die Fragen, aus denen Profil und Wochenplan entstehen.
  *
- * Vorbelegt ist, was die meisten wollen (zwei Personen, fuenf Abende, Herd und Ofen).
- * Jeder Schritt laesst sich ohne Auswahl weiterklicken; gespeichert wird erst am Ende,
- * damit ein Abbruch in der Mitte nichts halb Fertiges hinterlaesst.
+ * Zuerst, wer man ist und was man mag (Name, Land, Kuechen, Ernaehrung, Abneigungen),
+ * dann, wie geplant wird. Vorbelegt ist, was die meisten wollen: zwei Personen, fuenf
+ * Tage, Herd und Ofen. Jeder Schritt laesst sich ohne Auswahl weiterklicken; gespeichert
+ * wird erst am Ende, damit ein Abbruch in der Mitte nichts halb Fertiges hinterlaesst.
  */
 @HiltViewModel
 class PlanSetupViewModel @Inject constructor(
@@ -74,13 +81,21 @@ class PlanSetupViewModel @Inject constructor(
     private val _events = Channel<PlanSetupEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
-    fun onZipChange(text: String) = edit { ProfileEdits.zip(it, text) }
+    fun onNameChange(name: String) = edit { ProfileEdits.name(it, name) }
 
-    fun onStoreSelect(store: StoreChain) = edit { ProfileEdits.store(it, store) }
+    fun onCountrySelect(country: Country) = edit { ProfileEdits.country(it, country) }
+
+    fun onCuisineToggle(cuisine: Cuisine) = edit { ProfileEdits.toggleCuisine(it, cuisine) }
+
+    fun onStoreToggle(store: StoreChain) = edit { ProfileEdits.toggleStore(it, store) }
+
+    fun onMainStore(store: StoreChain) = edit { ProfileEdits.mainStore(it, store) }
 
     fun onPersonsChange(delta: Int) = edit { ProfileEdits.persons(it, delta) }
 
     fun onDayToggle(day: Weekday) = edit { ProfileEdits.toggleDay(it, day) }
+
+    fun onSlotToggle(slot: MealSlot) = edit { ProfileEdits.toggleSlot(it, slot) }
 
     fun onBudgetChange(value: Int) = edit { ProfileEdits.budget(it, value) }
 
@@ -91,6 +106,12 @@ class PlanSetupViewModel @Inject constructor(
     fun onDietToggle(diet: Diet) = edit { ProfileEdits.toggleDiet(it, diet) }
 
     fun onIntoleranceToggle(intolerance: Intolerance) = edit { ProfileEdits.toggleIntolerance(it, intolerance) }
+
+    fun onDislikeToggle(dislike: Dislike) = edit { ProfileEdits.toggleDislike(it, dislike) }
+
+    fun onCustomDislikeAdd(text: String) = edit { ProfileEdits.addCustomDislike(it, text) }
+
+    fun onCustomDislikeRemove(text: String) = edit { ProfileEdits.removeCustomDislike(it, text) }
 
     fun onApplianceToggle(appliance: Appliance) = edit { ProfileEdits.toggleAppliance(it, appliance) }
 
@@ -115,22 +136,8 @@ class PlanSetupViewModel @Inject constructor(
 
         viewModelScope.launch {
             val answers = _uiState.value.profile
-            // Name, Land und Kuechen stammen nicht aus diesen Fragen und bleiben erhalten.
-            profileRepository.update { current ->
-                current.copy(
-                    zip = answers.zip,
-                    country = current.country ?: answers.country,
-                    store = answers.store,
-                    householdSize = answers.householdSize,
-                    cookDays = answers.cookDays,
-                    weeklyBudget = answers.weeklyBudget,
-                    moods = answers.moods,
-                    diets = answers.diets,
-                    intolerances = answers.intolerances,
-                    appliances = answers.appliances,
-                    onboardingCompleted = true,
-                )
-            }
+            // Die Einrichtung fragt alles ab, was im Profil steht - also ersetzt sie es ganz.
+            profileRepository.update { answers.copy(firstName = answers.firstName.trim(), onboardingCompleted = true) }
             _events.send(PlanSetupEvent.Finished)
         }
     }

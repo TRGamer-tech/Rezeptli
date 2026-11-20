@@ -2,17 +2,32 @@ package ch.rezeptli.app.domain.plan
 
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.ShoppingItem
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.Weekday
 
 /** Ein Rezept samt seiner Einschaetzung - die Auswahl, aus der der Plan gebaut wird. */
 data class PlanCandidate(
     val recipe: Recipe,
     val traits: RecipeTraits,
+) {
+    /** Woran ein Rezept wiedererkannt wird: seine Adresse, sonst sein Titel. */
+    val key: String get() = keyOf(recipe)
+
+    companion object {
+        fun keyOf(recipe: Recipe): String = recipe.sourceUrl ?: recipe.title.trim().lowercase()
+    }
+}
+
+/** Ein Platz im Plan: Mittag oder Abend eines Wochentags. */
+data class PlanPlace(
+    val day: Weekday,
+    val slot: MealSlot,
 )
 
-/** Eine Mahlzeit im Plan: welches Rezept, an welchem Tag, fuer wie viele. */
+/** Eine Mahlzeit im Plan: welches Rezept, an welchem Platz, fuer wie viele. */
 data class PlannedMeal(
     val day: Weekday,
+    val slot: MealSlot,
     val candidate: PlanCandidate,
     val servings: Int,
     /** Anteilige Kosten dieser Mahlzeit, ohne Packungsreste. */
@@ -20,6 +35,7 @@ data class PlannedMeal(
 ) {
     val recipe: Recipe get() = candidate.recipe
     val label: MealLabel get() = candidate.traits.label
+    val place: PlanPlace get() = PlanPlace(day, slot)
 }
 
 /** Das Ergebnis der Planung. */
@@ -33,6 +49,6 @@ data class PlanDraft(
 
     val isOverBudget: Boolean get() = basketCost > budget
 
-    /** Weniger Mahlzeiten als gewuenscht: es gab nicht genug passende Rezepte. */
+    /** Keine einzige Mahlzeit: Es gab kein passendes Rezept. */
     val isIncomplete: Boolean get() = meals.isEmpty()
 }

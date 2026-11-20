@@ -34,6 +34,7 @@ fun RecipeWithDetails.toDomain(): Recipe = Recipe(
     lastCookedAt = recipe.lastCookedAt,
     sourceUrl = recipe.sourceUrl,
     sourceName = recipe.sourceName,
+    inCollection = recipe.inCollection,
 )
 
 fun RecipeStepEntity.toDomain(): RecipeStep = RecipeStep(
@@ -86,6 +87,7 @@ fun Recipe.toEntity(now: Long): RecipeEntity = RecipeEntity(
     lastCookedAt = lastCookedAt,
     sourceUrl = sourceUrl,
     sourceName = sourceName,
+    inCollection = inCollection,
 )
 
 fun RecipeSummaryProjection.toDomain(): RecipeSummary = RecipeSummary(

@@ -3,6 +3,7 @@ package ch.rezeptli.app.domain.plan
 import ch.rezeptli.app.domain.model.IngredientNameNormalizer
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.profile.Appliance
+import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.Mood
 import javax.inject.Inject
@@ -20,11 +21,13 @@ import javax.inject.Inject
  */
 class RecipeClassifier @Inject constructor() {
     fun classify(recipe: Recipe): RecipeTraits {
-        val words = recipe.ingredients
+        val ingredientWords = recipe.ingredients
             .flatMap { words(it.canonicalName ?: it.name) + words(it.name) }
             .toSet()
-        val title = words(recipe.title).toSet()
-        val all = words + title
+        val titleWords = words(recipe.title)
+        val title = titleWords.toSet()
+        val all = ingredientWords + title
+        val tagWords = recipe.tags.flatMap(::words).toSet()
         val text = IngredientNameNormalizer.normalize(
             recipe.title + " " + recipe.tags.joinToString(" ") + " " + recipe.instructions,
         )
@@ -32,7 +35,7 @@ class RecipeClassifier @Inject constructor() {
         val hasMeat = all.any(::isMeat)
         val hasFish = all.any { word -> FISH.any { word.contains(it) } }
         val hasDairy = all.any(::isDairy)
-        val hasEgg = all.any { it in EGG }
+        val hasEgg = all.any(::isEgg)
         val hasHoney = all.any { it.contains("honig") }
 
         val diet = when {
@@ -56,13 +59,67 @@ class RecipeClassifier @Inject constructor() {
             if (all.any { word -> SEAFOOD.any { word.contains(it) } }) add(Intolerance.MEERESFRUECHTE)
         }
 
+        // Suess und herzhaft zaehlen nur an den Zutaten - der Titel entscheidet in CourseRules.
+        val sweet = ingredientWords.count { word -> SWEET.any { word.contains(it) } }
+        val savory = ingredientWords.count { word ->
+            isMeat(word) ||
+                FISH.any { word.contains(it) } ||
+                SAVORY.any { word.contains(it) } ||
+                VEGETABLES.any { word.contains(it) }
+        }
+
         return RecipeTraits(
             diet = diet,
             allergens = allergens,
             moods = moodsOf(recipe, all, title, diet, text),
             requiredAppliances = appliancesOf(text),
             lowCarb = all.none { word -> CARBS.any { word.contains(it) } },
+            dislikes = dislikesOf(all, title + tagWords),
+            course = CourseRules.of(titleWords, tagWords, sweet, savory),
+            cuisines = CuisineRules.of(titleWords, tagWords),
+            words = all,
         )
+    }
+
+    /**
+     * Schaetzt ein Rezept nur aus seinem Titel ein.
+     *
+     * Mehr als den Titel kennt die App von einer Wischkarte nicht, solange die Rezeptseite
+     * nicht geladen ist. Das reicht, um Offensichtliches auszusortieren ("Lachsfilet" fuer
+     * jemanden, der keinen Fisch mag) - aber nie, um etwas zuzusagen.
+     */
+    fun classifyTitle(title: String): RecipeTraits = classify(Recipe(title = title))
+
+    /**
+     * Was das Rezept enthaelt, das jemand nicht moegen koennte.
+     *
+     * [labels] sind Titel und Schlagworte: Nur dort steht, ob ein Rezept als vegan oder
+     * scharf ausgeschrieben ist.
+     */
+    private fun dislikesOf(all: Set<String>, labels: Set<String>): Set<Dislike> = buildSet {
+        fun has(keywords: List<String>, except: List<String> = emptyList()) = all.any { word ->
+            keywords.any { word.contains(it) } && except.none { word.contains(it) }
+        }
+
+        if (has(SEAFOOD)) add(Dislike.MEERESFRUECHTE)
+        if (all.any { word -> FISH.any { word.contains(it) } && SEAFOOD.none { word.contains(it) } }) add(Dislike.FISCH)
+        if (has(POULTRY, PLANT_MEAT)) add(Dislike.POULET)
+        if (has(BEEF, PLANT_MEAT)) add(Dislike.RIND)
+        if (has(PORK, PLANT_MEAT + POULTRY)) add(Dislike.SCHWEIN)
+        if (has(LAMB, PLANT_MEAT)) add(Dislike.LAMM)
+        if (has(OFFAL, listOf("leberkaese", "leberwurst"))) add(Dislike.INNEREIEN)
+        if (has(MUSHROOMS)) add(Dislike.PILZE)
+        if (has(ONIONS)) add(Dislike.ZWIEBELN)
+        if (has(GARLIC)) add(Dislike.KNOBLAUCH)
+        if (has(listOf("koriander"))) add(Dislike.KORIANDER)
+        // Olivenoel ist keine Olive.
+        if (has(listOf("olive"), listOf("oel"))) add(Dislike.OLIVEN)
+        if (has(listOf("aubergine", "melanzane"))) add(Dislike.AUBERGINE)
+        if (all.any { it in CABBAGE }) add(Dislike.KOHL)
+        if (has(HOT) || labels.any { it in HOT_LABELS }) add(Dislike.SCHARF)
+        if (has(STRONG_CHEESE)) add(Dislike.KRAEFTIGER_KAESE)
+        if (has(MEAT_SUBSTITUTES)) add(Dislike.TOFU)
+        if (has(MEAT_SUBSTITUTES) || labels.any { it.startsWith("vegan") }) add(Dislike.VEGAN)
     }
 
     private fun moodsOf(
@@ -102,6 +159,7 @@ class RecipeClassifier @Inject constructor() {
             add(Appliance.SLOWCOOKER)
         }
         if (text.contains("reiskocher")) add(Appliance.REISKOCHER)
+        if (STEAMER.any { text.contains(it) }) add(Appliance.DAMPFGARER)
         // Alles, was keines der Geraete verlangt, geht auf dem Herd.
         if (isEmpty() || STOVE.any { text.contains(it) }) add(Appliance.HERD)
     }
@@ -110,6 +168,13 @@ class RecipeClassifier @Inject constructor() {
         MEAT.any { word.contains(it) } &&
             PLANT_MEAT.none { word.contains(it) } &&
             FISH.none { word.contains(it) }
+
+    /**
+     * Eier stehen als ganzes Wort da ("Ei", "Eier") - ein blosses "ei" im Wort waere bei
+     * "Reis" und "Weizen" ein Fehlalarm. Zusammensetzungen mit "Eier-" zaehlen mit.
+     */
+    private fun isEgg(word: String): Boolean =
+        word in EGG || (word.startsWith("eier") && EGG_LOOKALIKES.none { word.startsWith(it) })
 
     private fun hasGluten(word: String): Boolean =
         GLUTEN.any { word.contains(it) } && GLUTEN_FREE.none { word.contains(it) }
@@ -230,7 +295,27 @@ class RecipeClassifier @Inject constructor() {
             "nussbutter",
             "shea",
         )
-        val EGG = setOf("ei", "eier", "eigelb", "eiweiss", "eiern", "eidotter", "eischnee", "spiegelei", "rührei")
+        val EGG = setOf(
+            "ei",
+            "eier",
+            "eiern",
+            "eigelb",
+            "eigelbe",
+            "eiweiss",
+            "eidotter",
+            "eischnee",
+            "spiegelei",
+            "spiegeleier",
+            "ruehrei",
+            "ruehreier",
+            "omelette",
+            "omeletten",
+            "omelett",
+            "mayonnaise",
+        )
+
+        /** Beginnt mit "Eier", ist aber keines: Eierschwaemme sind Pilze, die Eierfrucht eine Aubergine. */
+        val EGG_LOOKALIKES = listOf("eierschw", "eierfrucht")
         val GLUTEN = listOf(
             "mehl",
             "weizen",
@@ -474,6 +559,210 @@ class RecipeClassifier @Inject constructor() {
             "kabeljau",
             "forelle",
             "schwein",
+        )
+        val POULTRY = listOf(
+            "poulet",
+            "huhn",
+            "haehnchen",
+            "huehn",
+            "pute",
+            "truthahn",
+            "gefluegel",
+            "chicken",
+            "entenbrust",
+            "entenkeule",
+            "ente",
+            "gans",
+            "wachtel",
+            "perlhuhn",
+            "stubenkueken",
+        )
+        val BEEF = listOf(
+            "rind",
+            "kalb",
+            "beef",
+            "entrecote",
+            "siedfleisch",
+            "tatar",
+            "hohruecken",
+            "roastbeef",
+            "ochsen",
+            "buendnerfleisch",
+            "tafelspitz",
+        )
+        val PORK = listOf(
+            "schwein",
+            "speck",
+            "schinken",
+            "bacon",
+            "pancetta",
+            "salami",
+            "chorizo",
+            "cervelat",
+            "landjaeger",
+            "prosciutto",
+            "bratwurst",
+            "mortadella",
+            "lyoner",
+            "fleischkaese",
+            "kassler",
+            "haxe",
+            "spareribs",
+            "wienerli",
+            "wuerstchen",
+            "wurst",
+            "guanciale",
+            "coppa",
+            "rippli",
+        )
+        val LAMB = listOf("lamm", "gigot", "hammel")
+        val OFFAL = listOf("leber", "niere", "nierli", "kutteln", "milken", "zunge", "herzen", "hirn", "bries")
+        val MUSHROOMS = listOf(
+            "pilz",
+            "champignon",
+            "eierschwamm",
+            "eierschwaemm",
+            "pfifferling",
+            "shiitake",
+            "morchel",
+            "trueffel",
+            "portobello",
+            "kraeuterseitling",
+            "austernseitling",
+        )
+        val ONIONS = listOf("zwiebel", "schalotte", "bundzwiebel")
+        val GARLIC = listOf("knoblauch", "knobli", "aioli")
+        val CABBAGE = setOf(
+            "kohl",
+            "rosenkohl",
+            "weisskohl",
+            "rotkohl",
+            "weisskabis",
+            "rotkabis",
+            "blaukabis",
+            "kabis",
+            "wirz",
+            "wirsing",
+            "sauerkraut",
+            "federkohl",
+            "gruenkohl",
+            "spitzkohl",
+            "chinakohl",
+            "rotkraut",
+            "weisskraut",
+            "blaukraut",
+            "krautsalat",
+        )
+        val HOT = listOf(
+            "chili",
+            "chilli",
+            "peperoncin",
+            "jalapeno",
+            "cayenne",
+            "sambal",
+            "harissa",
+            "sriracha",
+            "tabasco",
+            "habanero",
+            "gochujang",
+        )
+        val HOT_LABELS = setOf("scharf", "scharfe", "scharfer", "scharfes", "feurig", "feurige", "feuriger", "spicy")
+        val STRONG_CHEESE = listOf(
+            "ziegenkaese",
+            "ziegenfrischkaese",
+            "gorgonzola",
+            "roquefort",
+            "blauschimmel",
+            "schafskaese",
+            "limburger",
+            "harzer",
+            "munster",
+            "taleggio",
+            "stilton",
+        )
+        val MEAT_SUBSTITUTES = listOf(
+            "tofu",
+            "seitan",
+            "tempeh",
+            "fleischersatz",
+            "sojageschnetzeltes",
+            "sojagranulat",
+            "quorn",
+            "planted",
+            "veganer",
+            "veganes",
+            "vegane",
+            "veggieburger",
+        )
+        val SWEET = listOf(
+            "zucker",
+            "honig",
+            "ahornsirup",
+            "schokolade",
+            "kuvertuere",
+            "kakao",
+            "vanille",
+            "marzipan",
+            "nutella",
+            "konfituere",
+            "marmelade",
+            "kondensmilch",
+            "karamell",
+            "caramel",
+            "puddingpulver",
+            "agavendicksaft",
+            "sirup",
+            "streusel",
+            "kuchenglasur",
+            "biskuit",
+            "loeffelbiskuit",
+        )
+        val SAVORY = listOf(
+            "zwiebel",
+            "knoblauch",
+            "bouillon",
+            "bruehe",
+            "senf",
+            "kaese",
+            "parmesan",
+            "gruyere",
+            "sbrinz",
+            "mozzarella",
+            "feta",
+            "petersilie",
+            "basilikum",
+            "thymian",
+            "rosmarin",
+            "schnittlauch",
+            "oregano",
+            "sojasauce",
+            "tomatenmark",
+            "essig",
+            "olivenoel",
+            "kartoffel",
+            "linsen",
+            "kichererbsen",
+            "pfeffer",
+            "tofu",
+            "kapern",
+            "oliven",
+            "curry",
+            "paprikapulver",
+            "majoran",
+            "salbei",
+            "dill",
+        )
+        val STEAMER = listOf(
+            "dampfgarer",
+            "steamer",
+            "dampfgarofen",
+            "dampfbackofen",
+            "combi steam",
+            "combisteam",
+            "steamgarer",
+            "dampfgargeraet",
+            "im dampf garen",
+            "im dampfgarer",
         )
         val OVEN = listOf(
             "backofen",

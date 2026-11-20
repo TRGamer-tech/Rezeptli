@@ -6,6 +6,7 @@ import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.Country
 import ch.rezeptli.app.domain.profile.Cuisine
 import ch.rezeptli.app.domain.profile.Diet
+import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
 
 /*
@@ -63,3 +64,28 @@ fun Intolerance.label(): String = stringResource(
         Intolerance.MEERESFRUECHTE -> R.string.unvertraeglichkeit_meeresfruechte
     },
 )
+
+@Composable
+fun Dislike.label(): String = stringResource(labelRes())
+
+/** Die Beschriftung als Ressource - fuer Stellen, die mehrere zu einem Satz zusammensetzen. */
+fun Dislike.labelRes(): Int = when (this) {
+    Dislike.FISCH -> R.string.abneigung_fisch
+    Dislike.MEERESFRUECHTE -> R.string.abneigung_meeresfruechte
+    Dislike.POULET -> R.string.abneigung_poulet
+    Dislike.RIND -> R.string.abneigung_rind
+    Dislike.SCHWEIN -> R.string.abneigung_schwein
+    Dislike.LAMM -> R.string.abneigung_lamm
+    Dislike.INNEREIEN -> R.string.abneigung_innereien
+    Dislike.PILZE -> R.string.abneigung_pilze
+    Dislike.ZWIEBELN -> R.string.abneigung_zwiebeln
+    Dislike.KNOBLAUCH -> R.string.abneigung_knoblauch
+    Dislike.KORIANDER -> R.string.abneigung_koriander
+    Dislike.OLIVEN -> R.string.abneigung_oliven
+    Dislike.AUBERGINE -> R.string.abneigung_aubergine
+    Dislike.KOHL -> R.string.abneigung_kohl
+    Dislike.SCHARF -> R.string.abneigung_scharf
+    Dislike.KRAEFTIGER_KAESE -> R.string.abneigung_kaese
+    Dislike.TOFU -> R.string.abneigung_tofu
+    Dislike.VEGAN -> R.string.abneigung_vegan
+}

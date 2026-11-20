@@ -16,23 +16,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
-import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
@@ -42,7 +37,7 @@ import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /**
- * Die Einrichtung: acht kurze Fragen, dann baut Rezeptli den Plan.
+ * Die Einrichtung: elf kurze Fragen, dann baut Rezeptli den Plan.
  *
  * Jede Frage nimmt den ganzen Bildschirm ein und hat genau eine Aufgabe - so bleibt jede
  * Antwort ein Fingertipp. Nichts ist Pflicht, das Vorbelegte ist ein brauchbarer Plan.
@@ -147,43 +142,19 @@ private fun PlanSetupScreen(uiState: PlanSetupUiState, viewModel: PlanSetupViewM
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     when (step) {
-                        SetupStep.POSTLEITZAHL -> StepFrame(R.string.setup_plz_titel, R.string.setup_plz_text) {
-                            OutlinedTextField(
-                                value = profile.zip,
-                                onValueChange = viewModel::onZipChange,
-                                label = { Text(stringResource(R.string.setup_plz_label)) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Done,
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        SetupStep.NAME -> StepFrame(R.string.setup_name_titel, R.string.setup_name_text) {
+                            NameField(name = profile.firstName, onChange = viewModel::onNameChange)
                         }
 
-                        SetupStep.LADEN -> StepFrame(R.string.setup_laden_titel, R.string.setup_laden_text) {
-                            StoreGrid(selected = profile.store, onSelect = viewModel::onStoreSelect)
+                        SetupStep.LAND -> StepFrame(R.string.onboarding_land_frage, R.string.vorlieben_land_text) {
+                            CountryPicker(selected = profile.country, onSelect = viewModel::onCountrySelect)
                         }
 
-                        SetupStep.PERSONEN -> StepFrame(R.string.setup_personen_titel, R.string.setup_personen_text) {
-                            PersonStepper(persons = profile.persons, onChange = viewModel::onPersonsChange)
-                        }
-
-                        SetupStep.TAGE -> StepFrame(R.string.setup_tage_titel, R.string.setup_tage_text) {
-                            DayPicker(selected = profile.cookDays, onToggle = viewModel::onDayToggle)
-                        }
-
-                        SetupStep.BUDGET -> StepFrame(R.string.setup_budget_titel, R.string.setup_budget_text) {
-                            BudgetSlider(
-                                budget = profile.weeklyBudget ?: UserProfile.DEFAULT_BUDGET,
-                                persons = profile.persons,
-                                meals = profile.mealsPerWeek,
-                                onChange = viewModel::onBudgetChange,
-                            )
-                        }
-
-                        SetupStep.STIMMUNG -> StepFrame(R.string.setup_stimmung_titel, R.string.setup_stimmung_text) {
-                            MoodPicker(selected = profile.moods, onToggle = viewModel::onMoodToggle)
+                        SetupStep.KUECHEN -> StepFrame(
+                            R.string.onboarding_kuechen_titel,
+                            R.string.vorlieben_kuechen_text,
+                        ) {
+                            CuisinePicker(selected = profile.cuisines, onToggle = viewModel::onCuisineToggle)
                         }
 
                         SetupStep.ERNAEHRUNG -> StepFrame(
@@ -194,8 +165,60 @@ private fun PlanSetupScreen(uiState: PlanSetupUiState, viewModel: PlanSetupViewM
                                 profile = profile,
                                 onMainDiet = viewModel::onMainDiet,
                                 onToggleDiet = viewModel::onDietToggle,
-                                onToggleIntolerance = viewModel::onIntoleranceToggle,
                             )
+                            Text(
+                                text = stringResource(R.string.setup_unvertraeglich_titel),
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            IntolerancePicker(
+                                selected = profile.intolerances,
+                                onToggle = viewModel::onIntoleranceToggle,
+                            )
+                        }
+
+                        SetupStep.ABNEIGUNGEN -> StepFrame(
+                            R.string.setup_abneigung_titel,
+                            R.string.setup_abneigung_text,
+                        ) {
+                            DislikePicker(
+                                selected = profile.dislikes,
+                                custom = profile.customDislikes,
+                                onToggle = viewModel::onDislikeToggle,
+                                onAddCustom = viewModel::onCustomDislikeAdd,
+                                onRemoveCustom = viewModel::onCustomDislikeRemove,
+                            )
+                        }
+
+                        SetupStep.PERSONEN -> StepFrame(R.string.setup_personen_titel, R.string.setup_personen_text) {
+                            PersonStepper(persons = profile.persons, onChange = viewModel::onPersonsChange)
+                        }
+
+                        SetupStep.TAGE -> StepFrame(R.string.setup_tage_titel, R.string.setup_tage_text) {
+                            DayPicker(selected = profile.days.toSet(), onToggle = viewModel::onDayToggle)
+                            MealSlotPicker(profile = profile, onToggle = viewModel::onSlotToggle)
+                        }
+
+                        SetupStep.LADEN -> StepFrame(R.string.setup_laden_titel, R.string.setup_laden_text) {
+                            StoreGrid(
+                                market = profile.market,
+                                selected = profile.stores,
+                                onToggle = viewModel::onStoreToggle,
+                                onMakeMain = viewModel::onMainStore,
+                            )
+                        }
+
+                        SetupStep.BUDGET -> StepFrame(R.string.setup_budget_titel, R.string.setup_budget_text) {
+                            BudgetSlider(
+                                budget = profile.budget,
+                                currency = profile.market.currency,
+                                persons = profile.persons,
+                                meals = profile.mealsPerWeek,
+                                onChange = viewModel::onBudgetChange,
+                            )
+                        }
+
+                        SetupStep.STIMMUNG -> StepFrame(R.string.setup_stimmung_titel, R.string.setup_stimmung_text) {
+                            MoodPicker(selected = profile.moods, onToggle = viewModel::onMoodToggle)
                         }
 
                         SetupStep.GERAETE -> StepFrame(R.string.setup_geraete_titel, R.string.setup_geraete_text) {

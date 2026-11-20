@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import ch.rezeptli.app.domain.multiplayer.ActiveRound
 import ch.rezeptli.app.domain.multiplayer.ActiveRoundRepository
-import ch.rezeptli.app.domain.multiplayer.SharedVote
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -19,10 +18,11 @@ import javax.inject.Singleton
 private val Context.roundDataStore: DataStore<Preferences> by preferencesDataStore(name = "runde")
 
 /**
- * Legt die laufende Runde als kleine Einstellungsdatei ab.
+ * Legt die laufende Runde als kleine Einstellungsdatei ab: Code, Rolle, Ablauf.
  *
- * Die Stimmen stehen als "kennung:1,kennung:0" in einem Feld - es sind hoechstens ein paar
- * Dutzend, und sie werden immer als Ganzes gelesen und geschrieben.
+ * Aeltere Fassungen der App haben hier auch die eigenen Stimmen abgelegt. Das Feld wird
+ * nicht mehr gelesen - die Stimmen liegen beim Dienst - und verschwindet mit dem naechsten
+ * [clear].
  */
 @Singleton
 class ActiveRoundStore @Inject constructor(
@@ -34,7 +34,6 @@ class ActiveRoundStore @Inject constructor(
         return ActiveRound(
             code = code,
             isHost = daten[HOST] ?: false,
-            votes = parseVotes(daten[VOTES].orEmpty()),
             expiresAt = daten[EXPIRES] ?: 0L,
         )
     }
@@ -43,7 +42,6 @@ class ActiveRoundStore @Inject constructor(
         context.roundDataStore.edit {
             it[CODE] = round.code
             it[HOST] = round.isHost
-            it[VOTES] = round.votes.joinToString(",") { vote -> "${vote.recipeId}:${if (vote.liked) 1 else 0}" }
             it[EXPIRES] = round.expiresAt
         }
     }
@@ -52,17 +50,9 @@ class ActiveRoundStore @Inject constructor(
         context.roundDataStore.edit { it.clear() }
     }
 
-    private fun parseVotes(text: String): List<SharedVote> = text
-        .split(',')
-        .mapNotNull { eintrag ->
-            val (kennung, mag) = eintrag.split(':').takeIf { it.size == 2 } ?: return@mapNotNull null
-            kennung.toLongOrNull()?.let { SharedVote(recipeId = it, liked = mag == "1") }
-        }
-
     private companion object {
         val CODE = stringPreferencesKey("code")
         val HOST = booleanPreferencesKey("gastgeber")
-        val VOTES = stringPreferencesKey("stimmen")
         val EXPIRES = longPreferencesKey("verfaellt_am")
     }
 }

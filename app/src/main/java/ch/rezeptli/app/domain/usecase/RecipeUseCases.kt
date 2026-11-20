@@ -4,6 +4,7 @@ import androidx.paging.PagingData
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.RecipeFilter
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.domain.plan.PlanRepository
 import ch.rezeptli.app.domain.repository.RecipeRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -47,16 +48,40 @@ class CountMatchingRecipesUseCase @Inject constructor(
     suspend operator fun invoke(filter: RecipeFilter): Int = repository.getFilteredRecipeIds(filter).size
 }
 
+/**
+ * Entfernt ein Rezept aus der Sammlung.
+ *
+ * Steht es gerade im Wochenplan, bleibt es fuer den Plan gespeichert und verschwindet nur
+ * aus "Meine Rezepte" - sonst risse das Loeschen ein Loch in die Woche, waehrend die
+ * Zutaten noch auf der Einkaufsliste stehen.
+ */
 class DeleteRecipeUseCase @Inject constructor(
     private val repository: RecipeRepository,
+    private val planRepository: PlanRepository,
 ) {
-    suspend operator fun invoke(recipeId: Long) = repository.deleteRecipe(recipeId)
+    suspend operator fun invoke(recipeId: Long) {
+        val planned = planRepository.currentPlan().any { it.recipeId == recipeId }
+        if (planned) repository.setInCollection(recipeId, inCollection = false) else repository.deleteRecipe(recipeId)
+    }
 }
 
-/** Haelt fest, dass ein Rezept heute gekocht wurde. */
-class MarkRecipeCookedUseCase @Inject constructor(
+/** Nimmt ein Rezept, das bisher nur im Wochenplan stand, in die Sammlung auf. */
+class KeepRecipeUseCase @Inject constructor(
     private val repository: RecipeRepository,
 ) {
-    suspend operator fun invoke(recipeId: Long, cookedAt: Long = System.currentTimeMillis()) =
+    suspend operator fun invoke(recipeId: Long) = repository.setInCollection(recipeId, inCollection = true)
+}
+
+/**
+ * Haelt fest, dass ein Rezept gekocht wurde - am Rezept selbst und, falls es diese Woche
+ * im Plan steht, an der Mahlzeit dort. Mit `null` wird der Vermerk zurueckgenommen.
+ */
+class MarkRecipeCookedUseCase @Inject constructor(
+    private val repository: RecipeRepository,
+    private val planRepository: PlanRepository,
+) {
+    suspend operator fun invoke(recipeId: Long, cookedAt: Long? = System.currentTimeMillis()) {
         repository.markCooked(recipeId, cookedAt)
+        planRepository.markCooked(recipeId, cookedAt)
+    }
 }

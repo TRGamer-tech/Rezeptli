@@ -46,6 +46,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.domain.plan.CourseChoice
 import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
@@ -65,6 +66,7 @@ import ch.rezeptli.app.presentation.common.components.rememberEntranceState
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
+import ch.rezeptli.app.presentation.swipe.RecipeInfoSheet
 import ch.rezeptli.app.presentation.swipe.SwipeCardStack
 import ch.rezeptli.app.presentation.swipe.SwipeDecisionButtons
 import ch.rezeptli.app.presentation.swipe.rememberSwipeCardStackState
@@ -116,8 +118,12 @@ fun DeckRoute(
     DeckScreen(
         uiState = uiState,
         onTargetChange = viewModel::onTargetChange,
+        onCourseChange = viewModel::onCourseChange,
         onStart = viewModel::onStart,
         onSwiped = viewModel::onSwiped,
+        onUndo = viewModel::onUndo,
+        onInfo = viewModel::onInfoRequest,
+        onInfoDismiss = viewModel::onInfoDismiss,
         onFinishEarly = viewModel::onFinishEarly,
         onRestart = viewModel::onRestart,
         // Zurueck auf den Anfang der naechsten Runde statt weg von der Karte -
@@ -128,6 +134,8 @@ fun DeckRoute(
             viewModel.prepareTogether()
             onOpenTogether()
         },
+        // Ohne eigene Runde davor: einfach eine gemeinsame eroeffnen oder einer beitreten.
+        onTogetherDirect = onOpenTogether,
     )
 }
 
@@ -135,15 +143,23 @@ fun DeckRoute(
 fun DeckScreen(
     uiState: DeckUiState,
     onTargetChange: (Int?) -> Unit,
+    onCourseChange: (CourseChoice) -> Unit,
     onStart: () -> Unit,
     onSwiped: (DeckEntry, Boolean) -> Unit,
+    onUndo: () -> Unit,
+    onInfo: (Long) -> Unit,
+    onInfoDismiss: () -> Unit,
     onFinishEarly: () -> Unit,
     onRestart: () -> Unit,
     onKeep: () -> Unit,
     onTogether: () -> Unit,
     modifier: Modifier = Modifier,
+    onTogetherDirect: () -> Unit = {},
 ) {
     val motion = RezeptliTheme.motion
+
+    uiState.info?.let { info -> RecipeInfoSheet(info = info, onDismiss = onInfoDismiss) }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -174,7 +190,9 @@ fun DeckScreen(
                 DeckStep.ANZAHL -> TargetStep(
                     uiState = uiState,
                     onTargetChange = onTargetChange,
+                    onCourseChange = onCourseChange,
                     onStart = onStart,
+                    onTogether = onTogetherDirect,
                 )
 
                 DeckStep.LADEN -> RezeptliLoader(message = stringResource(R.string.laden_stapel))
@@ -182,6 +200,8 @@ fun DeckScreen(
                 DeckStep.WISCHEN -> SwipingStep(
                     uiState = uiState,
                     onSwiped = onSwiped,
+                    onUndo = onUndo,
+                    onInfo = onInfo,
                     onFinishEarly = onFinishEarly,
                 )
 
@@ -196,13 +216,15 @@ fun DeckScreen(
     }
 }
 
-/** Die Frage vor jeder Runde: wie viele Gerichte? */
+/** Die Fragen vor jeder Runde: wie viele Gerichte, und Essen oder Getraenke? */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TargetStep(
     uiState: DeckUiState,
     onTargetChange: (Int?) -> Unit,
+    onCourseChange: (CourseChoice) -> Unit,
     onStart: () -> Unit,
+    onTogether: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -236,19 +258,41 @@ private fun TargetStep(
             }
         }
 
-        if (uiState.loadFailed) {
+        SectionCard(title = stringResource(R.string.stapel_art_frage), index = 1) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                CourseChoice.entries.forEach { art ->
+                    RezeptliFilterChip(
+                        selected = uiState.course == art,
+                        onClick = { onCourseChange(art) },
+                        label = stringResource(art.labelRes()),
+                    )
+                }
+            }
             Text(
-                stringResource(R.string.stapel_kein_vorrat),
+                stringResource(R.string.stapel_nur_neues),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (uiState.loadFailed || uiState.nothingFits) {
+            Text(
+                stringResource(
+                    if (uiState.loadFailed) R.string.stapel_kein_vorrat else R.string.stapel_nichts_passendes,
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.entrance(1),
+                modifier = Modifier.entrance(2),
             )
         }
 
         BouncyButton(
             onClick = onStart,
             modifier = Modifier
-                .entrance(2)
+                .entrance(3)
                 .fillMaxWidth()
                 .heightIn(min = 56.dp),
         ) {
@@ -263,13 +307,35 @@ private fun TargetStep(
                     .size(20.dp),
             )
         }
+
+        // Die gemeinsame Runde steht gleich hier: Wer einen Code bekommen hat, soll nicht
+        // erst allein wischen muessen, um beitreten zu koennen.
+        BouncyOutlinedButton(
+            onClick = onTogether,
+            modifier = Modifier
+                .entrance(4)
+                .fillMaxWidth()
+                .heightIn(min = 52.dp),
+        ) {
+            Icon(imageVector = Icons.Filled.Group, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(text = stringResource(R.string.stapel_zu_zweit), modifier = Modifier.padding(start = 8.dp))
+        }
     }
+}
+
+/** Die Benennung der drei Moeglichkeiten - hier, weil nur die Oberflaeche Texte kennt. */
+private fun CourseChoice.labelRes(): Int = when (this) {
+    CourseChoice.ESSEN -> R.string.stapel_art_essen
+    CourseChoice.GETRAENKE -> R.string.stapel_art_getraenke
+    CourseChoice.BEIDES -> R.string.stapel_art_beides
 }
 
 @Composable
 private fun SwipingStep(
     uiState: DeckUiState,
     onSwiped: (DeckEntry, Boolean) -> Unit,
+    onUndo: () -> Unit,
+    onInfo: (Long) -> Unit,
     onFinishEarly: () -> Unit,
 ) {
     val stapel = rememberSwipeCardStackState()
@@ -288,6 +354,7 @@ private fun SwipingStep(
                     if (eintrag != null) onSwiped(eintrag, liked)
                 },
                 state = stapel,
+                onInfo = { summary -> onInfo(summary.id) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -299,6 +366,8 @@ private fun SwipingStep(
             onNo = { stapel.swipe(false) },
             onYes = { stapel.swipe(true) },
             enabled = !uiState.isEmpty,
+            onUndo = onUndo,
+            canUndo = uiState.canUndo,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 12.dp),
@@ -365,10 +434,15 @@ private fun ResultStep(
     onRestart: () -> Unit,
 ) {
     if (uiState.liked.isEmpty()) {
+        // Zwei verschiedene leere Enden: Nichts hat gefallen - oder es kam schlicht nichts mehr.
         EmptyState(
             icon = Icons.Filled.Restaurant,
-            title = stringResource(R.string.stapel_nichts_titel),
-            message = stringResource(R.string.stapel_nichts_text),
+            title = stringResource(
+                if (uiState.exhausted) R.string.stapel_aufgebraucht_titel else R.string.stapel_nichts_titel,
+            ),
+            message = stringResource(
+                if (uiState.exhausted) R.string.stapel_aufgebraucht_text else R.string.stapel_nichts_text,
+            ),
             primaryActionLabel = stringResource(R.string.stapel_neue_runde),
             onPrimaryAction = onRestart,
             modifier = Modifier.fillMaxSize(),
@@ -384,15 +458,26 @@ private fun ResultStep(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(key = "kopf") {
-                Text(
-                    text = pluralStringResource(
-                        R.plurals.stapel_ergebnis_titel,
-                        uiState.liked.size,
-                        uiState.liked.size,
-                    ),
-                    style = MaterialTheme.typography.headlineMedium,
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.entrance(0, eintritt, "kopf"),
-                )
+                ) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.stapel_ergebnis_titel,
+                            uiState.liked.size,
+                            uiState.liked.size,
+                        ),
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
+                    if (uiState.exhausted) {
+                        Text(
+                            text = stringResource(R.string.stapel_aufgebraucht),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
 
             itemsIndexed(uiState.liked, key = { _, eintrag -> eintrag.url }) { index, eintrag ->

@@ -40,6 +40,7 @@ class RecipeRepositoryImpl @Inject constructor(
                     tags = filter.tags.toList(),
                     tagCount = filter.tags.size,
                     maxPrepTimeMinutes = filter.maxPrepTimeMinutes,
+                    cooked = filter.cooked,
                 )
             },
         ).flow.map { pagingData -> pagingData.map { it.toDomain() } }
@@ -67,6 +68,7 @@ class RecipeRepositoryImpl @Inject constructor(
             tags = filter.tags.toList(),
             tagCount = filter.tags.size,
             maxPrepTimeMinutes = filter.maxPrepTimeMinutes,
+            cooked = filter.cooked,
         )
     }
 
@@ -91,6 +93,14 @@ class RecipeRepositoryImpl @Inject constructor(
         recipeDao.idBySourceUrl(url)
     }
 
+    override suspend fun savedSourceUrls(): Set<String> = withContext(ioDispatcher) {
+        recipeDao.savedSourceUrls().toSet()
+    }
+
+    override suspend fun setInCollection(id: Long, inCollection: Boolean) = withContext(ioDispatcher) {
+        recipeDao.setInCollection(id, inCollection, System.currentTimeMillis())
+    }
+
     override suspend fun deleteRecipe(id: Long) = withContext(ioDispatcher) {
         // Das Foto gehoert zum Rezept - beim Loeschen darf keine verwaiste Datei zurueckbleiben.
         val photoUri = recipeDao.recipeWithDetails(id)?.recipe?.photoUri
@@ -98,7 +108,15 @@ class RecipeRepositoryImpl @Inject constructor(
         photoStorage.deletePhoto(photoUri)
     }
 
-    override suspend fun markCooked(id: Long, cookedAt: Long) = withContext(ioDispatcher) {
+    /**
+     * Planrezepte kommen aus dem Web und haben kein eigenes Foto auf dem Geraet - es
+     * bleibt also keine Datei zurueck, wenn sie hier in einem Rutsch verschwinden.
+     */
+    override suspend fun deleteUnusedPlanRecipes() = withContext(ioDispatcher) {
+        recipeDao.deleteUnusedPlanRecipes()
+    }
+
+    override suspend fun markCooked(id: Long, cookedAt: Long?) = withContext(ioDispatcher) {
         recipeDao.updateLastCookedAt(id, cookedAt)
     }
 

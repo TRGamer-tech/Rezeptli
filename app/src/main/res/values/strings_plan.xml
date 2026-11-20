@@ -5,14 +5,9 @@
     <string name="setup_weiter">Weiter</string>
     <string name="setup_plan_erstellen">Plan erstellen</string>
     <string name="setup_zurueck">Zurück</string>
-    <string name="setup_ueberspringen">Überspringen</string>
-
-    <string name="setup_plz_titel">Wo wohnst du?</string>
-    <string name="setup_plz_text">Die Postleitzahl bestimmt, welche Rezeptquellen zuerst kommen. Rezeptli fragt keinen Standort ab, die Angabe bleibt auf deinem Gerät.</string>
-    <string name="setup_plz_label">Postleitzahl</string>
 
     <string name="setup_laden_titel">Wo kaufst du ein?</string>
-    <string name="setup_laden_text">Rezeptli schätzt die Preise für diesen Laden. Das sind Richtwerte, keine Tagespreise.</string>
+    <string name="setup_laden_text">Rezeptli schätzt die Preise für deinen Hauptladen. Das sind grobe Richtwerte, keine Tagespreise.</string>
 
     <string name="setup_personen_titel">Für wie viele kochst du?</string>
     <string name="setup_personen_text">Alle Mengen im Plan und auf der Einkaufsliste werden darauf umgerechnet.</string>
@@ -22,26 +17,25 @@
     <string name="setup_personen_mehr">Eine Person mehr</string>
 
     <string name="setup_tage_titel">An welchen Tagen kochst du?</string>
-    <string name="setup_tage_text">Für jeden gewählten Tag plant Rezeptli ein Abendessen.</string>
+    <string name="setup_tage_text">Für jeden gewählten Tag plant Rezeptli die Mahlzeiten, die du darunter wählst.</string>
     <string name="setup_tage_anzahl">%1$d Mahlzeiten pro Woche</string>
 
     <string name="setup_budget_titel">Dein Wochenbudget</string>
     <string name="setup_budget_text">Ist der Einkauf teurer, tauscht Rezeptli die teuerste Mahlzeit gegen eine günstigere.</string>
-    <string name="setup_budget_betrag">CHF %1$d</string>
-    <string name="setup_budget_pro_mahlzeit">ca. CHF %1$s pro Person und Mahlzeit</string>
+    <string name="setup_budget_pro_mahlzeit">ca. %1$s pro Person und Mahlzeit</string>
 
     <string name="setup_stimmung_titel">Wonach ist dir diese Woche?</string>
-    <string name="setup_stimmung_text">Wähle bis zu drei. Das gewichtet die Auswahl, schliesst aber nichts aus.</string>
+    <string name="setup_stimmung_text">Wähle bis zu drei. Das gewichtet den Wochenplan, schliesst aber nichts aus.</string>
     <string name="setup_stimmung_zaehler">%1$d von %2$d gewählt</string>
 
     <string name="setup_ernaehrung_titel">Ernährst du dich besonders?</string>
-    <string name="setup_ernaehrung_text">Was nicht passt, kommt nicht in den Plan.</string>
+    <string name="setup_ernaehrung_text">Was nicht passt, zeigt Rezeptli nicht – weder beim Wischen noch im Plan.</string>
     <string name="setup_ernaehrung_keine">Keine besondere</string>
     <string name="setup_unvertraeglich_titel">Verträgst du etwas nicht?</string>
     <string name="setup_unvertraeglich_hinweis">Rezeptli liest die Zutaten, kann aber nicht prüfen, ob ein Rezept wirklich frei davon ist – Spuren und Fertigprodukte sieht die App nicht. Verlass dich auf die Zutatenliste.</string>
 
     <string name="setup_geraete_titel">Was steht in deiner Küche?</string>
-    <string name="setup_geraete_text">Rezepte, die ein Gerät brauchen, das du nicht hast, kommen nicht in den Plan.</string>
+    <string name="setup_geraete_text">Rezepte, die ein Gerät brauchen, das du nicht hast, schlägt Rezeptli nicht vor. Für besondere Geräte wie den Dampfgarer kommen passende Rezepte im Plan nach vorn.</string>
 
     <!-- Plan wird gebaut -->
     <string name="bauen_titel">Wir bauen deine Woche …</string>
@@ -52,7 +46,7 @@
     <string name="bauen_fehler_keine_rezepte_titel">Keine Rezepte geladen</string>
     <string name="bauen_fehler_keine_rezepte_text">Ohne Verbindung kann Rezeptli keinen Plan bauen. Prüfe dein Netz und versuch es noch einmal.</string>
     <string name="bauen_fehler_passt_nichts_titel">Nichts passt dazu</string>
-    <string name="bauen_fehler_passt_nichts_text">Mit deiner Ernährung, deinen Unverträglichkeiten und deinen Geräten gab es keine passenden Rezepte. Lockere eine der Angaben in den Vorlieben.</string>
+    <string name="bauen_fehler_passt_nichts_text">Mit deiner Ernährung, deinen Abneigungen, Unverträglichkeiten und Geräten gab es keine passenden Rezepte. Lockere eine der Angaben in den Vorlieben.</string>
     <string name="bauen_nochmal">Nochmal versuchen</string>
     <string name="bauen_vorlieben">Vorlieben ändern</string>
     <string name="bauen_ohne_plan">Ohne Plan weiter</string>
@@ -62,18 +56,16 @@
     <string name="plan_gruss_tag">Guten Tag, %1$s!</string>
     <string name="plan_gruss_abend">Guten Abend, %1$s!</string>
     <string name="plan_gruss_name_standard">Chef</string>
-    <string name="plan_geplant_fuer">Geplant für %1$s</string>
     <string name="plan_kosten_titel">Geschätzte Kosten</string>
-    <string name="plan_kosten_von">ca. CHF %1$s von CHF %2$d</string>
+    <string name="plan_kosten_von">ca. %1$s von %2$s</string>
     <string name="plan_kosten_ueber">Über dem Budget</string>
-    <string name="plan_kosten_hinweis">Richtwerte für die Schweiz, keine Tagespreise.</string>
+    <string name="plan_kosten_hinweis">Grobe Richtwerte, keine Tagespreise.</string>
     <string name="plan_einkauf_titel">Einkaufsliste</string>
     <string name="plan_einkauf_stand">%1$d/%2$d Artikel gekauft</string>
     <string name="plan_einkauf_leer">Noch nichts auf der Liste</string>
     <string name="plan_woche_titel">Deine Woche</string>
     <string name="plan_karte_portionen">%1$d Portionen</string>
     <string name="plan_karte_portion">1 Portion</string>
-    <string name="plan_karte_preis">CHF %1$s</string>
     <string name="plan_tauschen">Mahlzeit tauschen</string>
     <string name="plan_tauschen_keine">Es gibt keine andere passende Mahlzeit.</string>
     <string name="plan_neu_bauen">Plan neu bauen</string>
@@ -84,11 +76,9 @@
     <string name="plan_leer_text">Rezeptli baut dir eine Woche aus Rezepten, die zu deinen Vorlieben passen.</string>
     <string name="plan_leer_aktion">Plan bauen</string>
     <string name="plan_unvollstaendig">Nur %1$d von %2$d Mahlzeiten gefunden. Lockere eine Vorliebe oder bau den Plan neu.</string>
-    <string name="plan_bild_beschreibung">Bild von %1$s</string>
 
     <!-- Vorlieben -->
     <string name="vorlieben_titel">Vorlieben</string>
-    <string name="vorlieben_laden">Laden</string>
     <string name="vorlieben_plan_neu">Mit diesen Vorlieben neu bauen</string>
 
     <!-- Einkaufsliste -->
@@ -97,7 +87,6 @@
     <string name="einkauf_kopieren">Liste kopieren</string>
     <string name="einkauf_teilen">Liste teilen</string>
     <string name="einkauf_kopiert">Liste kopiert</string>
-    <string name="einkauf_zeile_preis">%1$s · CHF %2$s</string>
 
     <!-- Zu zweit: Treffer in den Plan -->
     <string name="zuzweit_in_plan">In den Wochenplan übernehmen</string>
@@ -107,7 +96,6 @@
     <!-- Tabs -->
     <string name="tab_plan">Plan</string>
     <string name="tab_vorlieben">Vorlieben</string>
-    <string name="tab_einstellungen">Einstellungen</string>
 
     <!-- Wischen: nicht versehentlich hinaus -->
     <string name="stapel_verlassen_titel">Runde abbrechen?</string>
@@ -116,19 +104,170 @@
     <string name="stapel_weiterwischen">Weiterwischen</string>
 
     <!-- Zu zweit: Filter, Fortsetzen, Verlassen -->
-    <string name="zuzweit_filter_titel">Was darf nicht auf den Tisch?</string>
-    <string name="zuzweit_filter_text">Gilt für diese Runde. Vorbelegt aus deinen Vorlieben – ergänze, was die andere Person nicht isst.</string>
-    <string name="zuzweit_filter_hinweis">Jede Karte wird vorher anhand ihrer Zutaten geprüft. Das dauert einen Moment, und es kommen nur deutschsprachige Rezepte. Rezeptli kann Spuren und Fertigprodukte nicht prüfen – verlass dich bei Allergien auf die Zutatenliste.</string>
     <string name="zuzweit_fortsetzen_titel">Runde %1$s unterbrochen</string>
-    <string name="zuzweit_fortsetzen_text">Mach dort weiter, wo du aufgehört hast – mit denselben Karten in derselben Reihenfolge.</string>
+    <string name="zuzweit_fortsetzen_text">Mach dort weiter, wo du aufgehört hast – mit demselben Stapel und deinen bisherigen Entscheidungen.</string>
     <string name="zuzweit_fortsetzen">Runde fortsetzen</string>
     <string name="zuzweit_verlassen_titel">Runde verlassen?</string>
-    <string name="zuzweit_verlassen_text">Du kannst die Runde %1$s später fortsetzen. Beenden schliesst sie für beide.</string>
-    <string name="zuzweit_weiterwischen">Weiterwischen</string>
+    <string name="zuzweit_verlassen_text">Unterbrechen: Du kannst die Runde %1$s später fortsetzen.\n\nBeenden: Die Runde endet für euch beide. Was ihr bis dahin gemeinsam gefunden habt, bleibt.</string>
+    <string name="zuzweit_weiterwischen">Hierbleiben</string>
     <string name="zuzweit_unterbrechen">Unterbrechen</string>
     <string name="zuzweit_beenden">Beenden</string>
 
     <!-- Rezept -->
     <string name="rezept_quelle_oeffnen">Originalrezept öffnen</string>
     <string name="rezept_in_bring">In Bring! öffnen</string>
+
+    <!-- Vorlieben: Laeden, Abneigungen, Gruppen -->
+    <string name="abneigung_fisch">Fisch</string>
+    <string name="abneigung_meeresfruechte">Meeresfrüchte</string>
+    <string name="abneigung_poulet">Poulet &amp; Geflügel</string>
+    <string name="abneigung_rind">Rind &amp; Kalb</string>
+    <string name="abneigung_schwein">Schwein &amp; Wurst</string>
+    <string name="abneigung_lamm">Lamm</string>
+    <string name="abneigung_innereien">Innereien</string>
+    <string name="abneigung_pilze">Pilze</string>
+    <string name="abneigung_zwiebeln">Zwiebeln</string>
+    <string name="abneigung_knoblauch">Knoblauch</string>
+    <string name="abneigung_koriander">Koriander</string>
+    <string name="abneigung_oliven">Oliven</string>
+    <string name="abneigung_aubergine">Aubergine</string>
+    <string name="abneigung_kohl">Kohl &amp; Rosenkohl</string>
+    <string name="abneigung_scharf">Scharfes</string>
+    <string name="abneigung_kaese">Ziegen- &amp; Blauschimmelkäse</string>
+    <string name="abneigung_tofu">Tofu &amp; Fleischersatz</string>
+    <string name="abneigung_vegan">Vegane Gerichte</string>
+    <string name="abneigung_entfernen">%1$s entfernen</string>
+    <string name="abneigung_eigene">Etwas anderes, z. B. Rosinen</string>
+    <string name="abneigung_hinzufuegen">Hinzufügen</string>
+    <string name="abneigung_hinweis">Was du hier wählst, zeigt Rezeptli weder beim Wischen noch im Plan. In einer gemeinsamen Runde gilt es für euch beide.</string>
+    <string name="laeden_hinweis_leer">Wähle bis zu %1$d Läden. Der erste ist dein Hauptladen: Mit ihm rechnet Rezeptli.</string>
+    <string name="laeden_hinweis_einer">Rezeptli rechnet mit %1$s. Wähle weitere Läden, um sie im Plan daneben zu vergleichen.</string>
+    <string name="laeden_hinweis_mehrere">Rezeptli rechnet mit %1$s, deinem Hauptladen. Die anderen stehen im Plan zum Vergleich daneben.</string>
+    <string name="laeden_als_hauptladen">%1$s als Hauptladen</string>
+    <string name="plan_gerechnet_mit">Gerechnet mit %1$s</string>
+    <string name="plan_vergleich_titel">Zum Vergleich</string>
+    <string name="plan_vergleich_betrag">ca. %1$s</string>
+    <string name="plan_gekocht">Gekocht</string>
+    <string name="setup_name_titel">Wie heisst du?</string>
+    <string name="setup_name_text">Freiwillig. Dein Name steht nur in der Begrüssung und bleibt auf deinem Gerät.</string>
+    <string name="vorlieben_land_text">Bestimmt, welche Rezeptquellen zuerst kommen, welche Läden zur Auswahl stehen und in welcher Währung gerechnet wird.</string>
+    <string name="vorlieben_kuechen_text">Eine Vorliebe, kein Filter: Was du wählst, kommt beim Wischen und im Plan häufiger vor. Alles andere taucht weiterhin ab und zu auf.</string>
+    <string name="setup_abneigung_titel">Was magst du nicht?</string>
+    <string name="setup_abneigung_text">Rezepte, die etwas davon enthalten, zeigt Rezeptli nicht.</string>
+    <string name="vorlieben_gruppe_du">Du</string>
+    <string name="vorlieben_gruppe_geschmack">Geschmack</string>
+    <string name="vorlieben_gruppe_planung">Wochenplan</string>
+    <string name="vorlieben_gruppe_app">App</string>
+
+    <!-- Rezepte: wischen, gekocht, behalten, Einkaufsliste -->
+    <string name="rezept_entfernen_titel">Rezept entfernen?</string>
+    <string name="rezept_entfernen_text">«%1$s» wird aus deinen Rezepten entfernt. Das lässt sich nicht rückgängig machen.</string>
+    <string name="rezept_entfernen">Entfernen</string>
+    <string name="rezept_entfernt">«%1$s» entfernt</string>
+    <string name="rezept_gekocht_titel">Als gekocht vermerken</string>
+    <string name="rezept_gekocht_text">«%1$s» als heute gekocht vermerken?</string>
+    <string name="rezept_gekocht_text_erneut">«%1$s» hast du zuletzt am %2$s gekocht. Heute erneut vermerken?</string>
+    <string name="rezept_gekocht_bestaetigen">Gekocht</string>
+    <string name="rezept_gekocht_kurz">Gekocht</string>
+    <string name="rezept_gekocht_entfernen">Vermerk entfernen</string>
+    <string name="rezept_gekocht_entfernt">Vermerk entfernt.</string>
+    <string name="rezept_gekocht_vermerkt">«%1$s» als gekocht vermerkt</string>
+    <string name="rezept_gekocht_zurueckgenommen">Vermerk bei «%1$s» entfernt</string>
+    <string name="rezept_gekocht_am">Gekocht am %1$s</string>
+    <string name="rezepte_wischhinweis">Nach rechts wischen: gekocht. Nach links: entfernen.</string>
+    <string name="rezepte_filter_alle">Alle</string>
+    <string name="rezepte_filter_gekocht">Gekocht</string>
+    <string name="rezepte_filter_ungekocht">Noch nie gekocht</string>
+    <string name="rezept_gespeichert">In deinen Rezepten gespeichert.</string>
+    <string name="rezept_speichern">In meinen Rezepten speichern</string>
+    <string name="rezept_nur_im_plan">Dieses Rezept gehört zu deinem Wochenplan. In deinen Rezepten steht es erst, wenn du es speicherst.</string>
+    <string name="rezept_in_einkaufsliste">Auf die Einkaufsliste</string>
+    <string name="rezept_auf_liste">Zutaten für %1$d Personen stehen auf der Einkaufsliste.</string>
+    <string name="rezept_liste_oeffnen">Öffnen</string>
+
+    <!-- Wischen: Auswahl, zuruecknehmen, mehr zur Karte -->
+    <string name="wischen_zuruecknehmen">Letzte Entscheidung zurücknehmen</string>
+    <string name="karte_mehr">Mehr zum Rezept anzeigen</string>
+    <string name="karte_quelle">Von %1$s</string>
+    <string name="karte_portionen">%1$s Portionen</string>
+    <string name="karte_zutaten_laden">Die Zutaten werden geholt …</string>
+    <string name="karte_eigenes_rezept">Das ist ein eigenes Rezept deines Gegenübers. Geteilt werden davon nur Titel und Bild.</string>
+    <string name="karte_zutaten_fehler">Die Zutaten liessen sich gerade nicht laden. Über den Knopf oben kommst du zum Originalrezept.</string>
+    <string name="karte_fremdsprachig">Diese Quelle ist nicht auf Deutsch. Die Zutaten stehen so da, wie die Seite sie schreibt.</string>
+    <string name="stapel_art_frage">Wonach suchst du?</string>
+    <string name="stapel_art_essen">Essen</string>
+    <string name="stapel_art_getraenke">Getränke</string>
+    <string name="stapel_art_beides">Beides</string>
+    <string name="stapel_nur_neues">Du siehst nur Rezepte, die noch nicht in deiner Sammlung stehen.</string>
+    <string name="stapel_nichts_passendes">Dazu gibt es gerade nichts Neues: Entweder passt nichts zu deinen Vorlieben, oder du hast schon alles gesehen. Versuch es mit einer anderen Auswahl.</string>
+    <string name="stapel_aufgebraucht">Mehr passende Rezepte gibt es im Moment nicht.</string>
+    <string name="stapel_aufgebraucht_titel">Das war alles</string>
+    <string name="stapel_aufgebraucht_text">Zu deiner Auswahl und deinen Vorlieben gibt es gerade keine weiteren Rezepte. Mit einer anderen Auswahl geht es weiter.</string>
+
+    <!-- Zu zweit: Lobby, gemeinsamer Stapel, Frage, Ende -->
+    <string name="mehrspieler_fehler_veraltet">Für diese Runde braucht ihr beide die neueste Version von Rezeptli.</string>
+    <string name="zuzweit_eigene_titel">Was gilt für dich?</string>
+    <string name="zuzweit_eigene_text">Vorbelegt aus deinen Vorlieben. In der Runde gilt das für euch beide – genauso wie die Angaben deines Gegenübers.</string>
+    <string name="zuzweit_eigene_anpassen">Für diese Runde anpassen</string>
+    <string name="zuzweit_eigene_fertig">Fertig</string>
+    <string name="zuzweit_keine_angaben">Keine Einschränkungen – alles darf auf den Tisch.</string>
+    <string name="zuzweit_zeile_ernaehrung">Nur: %1$s</string>
+    <string name="zuzweit_zeile_unvertraeglich">Unverträglich: %1$s</string>
+    <string name="zuzweit_zeile_abneigungen">Nicht erwünscht: %1$s</string>
+    <string name="zuzweit_gruppe_ernaehrung">Ernährung</string>
+    <string name="zuzweit_gruppe_ernaehrung_text">Eine Bedingung: Es kommen nur Rezepte infrage, die dazu passen.</string>
+    <string name="zuzweit_gruppe_unvertraeglich">Unverträglichkeiten</string>
+    <string name="zuzweit_gruppe_unvertraeglich_text">Ein Ausschluss: Rezepte, die das enthalten, kommen nicht in den Stapel.</string>
+    <string name="zuzweit_gruppe_abneigungen">Mag ich nicht</string>
+    <string name="zuzweit_gruppe_abneigungen_text">Auch ein Ausschluss: Was du hier antippst, kommt für euch beide nicht vor.</string>
+    <string name="zuzweit_pruef_hinweis">Rezeptli liest dafür die Zutaten. Spuren und Fertigprodukte kann es nicht prüfen – verlass dich bei Allergien auf die Zutatenliste.</string>
+    <string name="zuzweit_lobby_wartet">Warte auf dein Gegenüber …</string>
+    <string name="zuzweit_lobby_da">Dein Gegenüber ist da.</string>
+    <string name="zuzweit_lobby_anzahl">Wie viele Gerichte sucht ihr?</string>
+    <string name="zuzweit_lobby_anzahl_text">Sobald ihr so viele gemeinsam gefunden habt, ist die Runde vorbei.</string>
+    <string name="zuzweit_lobby_art">Wonach sucht ihr?</string>
+    <string name="zuzweit_lobby_quelle">Womit fangt ihr an?</string>
+    <string name="zuzweit_quelle_gespeichert">Eure gespeicherten Rezepte</string>
+    <string name="zuzweit_quelle_neu">Neue Rezepte</string>
+    <string name="zuzweit_quelle_hinweis">Sind eure gespeicherten Rezepte durch, entscheidest du, ob es mit neuen weitergeht.</string>
+    <string name="zuzweit_gilt_titel">Das gilt für euch beide</string>
+    <string name="zuzweit_lobby_start_allein">Sobald dein Gegenüber da ist, kann es losgehen.</string>
+    <string name="zuzweit_gast_titel">Du bist dabei</string>
+    <string name="zuzweit_gast_text">Dein Gegenüber legt fest, was ihr sucht. Sobald es losgeht, erscheint hier der Stapel.</string>
+    <string name="zuzweit_gast_gesucht">Gesucht</string>
+    <string name="zuzweit_gast_quelle_gespeichert">Zuerst aus euren gespeicherten Rezepten</string>
+    <string name="zuzweit_gast_quelle_neu">Aus neuen Rezepten</string>
+    <string name="zuzweit_sammeln_titel">Der Stapel wird gemischt</string>
+    <string name="zuzweit_sammeln_gespeichert">Deine gespeicherten Rezepte, die für euch beide passen, kommen in den Stapel.</string>
+    <string name="zuzweit_sammeln_neu">Neue Rezepte werden ausgesucht und geprüft. Das kann einen Moment dauern.</string>
+    <string name="zuzweit_sammeln_wartet">Deine Karten sind dabei. Es fehlen noch die deines Gegenübers.</string>
+    <string name="zuzweit_fortschritt">%1$d von %2$d gemeinsam gefunden</string>
+    <string name="zuzweit_offline">Keine Verbindung. Deine Entscheidungen werden nachgereicht, sobald sie wieder da ist.</string>
+    <string name="zuzweit_frage_titel">Der Stapel ist durch</string>
+    <string name="zuzweit_frage_gespeichert">Eure gespeicherten Rezepte sind durch. Ihr habt %1$d von %2$d Gerichten gefunden.</string>
+    <string name="zuzweit_frage_neu">Auch diese Rezepte sind durch. Ihr habt %1$d von %2$d Gerichten gefunden.</string>
+    <string name="zuzweit_frage_weiter">Mit neuen Rezepten weitermachen</string>
+    <string name="zuzweit_frage_aufhoeren">Aufhören und Treffer behalten</string>
+    <string name="zuzweit_frage_aufhoeren_leer">Aufhören</string>
+    <string name="zuzweit_frage_gast">Dein Gegenüber entscheidet, ob es mit neuen Rezepten weitergeht.</string>
+    <string name="zuzweit_bisher">Bisher gefunden</string>
+    <string name="zuzweit_ende_ziel">Geschafft – ihr habt gefunden, was ihr gesucht habt.</string>
+    <string name="zuzweit_ende_leer">Mehr Rezepte, die für euch beide passen, gab es gerade nicht.</string>
+    <string name="zuzweit_ende_ich">Du hast die Runde beendet.</string>
+    <string name="zuzweit_ende_gegenueber">Dein Gegenüber hat die Runde beendet.</string>
+    <string name="zuzweit_neue_runde">Neue Runde</string>
+    <plurals name="zuzweit_auswahl_kommt_mit">
+        <item quantity="one">%d Rezept aus deiner Wischrunde kommt mit in den Stapel.</item>
+        <item quantity="other">%d Rezepte aus deiner Wischrunde kommen mit in den Stapel.</item>
+    </plurals>
+    <plurals name="zuzweit_karten_offen">
+        <item quantity="one">Noch %d Karte</item>
+        <item quantity="other">Noch %d Karten</item>
+    </plurals>
+    <plurals name="zuzweit_nicht_holbar">
+        <item quantity="one">%d eigenes Rezept deines Gegenübers lässt sich nicht übernehmen – lass es dir schicken.</item>
+        <item quantity="other">%d eigene Rezepte deines Gegenübers lassen sich nicht übernehmen – lass sie dir schicken.</item>
+    </plurals>
+
+    <string name="vorlieben_plan_hinweis">Personenzahl und Hauptladen gelten sofort – auch für den Plan, der schon steht. Alles andere wirkt beim Wischen ab dem nächsten Stapel und im Plan, sobald du ihn neu baust oder eine Mahlzeit tauschst.</string>
 </resources>

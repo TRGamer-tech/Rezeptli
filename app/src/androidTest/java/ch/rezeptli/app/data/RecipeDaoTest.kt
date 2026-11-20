@@ -7,9 +7,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import ch.rezeptli.app.data.local.RezeptliDatabase
 import ch.rezeptli.app.data.local.dao.RecipeDao
 import ch.rezeptli.app.data.local.entity.IngredientEntity
+import ch.rezeptli.app.data.local.entity.PlanEntryEntity
 import ch.rezeptli.app.data.local.entity.RecipeEntity
 import ch.rezeptli.app.data.local.entity.RecipeStepEntity
 import ch.rezeptli.app.domain.model.IngredientUnit
+import ch.rezeptli.app.domain.profile.MealSlot
+import ch.rezeptli.app.domain.profile.Weekday
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -46,6 +50,9 @@ class RecipeDaoTest {
         tags: List<String> = emptyList(),
         ingredients: List<String> = emptyList(),
         steps: List<String> = emptyList(),
+        lastCookedAt: Long? = null,
+        sourceUrl: String? = null,
+        inCollection: Boolean = true,
     ): Long = dao.upsertRecipe(
         recipe = RecipeEntity(
             title = title,
@@ -54,7 +61,9 @@ class RecipeDaoTest {
             photoUri = null,
             createdAt = 0L,
             updatedAt = 0L,
-            lastCookedAt = null,
+            lastCookedAt = lastCookedAt,
+            sourceUrl = sourceUrl,
+            inCollection = inCollection,
         ),
         ingredients = ingredients.map { name ->
             IngredientEntity(
@@ -148,6 +157,7 @@ class RecipeDaoTest {
             tags = emptyList(),
             tagCount = 0,
             maxPrepTimeMinutes = null,
+            cooked = null,
         )
 
         assertEquals(1, ids.size)
@@ -164,6 +174,7 @@ class RecipeDaoTest {
             tags = listOf("vegan", "schnell"),
             tagCount = 2,
             maxPrepTimeMinutes = null,
+            cooked = null,
         )
 
         assertEquals(1, ids.size)
@@ -181,10 +192,132 @@ class RecipeDaoTest {
             tags = emptyList(),
             tagCount = 0,
             maxPrepTimeMinutes = 30,
+            cooked = null,
         )
 
         assertEquals(1, ids.size)
         assertEquals("Rührei", dao.recipeWithDetails(ids.single())?.recipe?.title)
+    }
+
+    private suspend fun titel(cooked: Boolean?): List<String> = dao
+        .filteredRecipeIds(query = "", tags = emptyList(), tagCount = 0, maxPrepTimeMinutes = null, cooked = cooked)
+        .mapNotNull { dao.recipeWithDetails(it)?.recipe?.title }
+        .sorted()
+
+    @Test
+    fun filtertNachGekochtUndNochNieGekocht() = runTest {
+        insertRecipe(title = "Schon gekocht", lastCookedAt = 1_700_000_000_000L)
+        insertRecipe(title = "Noch nie gekocht")
+
+        assertEquals(listOf("Schon gekocht"), titel(cooked = true))
+        assertEquals(listOf("Noch nie gekocht"), titel(cooked = false))
+        assertEquals(listOf("Noch nie gekocht", "Schon gekocht"), titel(cooked = null))
+    }
+
+    @Test
+    fun derVermerkGekochtLaesstSichSetzenUndZuruecknehmen() = runTest {
+        val id = insertRecipe(title = "Rösti")
+
+        dao.updateLastCookedAt(id, 42L)
+        assertEquals(42L, dao.recipeWithDetails(id)?.recipe?.lastCookedAt)
+        assertEquals(listOf("Rösti"), titel(cooked = true))
+
+        dao.updateLastCookedAt(id, null)
+        assertNull(dao.recipeWithDetails(id)?.recipe?.lastCookedAt)
+        assertEquals(listOf("Rösti"), titel(cooked = false))
+    }
+
+    @Test
+    fun wasNurFuerDenPlanGespeichertIstGehoertNichtZurSammlung() = runTest {
+        insertRecipe(title = "Meins", tags = listOf("vegetarisch"), sourceUrl = "https://beispiel.ch/meins")
+        val planId = insertRecipe(
+            title = "Nur im Plan",
+            tags = listOf("asiatisch"),
+            sourceUrl = "https://beispiel.ch/plan",
+            inCollection = false,
+        )
+
+        // Weder in der Liste noch in der Anzahl, bei den Tags oder unter den gespeicherten Adressen.
+        assertEquals(listOf("Meins"), titel(cooked = null))
+        assertEquals(1, dao.observeRecipeCount().first())
+        assertEquals(listOf("vegetarisch"), dao.observeAllTags().first())
+        assertEquals(listOf("https://beispiel.ch/meins"), dao.savedSourceUrls())
+        // Gespeichert ist es trotzdem - der Plan muss es ja zeigen und kochen koennen.
+        assertEquals("Nur im Plan", dao.recipeWithDetails(planId)?.recipe?.title)
+
+        dao.setInCollection(planId, inCollection = true, now = 5L)
+
+        assertEquals(listOf("Meins", "Nur im Plan"), titel(cooked = null))
+        assertEquals(2, dao.observeRecipeCount().first())
+    }
+
+    @Test
+    fun zuEinerAdresseKommtZuerstDasRezeptAusDerSammlung() = runTest {
+        val url = "https://beispiel.ch/roesti"
+        insertRecipe(title = "Rösti (Plan)", sourceUrl = url, inCollection = false)
+        val gespeichert = insertRecipe(title = "Rösti", sourceUrl = url)
+
+        assertEquals(gespeichert, dao.idBySourceUrl(url))
+        assertNull(dao.idBySourceUrl("https://beispiel.ch/unbekannt"))
+    }
+
+    @Test
+    fun raeumtNurPlanrezepteWegDieNichtMehrImPlanStehen() = runTest {
+        val meins = insertRecipe(title = "Meins")
+        val imPlan = insertRecipe(title = "Im Plan", inCollection = false)
+        val verwaist = insertRecipe(title = "Aus dem Plan gefallen", inCollection = false)
+        database.planDao().replacePlan(
+            entries = listOf(
+                PlanEntryEntity(
+                    day = Weekday.MONTAG,
+                    slot = MealSlot.ABEND,
+                    recipeId = imPlan,
+                    servings = 2,
+                    cost = 8.0,
+                    label = "ALLTAG",
+                ),
+            ),
+            items = emptyList(),
+        )
+
+        dao.deleteUnusedPlanRecipes()
+
+        assertEquals("Meins", dao.recipeWithDetails(meins)?.recipe?.title)
+        assertEquals("Im Plan", dao.recipeWithDetails(imPlan)?.recipe?.title)
+        assertNull(dao.recipeWithDetails(verwaist))
+    }
+
+    @Test
+    fun derPlanHatProTagEinMittagUndEinAbendessenUndMerktSichGekochtes() = runTest {
+        val roesti = insertRecipe(title = "Rösti")
+        val risotto = insertRecipe(title = "Risotto")
+        val curry = insertRecipe(title = "Curry")
+        val plan = database.planDao()
+
+        fun eintrag(slot: MealSlot, recipeId: Long, cookedAt: Long? = null) = PlanEntryEntity(
+            day = Weekday.MONTAG,
+            slot = slot,
+            recipeId = recipeId,
+            servings = 2,
+            cost = 8.0,
+            label = "ALLTAG",
+            cookedAt = cookedAt,
+        )
+        plan.replacePlan(listOf(eintrag(MealSlot.MITTAG, roesti), eintrag(MealSlot.ABEND, risotto)), emptyList())
+
+        assertEquals(setOf(MealSlot.MITTAG, MealSlot.ABEND), plan.rows().map { it.slot }.toSet())
+
+        // Gekocht wird am Rezept vermerkt - die Mahlzeit im Plan ist damit abgehakt.
+        plan.markCooked(roesti, 99L)
+        assertEquals(99L, plan.rows().first { it.recipeId == roesti }.cookedAt)
+        assertNull(plan.rows().first { it.recipeId == risotto }.cookedAt)
+
+        // Getauscht wird genau ein Platz: Das Mittagessen bleibt, samt seinem Vermerk.
+        plan.replaceEntry(eintrag(MealSlot.ABEND, curry), emptyList())
+        val danach = plan.rows()
+        assertEquals(2, danach.size)
+        assertEquals(curry, danach.first { it.slot == MealSlot.ABEND }.recipeId)
+        assertEquals(99L, danach.first { it.slot == MealSlot.MITTAG }.cookedAt)
     }
 
     @Test

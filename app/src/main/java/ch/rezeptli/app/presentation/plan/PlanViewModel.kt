@@ -4,7 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.plan.ObservePlanUseCase
 import ch.rezeptli.app.domain.plan.PlanEntry
+import ch.rezeptli.app.domain.plan.PlanPlace
 import ch.rezeptli.app.domain.plan.ReplaceMealUseCase
+import ch.rezeptli.app.domain.plan.StoreComparison
+import ch.rezeptli.app.domain.plan.StoreEstimate
+import ch.rezeptli.app.domain.profile.Currency
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.StoreChain
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
@@ -22,18 +27,28 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Die Mahlzeiten eines Tages - mittags vor abends. */
+data class PlanDay(
+    val day: Weekday,
+    val meals: List<PlanEntry>,
+)
+
 data class PlanUiState(
     val isLoading: Boolean = true,
     val name: String = "",
+    /** Der Hauptladen - mit ihm wird gerechnet. */
     val store: StoreChain? = null,
-    val budget: Int = UserProfile.DEFAULT_BUDGET,
-    val expectedMeals: Int = UserProfile.DEFAULT_COOK_DAYS,
+    val currency: Currency = Currency.CHF,
+    val budget: Int = UserProfile.EMPTY.budget,
+    val expectedMeals: Int = UserProfile.EMPTY.mealsPerWeek,
     val meals: List<PlanEntry> = emptyList(),
     val itemsTotal: Int = 0,
     val itemsChecked: Int = 0,
-    /** Was der Einkauf des Plans kostet, mit ganzen Packungen. */
+    /** Was der Einkauf des Plans im Hauptladen kostet, mit ganzen Packungen. */
     val estimatedCost: Double = 0.0,
-    val replacingDay: Weekday? = null,
+    /** Dieselbe Rechnung fuer die anderen gewaehlten Laeden - nur zum Vergleich. */
+    val comparisons: List<StoreEstimate> = emptyList(),
+    val replacing: PlanPlace? = null,
     val showRebuildDialog: Boolean = false,
 ) {
     val hasPlan: Boolean get() = meals.isNotEmpty()
@@ -42,6 +57,18 @@ data class PlanUiState(
 
     /** Wie weit das Budget aufgebraucht ist, fuer den Balken: zwischen 0 und 1. */
     val budgetShare: Float get() = if (budget <= 0) 0f else (estimatedCost / budget).toFloat().coerceIn(0f, 1f)
+
+    /** Die Woche, Tag fuer Tag. */
+    val days: List<PlanDay>
+        get() = meals
+            .groupBy { it.day }
+            .map { (day, entries) -> PlanDay(day, entries.sortedBy { it.slot.ordinal }) }
+            .sortedBy { it.day.ordinal }
+
+    /** Sobald auch Mittagessen geplant sind, braucht jede Karte ihre Tageszeit. */
+    val showsSlots: Boolean get() = meals.any { it.slot == MealSlot.MITTAG }
+
+    val cookedCount: Int get() = meals.count { it.isCooked }
 }
 
 sealed interface PlanEvent {
@@ -65,17 +92,20 @@ class PlanViewModel @Inject constructor(
         local,
     ) { profile, meals, items, state ->
         val planItems = items.filter { it.fromPlan }
+        val cost = planItems.sumOf { it.price ?: 0.0 }
         PlanUiState(
             isLoading = false,
             name = profile.firstName,
             store = profile.store,
-            budget = profile.weeklyBudget ?: UserProfile.DEFAULT_BUDGET,
+            currency = profile.market.currency,
+            budget = profile.budget,
             expectedMeals = profile.mealsPerWeek,
             meals = meals,
             itemsTotal = items.size,
             itemsChecked = items.count { it.isChecked },
-            estimatedCost = planItems.sumOf { it.price ?: 0.0 },
-            replacingDay = state.replacingDay,
+            estimatedCost = cost,
+            comparisons = StoreComparison.of(profile, cost),
+            replacing = state.replacing,
             showRebuildDialog = state.showRebuildDialog,
         )
     }.stateIn(
@@ -87,12 +117,12 @@ class PlanViewModel @Inject constructor(
     private val _events = Channel<PlanEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
-    fun onReplace(day: Weekday) {
-        if (local.value.replacingDay != null) return
-        local.update { it.copy(replacingDay = day) }
+    fun onReplace(day: Weekday, slot: MealSlot) {
+        if (local.value.replacing != null) return
+        local.update { it.copy(replacing = PlanPlace(day, slot)) }
         viewModelScope.launch {
-            val replaced = replaceMeal(day)
-            local.update { it.copy(replacingDay = null) }
+            val replaced = replaceMeal(day, slot)
+            local.update { it.copy(replacing = null) }
             if (!replaced) _events.send(PlanEvent.NoAlternative)
         }
     }
@@ -102,7 +132,7 @@ class PlanViewModel @Inject constructor(
     fun onRebuildDismiss() = local.update { it.copy(showRebuildDialog = false) }
 
     private data class LocalState(
-        val replacingDay: Weekday? = null,
+        val replacing: PlanPlace? = null,
         val showRebuildDialog: Boolean = false,
     )
 

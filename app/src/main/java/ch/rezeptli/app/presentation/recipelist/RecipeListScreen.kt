@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,19 +13,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwipeRight
 import androidx.compose.material3.Badge
@@ -38,14 +41,22 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,12 +66,15 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.BouncyIconButton
 import ch.rezeptli.app.presentation.common.components.BouncyTextButton
+import ch.rezeptli.app.presentation.common.components.CookedDialog
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
 import ch.rezeptli.app.presentation.common.components.RecipeListCard
+import ch.rezeptli.app.presentation.common.components.RemoveRecipeDialog
 import ch.rezeptli.app.presentation.common.components.RezeptliFilterChip
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
@@ -72,7 +86,12 @@ import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import kotlinx.coroutines.launch
 
-/** Einstiegspunkt der App: alle Rezepte, Suche, Filter und der Weg in den Swipe-Modus. */
+/**
+ * Die eigene Sammlung: alle Rezepte, Suche, Filter und der Weg in den Swipe-Modus.
+ *
+ * Ein Rezept laesst sich in der Liste wischen: nach rechts ist es gekocht, nach links wird
+ * es entfernt. Beides fragt erst nach - ein Wisch beim Scrollen ist schnell passiert.
+ */
 @Composable
 fun RecipeListRoute(
     onRecipeClick: (Long) -> Unit,
@@ -81,7 +100,6 @@ fun RecipeListRoute(
     onSearchWeb: () -> Unit,
     onStartSwipe: () -> Unit,
     onOpenShoppingList: () -> Unit,
-    onOpenSettings: () -> Unit,
     viewModel: RecipeListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +107,18 @@ fun RecipeListRoute(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val swipeNeedsRecipes = stringResource(R.string.recipes_swipe_needs_recipes)
+    val entfernt = stringResource(R.string.rezept_entfernt)
+    val gekocht = stringResource(R.string.rezept_gekocht_vermerkt)
+    val zurueckgenommen = stringResource(R.string.rezept_gekocht_zurueckgenommen)
+
+    ObserveAsEvents(viewModel.events) { event ->
+        val meldung = when (event) {
+            is RecipeListEvent.Removed -> entfernt.format(event.title)
+            is RecipeListEvent.MarkedCooked -> gekocht.format(event.title)
+            is RecipeListEvent.CookedCleared -> zurueckgenommen.format(event.title)
+        }
+        scope.launch { snackbarHostState.showSnackbar(meldung) }
+    }
 
     RecipeListScreen(
         uiState = uiState,
@@ -97,6 +127,7 @@ fun RecipeListRoute(
         onQueryChange = viewModel::onQueryChange,
         onToggleTag = viewModel::onToggleTag,
         onMaxPrepTimeChange = viewModel::onMaxPrepTimeChange,
+        onCookedFilterChange = viewModel::onCookedFilterChange,
         onFilterVisibilityChange = viewModel::onFilterVisibilityChange,
         onResetFilter = viewModel::onResetFilter,
         onRecipeClick = onRecipeClick,
@@ -104,7 +135,8 @@ fun RecipeListRoute(
         onImportRecipe = onImportRecipe,
         onSearchWeb = onSearchWeb,
         onOpenShoppingList = onOpenShoppingList,
-        onOpenSettings = onOpenSettings,
+        onRemoveRequest = viewModel::onRemoveRequest,
+        onCookedRequest = viewModel::onCookedRequest,
         onStartSwipe = {
             if (uiState.hasAnyRecipes) {
                 onStartSwipe()
@@ -113,6 +145,23 @@ fun RecipeListRoute(
             }
         },
     )
+
+    uiState.pendingRemoval?.let { recipe ->
+        RemoveRecipeDialog(
+            title = recipe.title,
+            onConfirm = viewModel::onRemoveConfirm,
+            onDismiss = viewModel::onDialogDismiss,
+        )
+    }
+    uiState.pendingCooked?.let { recipe ->
+        CookedDialog(
+            title = recipe.title,
+            lastCookedAt = recipe.lastCookedAt,
+            onConfirm = viewModel::onCookedConfirm,
+            onClear = viewModel::onCookedClear,
+            onDismiss = viewModel::onDialogDismiss,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,6 +173,7 @@ fun RecipeListScreen(
     onQueryChange: (String) -> Unit,
     onToggleTag: (String) -> Unit,
     onMaxPrepTimeChange: (Int?) -> Unit,
+    onCookedFilterChange: (Boolean?) -> Unit,
     onFilterVisibilityChange: (Boolean) -> Unit,
     onResetFilter: () -> Unit,
     onRecipeClick: (Long) -> Unit,
@@ -131,7 +181,8 @@ fun RecipeListScreen(
     onImportRecipe: () -> Unit,
     onSearchWeb: () -> Unit,
     onOpenShoppingList: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onRemoveRequest: (RecipeSummary) -> Unit,
+    onCookedRequest: (RecipeSummary) -> Unit,
     onStartSwipe: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -170,12 +221,6 @@ fun RecipeListScreen(
                         Icon(
                             imageVector = Icons.Filled.ContentPaste,
                             contentDescription = stringResource(R.string.recipes_import),
-                        )
-                    }
-                    BouncyIconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.einstellungen_oeffnen),
                         )
                     }
                     BouncyIconButton(onClick = { onFilterVisibilityChange(!uiState.isFilterVisible) }) {
@@ -253,6 +298,16 @@ fun RecipeListScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
 
+            // Gekocht oder noch nicht: die Frage, die man an eine Sammlung am haeufigsten stellt -
+            // darum steht sie immer da und nicht erst hinter dem Filterknopf.
+            if (uiState.hasAnyRecipes) {
+                CookedFilter(
+                    cooked = uiState.cooked,
+                    onChange = onCookedFilterChange,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+
             AnimatedVisibility(
                 visible = uiState.isFilterVisible,
                 enter = if (motion.reduced) {
@@ -284,6 +339,8 @@ fun RecipeListScreen(
                 onImportRecipe = onImportRecipe,
                 onSearchWeb = onSearchWeb,
                 onResetFilter = onResetFilter,
+                onRemoveRequest = onRemoveRequest,
+                onCookedRequest = onCookedRequest,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -299,6 +356,8 @@ private fun RecipeListContent(
     onImportRecipe: () -> Unit,
     onSearchWeb: () -> Unit,
     onResetFilter: () -> Unit,
+    onRemoveRequest: (RecipeSummary) -> Unit,
+    onCookedRequest: (RecipeSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isLoading = recipes.loadState.refresh is LoadState.Loading
@@ -336,6 +395,14 @@ private fun RecipeListContent(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(key = "wischhinweis") {
+                Text(
+                    text = stringResource(R.string.rezepte_wischhinweis),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
             items(
                 count = recipes.itemCount,
                 key = recipes.itemKey { it.id },
@@ -343,14 +410,133 @@ private fun RecipeListContent(
                 val recipe = recipes[index]
                 if (recipe != null) {
                     val gleiten = if (motion.reduced) Modifier else Modifier.animateItem()
-                    RecipeListCard(
+                    SwipeableRecipeCard(
                         recipe = recipe,
                         onClick = { onRecipeClick(recipe.id) },
+                        onRemove = { onRemoveRequest(recipe) },
+                        onCooked = { onCookedRequest(recipe) },
                         modifier = gleiten.entrance(index, eintritt, recipe.id),
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * Eine Rezeptkarte, die sich wischen laesst: nach rechts gekocht, nach links entfernen.
+ *
+ * Die Karte schnappt nach dem Wisch immer zurueck - entschieden wird in der Rueckfrage,
+ * nicht durch die Geste. Wer nicht wischen kann oder will, findet beides als Aktion fuer
+ * den Screenreader und auf der Detailseite.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableRecipeCard(
+    recipe: RecipeSummary,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    onCooked: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val entfernen by rememberUpdatedState(onRemove)
+    val kochen by rememberUpdatedState(onCooked)
+    val zustand = rememberSwipeToDismissBoxState(
+        confirmValueChange = { ziel ->
+            when (ziel) {
+                SwipeToDismissBoxValue.StartToEnd -> kochen()
+                SwipeToDismissBoxValue.EndToStart -> entfernen()
+                SwipeToDismissBoxValue.Settled -> Unit
+            }
+            false
+        },
+        positionalThreshold = { breite -> breite * SWIPE_THRESHOLD },
+    )
+    val gekochtText = stringResource(R.string.rezept_gekocht_bestaetigen)
+    val entfernenText = stringResource(R.string.rezept_entfernen)
+
+    SwipeToDismissBox(
+        state = zustand,
+        modifier = modifier.semantics {
+            customActions = listOf(
+                CustomAccessibilityAction(gekochtText) {
+                    kochen()
+                    true
+                },
+                CustomAccessibilityAction(entfernenText) {
+                    entfernen()
+                    true
+                },
+            )
+        },
+        backgroundContent = { SwipeBackground(direction = zustand.dismissDirection) },
+    ) {
+        RecipeListCard(recipe = recipe, onClick = onClick)
+    }
+}
+
+/** Was hinter der Karte zum Vorschein kommt: gruen mit Haken oder rot mit Papierkorb. */
+@Composable
+private fun SwipeBackground(direction: SwipeToDismissBoxValue) {
+    val gekocht = direction == SwipeToDismissBoxValue.StartToEnd
+    val farbe = when (direction) {
+        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+        SwipeToDismissBoxValue.Settled -> MaterialTheme.colorScheme.surfaceContainer
+    }
+    val inhalt = when (direction) {
+        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onErrorContainer
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(Tokens.Radius.LgShape)
+            .background(farbe)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (gekocht) Arrangement.Start else Arrangement.End,
+    ) {
+        if (direction != SwipeToDismissBoxValue.Settled) {
+            Icon(
+                imageVector = if (gekocht) Icons.Filled.CheckCircle else Icons.Filled.Delete,
+                contentDescription = null,
+                tint = inhalt,
+            )
+            Text(
+                text = stringResource(if (gekocht) R.string.rezept_gekocht_kurz else R.string.rezept_entfernen),
+                style = MaterialTheme.typography.labelLarge,
+                color = inhalt,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+    }
+}
+
+/** Alle, nur Gekochte, nur noch nie Gekochte. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CookedFilter(
+    cooked: Boolean?,
+    onChange: (Boolean?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FlowRow(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        RezeptliFilterChip(
+            selected = cooked == null,
+            onClick = { onChange(null) },
+            label = stringResource(R.string.rezepte_filter_alle),
+        )
+        RezeptliFilterChip(
+            selected = cooked == true,
+            onClick = { onChange(if (cooked == true) null else true) },
+            label = stringResource(R.string.rezepte_filter_gekocht),
+        )
+        RezeptliFilterChip(
+            selected = cooked == false,
+            onClick = { onChange(if (cooked == false) null else false) },
+            label = stringResource(R.string.rezepte_filter_ungekocht),
+        )
     }
 }
 
@@ -443,3 +629,6 @@ private fun FilterSection(
 }
 
 private val PREP_TIME_OPTIONS: List<Int?> = listOf(null, 15, 30, 45, 60)
+
+/** So weit muss eine Karte gezogen werden, bis der Wisch zaehlt. */
+private const val SWIPE_THRESHOLD = 0.35f

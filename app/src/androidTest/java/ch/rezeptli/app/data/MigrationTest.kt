@@ -93,10 +93,64 @@ class MigrationTest {
             assertTrue(cursor.isNull(1))
             assertTrue(cursor.isNull(2))
         }
+
+        // Version 6 trennt Sammlung und Plan: Was vor dem Update gespeichert war, bleibt in
+        // "Meine Rezepte" - die App kann nicht wissen, was davon bewusst gespeichert wurde.
+        db.query("SELECT inCollection FROM recipes").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Bestehende Rezepte bleiben in der Sammlung", 1, cursor.getInt(0))
+        }
+    }
+
+    @Test
+    fun einBestehenderWochenplanWirdZuAbendessenUndBekommtPlatzFuersMittagessen() {
+        helper.createDatabase(TEST_DB_PLAN, 5).use { db ->
+            db.execSQL(
+                "INSERT INTO recipes (id, title, instructions, createdAt, updatedAt) VALUES (1, 'Rösti', 'Braten.', 1, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO recipes (id, title, instructions, createdAt, updatedAt) VALUES (2, 'Risotto', 'Rühren.', 1, 1)",
+            )
+            db.execSQL(
+                "INSERT INTO plan_entries (day, recipeId, servings, cost, label) VALUES ('MONTAG', 1, 2, 7.5, 'ALLTAG')",
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(TEST_DB_PLAN, CURRENT_VERSION, true, *RezeptliDatabase.MIGRATIONS)
+
+        // Bisher gab es eine Mahlzeit pro Tag - das war das Abendessen, und gekocht ist sie noch nicht.
+        db.query("SELECT day, slot, recipeId, cookedAt FROM plan_entries").use { cursor ->
+            assertTrue("Der Plan muss die Migration ueberleben", cursor.moveToFirst())
+            assertEquals("MONTAG", cursor.getString(0))
+            assertEquals("ABEND", cursor.getString(1))
+            assertEquals(1L, cursor.getLong(2))
+            assertTrue(cursor.isNull(3))
+            assertEquals(1, cursor.count)
+        }
+
+        // Am selben Tag hat jetzt auch ein Mittagessen Platz ...
+        db.execSQL(
+            "INSERT INTO plan_entries (day, slot, recipeId, servings, cost, label) " +
+                "VALUES ('MONTAG', 'MITTAG', 2, 2, 6.0, 'ALLTAG')",
+        )
+        db.query("SELECT COUNT(*) FROM plan_entries WHERE day = 'MONTAG'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(2, cursor.getInt(0))
+        }
+
+        // ... aber nicht zwei Abendessen.
+        val doppelt = runCatching {
+            db.execSQL(
+                "INSERT INTO plan_entries (day, slot, recipeId, servings, cost, label) " +
+                    "VALUES ('MONTAG', 'ABEND', 2, 2, 6.0, 'ALLTAG')",
+            )
+        }
+        assertTrue("Ein Platz im Plan fasst genau eine Mahlzeit", doppelt.isFailure)
     }
 
     private companion object {
         const val TEST_DB = "migration-test"
-        const val CURRENT_VERSION = 5
+        const val TEST_DB_PLAN = "migration-test-plan"
+        const val CURRENT_VERSION = 6
     }
 }

@@ -15,28 +15,43 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
 
 ## Funktionen
 
-- **Einrichtung in acht Fragen** – Postleitzahl, Laden, Personen, Kochtage, Wochenbudget,
-  Stimmung (bis zu drei), Ernährung samt Unverträglichkeiten und Küchengeräte. Alles
-  vorbelegt und überspringbar; später im Tab *Vorlieben* änderbar.
-- **Wochenplan** – ein Abendessen pro Kochtag. Ernährung, Unverträglichkeiten und Geräte
-  schliessen Rezepte hart aus, Stimmungen gewichten nur. Dazu Kosten gegen Budget, eine
-  Mahlzeit lässt sich mit einem Tipp tauschen, der ganze Plan neu bauen.
+- **Einrichtung in elf kurzen Fragen** – Name, Land, Lieblingsküchen, Ernährung samt
+  Unverträglichkeiten, was du nicht magst, Personen, Kochtage und Mahlzeiten, bis zu drei
+  Läden, Wochenbudget, Stimmung (bis zu drei) und Küchengeräte. Alles vorbelegt und
+  überspringbar; später im Tab *Vorlieben* änderbar – dort stehen auch die Einstellungen
+  der App.
+- **Wochenplan** – Mittag- und Abendessen pro Kochtag (oder nur eines davon). Ernährung,
+  Unverträglichkeiten, Abneigungen und fehlende Geräte schliessen Rezepte hart aus;
+  Stimmungen und Küchen gewichten nur. Getränke, Desserts und Saucen kommen nicht hinein.
+  Dazu Kosten gegen Budget, gerechnet mit dem Hauptladen und mit den anderen verglichen.
+  Eine Mahlzeit lässt sich mit einem Tipp tauschen – gegen etwas, das diese Woche noch
+  nicht vorgeschlagen wurde. Was der Plan holt, landet nicht ungefragt in der Sammlung.
 - **Einkaufsliste mit Packungen** – Bedarf in der Menge des Rezepts, darunter die Packung,
   die man kauft, und der geschätzte Preis. Abgehaktes sinkt ans Ende der Gruppe; die
   Liste lässt sich kopieren und teilen und um eigene Posten ergänzen.
-- **Zu zweit wischen** – beide wischen am eigenen Handy durch Rezeptbilder, am Ende zeigt
-  die App, worauf ihr beide Lust habt, und legt es in den Wochenplan.
-- **Wischen allein** – Kartenstapel aus dem Rezeptverzeichnis, mit Undo
+- **Zu zweit wischen** – eine Person eröffnet und bekommt sofort den Code; sie legt fest,
+  wie viele Gerichte gesucht werden und ob Essen, Getränke oder beides. Beide wischen
+  denselben Stapel – zuerst die gespeicherten Rezepte beider, auf Wunsch danach neue. Was
+  eine Person nicht isst, gilt für beide. Sobald genug gemeinsame Treffer da sind, ist
+  Schluss; sie lassen sich in den Wochenplan und auf die Einkaufsliste übernehmen.
+- **Wischen allein** – Kartenstapel aus dem Rezeptverzeichnis: nur Neues (nichts, was
+  schon gespeichert ist), wahlweise Essen, Getränke oder beides. Ein Tipp auf die Karte
+  zeigt Quelle und Zutaten, die letzte Entscheidung lässt sich zurücknehmen.
 - **Rezepte verwalten** – anlegen, bearbeiten, löschen; mit Zutaten, Zubereitung, Foto,
-  Tags und Zubereitungszeit; Text-Import per Copy-Paste mit regelbasiertem Parser
+  Tags und Zubereitungszeit; Text-Import per Copy-Paste mit regelbasiertem Parser. In der
+  Liste nach links wischen entfernt, nach rechts vermerkt „gekocht“ (beides mit
+  Rückfrage); ein Filter zeigt Gekochtes oder noch nie Gekochtes.
 - **Rezepte im Web finden** – Suche bei elf Quellen aus der Schweiz, Deutschland,
   Österreich, Frankreich und Italien; ein Rezept aus dem Browser lässt sich über "Teilen"
   direkt an Rezeptli schicken
-- **Kochmodus** – ein Arbeitsschritt pro Karte, mit den Zutaten dieses Schritts und Timer
+- **Kochmodus** – ein Arbeitsschritt pro Karte, mit den Zutaten dieses Schritts und Timer;
+  wer fertig gekocht hat, hat das Rezept als gekocht vermerkt – auch im Wochenplan
 - **Hell und dunkel** – folgt der Einstellung des Geräts
 
 **Zu den Preisen:** Rezeptli fragt kein Geschäft ab. Die Preise sind Richtwerte für die
 Schweiz, je nach Laden mit einem Faktor verschoben, und überall als Schätzung beschriftet.
+Für Deutschland, Österreich, Frankreich und Italien werden sie mit einem groben
+Preisniveau des Landes in Euro umgerechnet – eine Grössenordnung, kein Kassenzettel.
 Auch die Einstufung eines Rezepts (vegetarisch, enthält Gluten, braucht den Ofen …) ist
 eine Heuristik aus den Zutaten – bei Allergien gilt die Zutatenliste der Quelle.
 
@@ -75,11 +90,15 @@ das die App vorher geladen hat, auf dem Gerät.
 enthält Rezepttitel und Adressen der unterstützten Quellen und ist für alle dieselbe –
 daraus lässt sich nicht ablesen, wonach du suchst.
 
-**Wenn du zu zweit entscheidest**, gehen die Titel der Rezepte deiner Runde an unseren
-Pairing-Dienst, damit die zweite Person weiss, worüber sie abstimmt. Zutaten und
-Zubereitung bleiben hier. Der Dienst kennt keine Namen und keine Konten, die Kennung
-deines Geräts ist eine Zufallszahl, und nach zwölf Stunden wird die Runde gelöscht.
-Einzelheiten und der Quelltext stehen in [`pairing/`](pairing/README.md).
+**Wenn du zu zweit entscheidest**, gehen an unseren Pairing-Dienst: die Titel der Rezepte
+der Runde (zuerst die eurer gespeicherten Rezepte, die für beide passen), eure
+Entscheidungen dazu, und was ihr für die Runde ausschliesst – Ernährungsform,
+Unverträglichkeiten, Abneigungen. Das zweite Telefon muss davon erfahren, damit "kein
+Fisch" der einen Person auch für die andere gilt; gespeichert wird es für beide
+zusammengelegt, ohne Vermerk, von wem es stammt. Zutaten, Zubereitung und eigene Fotos
+bleiben hier. Der Dienst kennt keine Namen und keine Konten, die Kennung deines Geräts
+ist eine Zufallszahl, und nach zwölf Stunden wird die Runde gelöscht. Einzelheiten und
+der Quelltext stehen in [`pairing/`](pairing/README.md).
 
 Ohne diese drei Funktionen läuft die App vollständig ohne Netz.
 
@@ -131,7 +150,8 @@ ist aber darauf vorbereitet:
 - **Vorrats-Abgleich** – "das habe ich zuhause" mit den Zutaten abgleichen
 - **Einkaufsliste teilen** – die Liste als Text an andere Apps weitergeben
 - **Rezept-Historie** – Wiederholungen vermeiden, indem die App weiss, was zuletzt auf
-  dem Tisch stand
+  dem Tisch stand (der Vermerk "gekocht" und der Filter dazu sind da; der Wochenplan
+  nutzt sie noch nicht)
 - **Backup als JSON** – Export und Import der ganzen Sammlung, kein Vendor-Lock-in
 
 ## Lizenz

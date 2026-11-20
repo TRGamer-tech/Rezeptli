@@ -154,9 +154,10 @@ fun SwipeSetupScreen(
 
             // Der gemeinsame Modus steht gleichberechtigt daneben und nicht in einem
             // Menue: Er war bisher nirgends zu finden, und genau das war das Problem.
+            // Die gemeinsame Runde braucht keine eigenen Rezepte: Man kann auch nur beitreten,
+            // und sind keine gespeicherten da, geht es mit neuen weiter.
             BouncyOutlinedButton(
                 onClick = onStartTogether,
-                enabled = uiState.canStart && !uiState.isCounting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp),

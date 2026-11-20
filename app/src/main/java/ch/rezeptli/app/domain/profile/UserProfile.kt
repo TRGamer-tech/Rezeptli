@@ -3,11 +3,11 @@ package ch.rezeptli.app.domain.profile
 /**
  * Was die App ueber die Person weiss, die sie benutzt.
  *
- * Alles ist freiwillig: Ein leeres Profil ist ein gueltiges Profil. Die Angaben
- * beeinflussen die Reihenfolge der Vorschlaege, nie deren Verfuegbarkeit - wer nichts
- * angibt, sieht dieselben Rezepte, nur in anderer Reihenfolge.
+ * Alles ist freiwillig: Ein leeres Profil ist ein gueltiges Profil. Was hier steht, wirkt
+ * an genau den Stellen, die die Einstellung nennt - eine Angabe ohne Folge gibt es nicht.
  *
- * Die Angaben bleiben auf dem Geraet.
+ * Die Angaben bleiben auf dem Geraet. Einzige Ausnahme ist die gemeinsame Runde: Dort geht,
+ * was nicht auf den Tisch soll, an den Pairing-Dienst, damit es fuer beide gilt.
  */
 data class UserProfile(
     val firstName: String = "",
@@ -15,28 +15,52 @@ data class UserProfile(
     val cuisines: Set<Cuisine> = emptySet(),
     val diets: Set<Diet> = emptySet(),
     val intolerances: Set<Intolerance> = emptySet(),
+    /** Was jemand nicht mag - wird ausgeschlossen wie eine Unvertraeglichkeit, nur ohne Gesundheitsrisiko. */
+    val dislikes: Set<Dislike> = emptySet(),
+    /** Eigene Stichworte fuer alles, was in der Liste fehlt, etwa "Rosinen". */
+    val customDislikes: List<String> = emptyList(),
     val householdSize: Int? = null,
-    /** Postleitzahl - bestimmt nichts ausser der Anzeige; die App fragt keinen Standort ab. */
-    val zip: String = "",
-    val store: StoreChain? = null,
+    /**
+     * Die bevorzugten Laeden, hoechstens [MAX_STORES]. Der erste ist der Hauptladen: Mit
+     * ihm rechnet die App. Die anderen stehen zum Vergleich daneben.
+     */
+    val stores: List<StoreChain> = emptyList(),
     val cookDays: Set<Weekday> = emptySet(),
-    /** Wochenbudget in Franken fuer alle Einkaeufe des Plans. */
+    /** Welche Mahlzeiten geplant werden. Leer heisst: Mittag- und Abendessen. */
+    val mealSlots: Set<MealSlot> = emptySet(),
+    /** Wochenbudget fuer alle Einkaeufe des Plans, in der Waehrung des Landes. */
     val weeklyBudget: Int? = null,
     val moods: Set<Mood> = emptySet(),
     val appliances: Set<Appliance> = emptySet(),
     /** Wurde das Onboarding gesehen - unabhaengig davon, ob etwas ausgefuellt wurde. */
     val onboardingCompleted: Boolean = false,
 ) {
-    val hasName: Boolean get() = firstName.isNotBlank()
+    /** Der Laden, mit dem gerechnet wird. */
+    val store: StoreChain? get() = stores.firstOrNull()
 
-    /** Anzahl Mahlzeiten pro Woche; ohne Auswahl kocht man an fuenf Tagen. */
-    val mealsPerWeek: Int get() = cookDays.size.takeIf { it > 0 } ?: DEFAULT_COOK_DAYS
+    /** Wo eingekauft wird - bestimmt Laeden, Waehrung und Preisniveau. */
+    val market: Market get() = Market.of(country)
+
+    /** Die Kochtage in Wochenreihenfolge; ohne Auswahl Montag bis Freitag. */
+    val days: List<Weekday>
+        get() = cookDays.sortedBy { it.ordinal }.ifEmpty { Weekday.entries.take(DEFAULT_COOK_DAYS) }
+
+    /** Die geplanten Mahlzeiten eines Tages, in Tagesreihenfolge. */
+    val slots: List<MealSlot>
+        get() = mealSlots.sortedBy { it.ordinal }.ifEmpty { MealSlot.entries }
+
+    /** Anzahl Mahlzeiten pro Woche: Kochtage mal Mahlzeiten pro Tag. */
+    val mealsPerWeek: Int get() = days.size * slots.size
 
     val persons: Int get() = householdSize ?: 2
 
-    /** Sprachregionen, aus denen Quellen bevorzugt werden. */
-    val preferredRegions: List<LanguageRegion>
-        get() = country?.let { listOf(it.region) } ?: emptyList()
+    val budget: Int get() = weeklyBudget ?: market.defaultBudget
+
+    /**
+     * Der Faktor auf die Schweizer Richtpreise der App: Preisniveau des Landes mal Niveau
+     * des Hauptladens. Ohne gewaehlten Laden gilt der uebliche Supermarkt des Landes.
+     */
+    val priceFactor: Double get() = store?.priceMultiplier ?: market.priceLevel
 
     companion object {
         val EMPTY = UserProfile()
@@ -46,18 +70,23 @@ data class UserProfile(
 
         const val DEFAULT_COOK_DAYS = 5
         const val MAX_MOODS = 3
+        const val MAX_STORES = 3
         const val MIN_BUDGET = 20
-        const val MAX_BUDGET = 400
-        const val DEFAULT_BUDGET = 120
+
+        /** Zwei Mahlzeiten an sieben Tagen fuer eine grosse Familie brauchen Luft nach oben. */
+        const val MAX_BUDGET = 600
+
+        const val MAX_CUSTOM_DISLIKES = 12
+        const val MAX_DISLIKE_LENGTH = 24
     }
 }
 
 /**
- * Das Wohnland. Bestimmt, welche Quellen zuerst vorgeschlagen werden.
+ * Das Wohnland. Bestimmt, welche Quellen zuerst vorgeschlagen werden, welche Laeden zur
+ * Auswahl stehen und in welcher Waehrung gerechnet wird.
  *
  * Bewusst eine kurze Liste: Die App kennt nur Quellen aus diesen Laendern, und ein
- * Auswahlfeld mit 200 Eintraegen waere eine Zumutung fuer eine Frage, deren Antwort
- * nur die Reihenfolge beeinflusst. "Anderswo" faengt alle uebrigen ab.
+ * Auswahlfeld mit 200 Eintraegen waere eine Zumutung. "Anderswo" faengt alle uebrigen ab.
  */
 enum class Country(val code: String, val region: LanguageRegion) {
     SCHWEIZ("CH", LanguageRegion.DEUTSCH),
@@ -83,11 +112,13 @@ enum class LanguageRegion {
 /**
  * Kuechen im Sinne von Geschmacksrichtung.
  *
- * Bewusst getrennt von [Diet]: "italienisch" und "vegan" schliessen sich nicht aus,
- * in einer gemeinsamen Liste liessen sie sich aber nicht zusammen ausdruecken.
+ * Eine Vorliebe, kein Filter: Gewaehlte Kuechen kommen beim Wischen und im Wochenplan
+ * haeufiger vor, alles andere taucht weiterhin ab und zu auf.
+ *
+ * Bewusst getrennt von [Diet]: "italienisch" und "vegan" schliessen sich nicht aus.
  *
  * [region] verbindet eine Kueche mit einem Sprachraum. Wer italienisch mag, bekommt
- * italienische Quellen weiter oben - auch ohne in Italien zu wohnen.
+ * zusaetzlich mehr Karten aus italienischen Quellen - auch ohne in Italien zu wohnen.
  */
 enum class Cuisine(val region: LanguageRegion? = null) {
     SCHWEIZER_KLASSIKER(LanguageRegion.DEUTSCH),
@@ -122,10 +153,9 @@ enum class Diet {
 /**
  * Unvertraeglichkeiten und Allergien.
  *
- * Getrennt von [Diet], weil hier etwas anderes auf dem Spiel steht: Eine Ernaehrungsform
- * ist eine Vorliebe, eine Allergie ist ein Gesundheitsrisiko. Die App darf daraus
- * niemals ableiten, ein Rezept sei "sicher" - sie kennt weder Spuren noch Zutatenlisten
- * von Fertigprodukten. Die Angabe dient nur dazu, passende Rezepte nach oben zu holen.
+ * Getrennt von [Diet] und [Dislike], weil hier etwas anderes auf dem Spiel steht: Eine
+ * Allergie ist ein Gesundheitsrisiko. Die App darf daraus niemals ableiten, ein Rezept sei
+ * "sicher" - sie kennt weder Spuren noch die Zutatenlisten von Fertigprodukten.
  */
 enum class Intolerance {
     GLUTEN,
@@ -138,5 +168,41 @@ enum class Intolerance {
 
     companion object {
         fun fromName(value: String): Intolerance? = entries.firstOrNull { it.name == value }
+    }
+}
+
+/**
+ * Was jemand schlicht nicht mag.
+ *
+ * Wirkt wie ein Ausschluss: Ein Rezept, das etwas davon enthaelt, wird weder beim Wischen
+ * gezeigt noch in den Plan genommen. In der gemeinsamen Runde zaehlen die Abneigungen
+ * beider.
+ *
+ * [VEGAN] meint, was als vegan ausgeschrieben ist oder auf Fleischersatz baut - nicht
+ * jeden Tomatensalat, der zufaellig ohne Tierisches auskommt.
+ */
+enum class Dislike {
+    FISCH,
+    MEERESFRUECHTE,
+    POULET,
+    RIND,
+    SCHWEIN,
+    LAMM,
+    INNEREIEN,
+    PILZE,
+    ZWIEBELN,
+    KNOBLAUCH,
+    KORIANDER,
+    OLIVEN,
+    AUBERGINE,
+    KOHL,
+    SCHARF,
+    KRAEFTIGER_KAESE,
+    TOFU,
+    VEGAN,
+    ;
+
+    companion object {
+        fun fromName(value: String): Dislike? = entries.firstOrNull { it.name == value }
     }
 }

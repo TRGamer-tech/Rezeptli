@@ -48,6 +48,14 @@ jobs:
           # der Abfrage, die auch der Dienst verwendet. D1 spricht SQLite.
           python3 pairing/tests/treffer_test.py
 
+      - name: Ganze Runden durchspielen
+        working-directory: pairing
+        run: |
+          # Der Dienst laeuft dafuer lokal in derselben Laufzeit wie bei Cloudflare,
+          # mit echter D1-Datenbank und den echten Migrationen. Zwei gedachte Telefone
+          # spielen Lobby, Stapel, Stimmen und Ende durch - alte und neue Fassung.
+          node tests/ablauf_test.mjs
+
   veroeffentlichen:
     name: Auf Cloudflare veröffentlichen
     runs-on: ubuntu-latest

@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.Flow
 abstract class PlanDao {
     @Query(
         """
-        SELECT p.day AS day, p.recipeId AS recipeId, p.servings AS servings, p.cost AS cost, p.label AS label,
+        SELECT p.day AS day, p.slot AS slot, p.recipeId AS recipeId, p.servings AS servings, p.cost AS cost,
+               p.label AS label, p.cookedAt AS cookedAt,
                r.title AS title, r.photoUri AS photoUri, r.prepTimeMinutes AS prepTimeMinutes
         FROM plan_entries p JOIN recipes r ON r.id = p.recipeId
         """,
@@ -22,7 +23,8 @@ abstract class PlanDao {
 
     @Query(
         """
-        SELECT p.day AS day, p.recipeId AS recipeId, p.servings AS servings, p.cost AS cost, p.label AS label,
+        SELECT p.day AS day, p.slot AS slot, p.recipeId AS recipeId, p.servings AS servings, p.cost AS cost,
+               p.label AS label, p.cookedAt AS cookedAt,
                r.title AS title, r.photoUri AS photoUri, r.prepTimeMinutes AS prepTimeMinutes
         FROM plan_entries p JOIN recipes r ON r.id = p.recipeId
         """,
@@ -32,8 +34,12 @@ abstract class PlanDao {
     @Query("DELETE FROM plan_entries")
     abstract suspend fun deleteEntries()
 
-    @Query("DELETE FROM plan_entries WHERE day = :day")
-    abstract suspend fun deleteEntry(day: String)
+    @Query("DELETE FROM plan_entries WHERE day = :day AND slot = :slot")
+    abstract suspend fun deleteEntry(day: String, slot: String)
+
+    /** Vermerkt an allen Mahlzeiten mit diesem Rezept, dass gekocht wurde - oder nimmt es zurueck. */
+    @Query("UPDATE plan_entries SET cookedAt = :cookedAt WHERE recipeId = :recipeId")
+    abstract suspend fun markCooked(recipeId: Long, cookedAt: Long?)
 
     @Insert
     abstract suspend fun insertEntries(entries: List<PlanEntryEntity>)
@@ -57,10 +63,10 @@ abstract class PlanDao {
         if (items.isNotEmpty()) insertItems(items.map { it.copy(id = 0L) })
     }
 
-    /** Tauscht die Mahlzeit eines Tages und baut den Einkauf neu auf. */
+    /** Tauscht die Mahlzeit eines Platzes und baut den Einkauf neu auf. */
     @Transaction
-    open suspend fun replaceEntry(day: String, entry: PlanEntryEntity, items: List<ShoppingItemEntity>) {
-        deleteEntry(day)
+    open suspend fun replaceEntry(entry: PlanEntryEntity, items: List<ShoppingItemEntity>) {
+        deleteEntry(entry.day.name, entry.slot.name)
         insertEntries(listOf(entry.copy(id = 0L)))
         deletePlanItems()
         if (items.isNotEmpty()) insertItems(items.map { it.copy(id = 0L) })

@@ -36,7 +36,6 @@ import ch.rezeptli.app.presentation.recipeedit.RecipeEditRoute
 import ch.rezeptli.app.presentation.recipeimport.RecipeImportRoute
 import ch.rezeptli.app.presentation.recipelist.RecipeListRoute
 import ch.rezeptli.app.presentation.results.ResultsRoute
-import ch.rezeptli.app.presentation.settings.SettingsRoute
 import ch.rezeptli.app.presentation.shoppinglist.ShoppingListRoute
 import ch.rezeptli.app.presentation.swipe.SwipeRoute
 import ch.rezeptli.app.presentation.swipe.SwipeSetupRoute
@@ -171,10 +170,6 @@ fun RezeptliNavHost(
                 )
             }
 
-            composable(Destinations.SETTINGS) {
-                SettingsRoute()
-            }
-
             composable(Destinations.RECIPE_LIST) {
                 RecipeListRoute(
                     onRecipeClick = { recipeId ->
@@ -185,7 +180,6 @@ fun RezeptliNavHost(
                     onSearchWeb = { navController.navigate(Destinations.WEB_SEARCH) },
                     onStartSwipe = { navController.navigate(Destinations.SWIPE_SETUP) },
                     onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
-                    onOpenSettings = { navController.navigate(Destinations.SETTINGS) },
                 )
             }
 
@@ -197,6 +191,7 @@ fun RezeptliNavHost(
                     onBack = { navController.popBackStack() },
                     onEdit = { recipeId -> navController.navigate(Destinations.recipeEdit(recipeId)) },
                     onStartCooking = { recipeId -> navController.navigate(Destinations.cooking(recipeId)) },
+                    onOpenShoppingList = { navController.navigate(Destinations.SHOPPING_LIST) },
                 )
             }
 

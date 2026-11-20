@@ -3,6 +3,7 @@ package ch.rezeptli.app.domain.plan
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.profile.Appliance
+import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.Mood
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -51,6 +52,17 @@ class RecipeClassifierTest {
 
         assertEquals(DietClass.VEGAN, traits.diet)
         assertFalse(Intolerance.EIER in traits.allergens)
+    }
+
+    @Test
+    fun `Eier werden auch im Titel und in Zusammensetzungen erkannt - Eierschwaemme sind Pilze`() {
+        assertTrue(Intolerance.EIER in classifier.classifyTitle("Rührei mit Schnittlauch").allergens)
+        assertTrue(Intolerance.EIER in classifier.classifyTitle("Eiersalat").allergens)
+        assertTrue(Intolerance.EIER in classifier.classify(recipe("Nudelpfanne", "Eiernudeln", "Lauch")).allergens)
+
+        val pilze = classifier.classify(recipe("Rahmsauce", "Eierschwämmli", "Rahm"))
+        assertFalse(Intolerance.EIER in pilze.allergens)
+        assertTrue(Dislike.PILZE in pilze.dislikes)
     }
 
     @Test

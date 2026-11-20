@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.Storefront
@@ -45,6 +45,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.plan.MealLabel
 import ch.rezeptli.app.domain.plan.PlanEntry
+import ch.rezeptli.app.domain.profile.Currency
+import ch.rezeptli.app.domain.profile.MealSlot
 import ch.rezeptli.app.domain.profile.Weekday
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
 import ch.rezeptli.app.presentation.common.components.BouncyButton
@@ -61,7 +63,7 @@ import ch.rezeptli.app.presentation.common.components.bouncyClickable
 import ch.rezeptli.app.presentation.common.components.entrance
 import ch.rezeptli.app.presentation.common.components.rememberEntranceState
 import ch.rezeptli.app.presentation.common.components.wiggleOnChange
-import ch.rezeptli.app.presentation.common.formatChf
+import ch.rezeptli.app.presentation.common.formatMoney
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.TagColors
 import ch.rezeptli.app.presentation.common.theme.Tokens
@@ -107,7 +109,7 @@ fun PlanScreen(
     onOpenRecipe: (Long) -> Unit,
     onOpenShoppingList: () -> Unit,
     onBuildPlan: () -> Unit,
-    onReplace: (Weekday) -> Unit,
+    onReplace: (Weekday, MealSlot) -> Unit,
     onRebuildRequest: () -> Unit,
     onRebuildDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -154,16 +156,33 @@ fun PlanScreen(
                             .entrance(3, eintritt, "woche"),
                     )
                 }
-                itemsIndexed(uiState.meals, key = { _, meal -> meal.day.name }) { index, meal ->
-                    // Wird ein Gericht getauscht, gleitet die Karte an ihren Platz statt zu springen.
-                    val gleiten = if (RezeptliTheme.motion.reduced) Modifier else Modifier.animateItem()
-                    MealCard(
-                        meal = meal,
-                        isReplacing = uiState.replacingDay == meal.day,
-                        onClick = { onOpenRecipe(meal.recipeId) },
-                        onReplace = { onReplace(meal.day) },
-                        modifier = gleiten.entrance(index + 4, eintritt, meal.day.name),
-                    )
+                // Tag fuer Tag: erst der Wochentag, darunter Mittag- und Abendessen.
+                uiState.days.forEachIndexed { tagIndex, tag ->
+                    item(key = "tag-" + tag.day.name) {
+                        Text(
+                            text = tag.day.label,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .entrance(tagIndex + 4, eintritt, "tag-" + tag.day.name),
+                        )
+                    }
+                    tag.meals.forEach { meal ->
+                        val schluessel = meal.day.name + "-" + meal.slot.name
+                        item(key = schluessel) {
+                            // Wird ein Gericht getauscht, gleitet die Karte an ihren Platz statt zu springen.
+                            val gleiten = if (RezeptliTheme.motion.reduced) Modifier else Modifier.animateItem()
+                            MealCard(
+                                meal = meal,
+                                currency = uiState.currency,
+                                showSlot = uiState.showsSlots,
+                                isReplacing = uiState.replacing == meal.place,
+                                onClick = { onOpenRecipe(meal.recipeId) },
+                                onReplace = { onReplace(meal.day, meal.slot) },
+                                modifier = gleiten.entrance(tagIndex + 4, eintritt, schluessel),
+                            )
+                        }
+                    }
                 }
                 item(key = "neu") {
                     BouncyOutlinedButton(
@@ -262,7 +281,7 @@ private fun Header(uiState: PlanUiState, modifier: Modifier = Modifier) {
                     modifier = Modifier.size(16.dp),
                 )
                 Text(
-                    text = stringResource(R.string.plan_geplant_fuer, store.label),
+                    text = stringResource(R.string.plan_gerechnet_mit, store.label),
                     style = MaterialTheme.typography.labelLarge,
                     color = farbe.content,
                 )
@@ -300,8 +319,8 @@ private fun CostCard(uiState: PlanUiState, modifier: Modifier = Modifier) {
         Text(
             text = stringResource(
                 R.string.plan_kosten_von,
-                formatChf(angezeigt.toDouble()),
-                uiState.budget,
+                formatMoney(angezeigt.toDouble(), uiState.currency),
+                formatMoney(uiState.budget, uiState.currency),
             ),
             style = MaterialTheme.typography.headlineSmall,
             color = if (warnung) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
@@ -314,6 +333,32 @@ private fun CostCard(uiState: PlanUiState, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             color = if (warnung) barColor else MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // Die anderen gewaehlten Laeden zum Vergleich - gerechnet wird mit dem Hauptladen.
+        if (uiState.comparisons.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.plan_vergleich_titel),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                uiState.comparisons.forEach { vergleich ->
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = vergleich.store.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.plan_vergleich_betrag,
+                                formatMoney(vergleich.cost, uiState.currency),
+                            ),
+                            style = RezeptliTheme.amountStyle,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -376,6 +421,8 @@ private fun ShoppingCard(uiState: PlanUiState, onClick: () -> Unit, modifier: Mo
 @Composable
 private fun MealCard(
     meal: PlanEntry,
+    currency: Currency,
+    showSlot: Boolean,
     isReplacing: Boolean,
     onClick: () -> Unit,
     onReplace: () -> Unit,
@@ -393,20 +440,47 @@ private fun MealCard(
                 title = meal.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(172.dp),
+                    .height(148.dp),
             )
-            // Der Tag als Etikett auf dem Foto - wie ein Zettel am Marktstand.
-            Text(
-                text = meal.day.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(Tokens.Radius.PillShape)
-                    .background(RezeptliTheme.accents.cardFill)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            // Die Tageszeit als Etikett auf dem Foto - wie ein Zettel am Marktstand.
+            if (showSlot) {
+                Text(
+                    text = meal.slot.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .clip(Tokens.Radius.PillShape)
+                        .background(RezeptliTheme.accents.cardFill)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+            // Gekocht: ein gruener Haken unten auf dem Foto.
+            if (meal.isCooked) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp)
+                        .clip(Tokens.Radius.PillShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.plan_gekocht),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
             BouncyIconButton(
                 onClick = onReplace,
                 enabled = !isReplacing,
@@ -440,10 +514,7 @@ private fun MealCard(
                 meal.prepTimeMinutes?.let { PrepTimeLabel(it) }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = stringResource(
-                        R.string.plan_karte_preis,
-                        formatChf(meal.cost),
-                    ),
+                    text = formatMoney(meal.cost, currency),
                     style = RezeptliTheme.amountStyle,
                 )
             }

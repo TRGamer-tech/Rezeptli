@@ -20,12 +20,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -33,8 +35,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,12 +59,16 @@ import ch.rezeptli.app.domain.model.BringLink
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyFilledTonalButton
 import ch.rezeptli.app.presentation.common.components.BouncyIconButton
 import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
-import ch.rezeptli.app.presentation.common.components.BouncyTextButton
+import ch.rezeptli.app.presentation.common.components.CookedDialog
+import ch.rezeptli.app.presentation.common.components.CookedLabel
 import ch.rezeptli.app.presentation.common.components.IconMotion
 import ch.rezeptli.app.presentation.common.components.MotionIcon
 import ch.rezeptli.app.presentation.common.components.RecipeImage
+import ch.rezeptli.app.presentation.common.components.RemoveRecipeDialog
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
@@ -70,6 +78,7 @@ import ch.rezeptli.app.presentation.common.components.rememberEntranceState
 import ch.rezeptli.app.presentation.common.displayText
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
+import ch.rezeptli.app.presentation.common.theme.cardSurface
 import kotlinx.coroutines.launch
 
 /** Detailansicht eines Rezepts mit Zutaten und Zubereitung. */
@@ -78,18 +87,31 @@ fun RecipeDetailRoute(
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
     onStartCooking: (Long) -> Unit,
+    onOpenShoppingList: () -> Unit,
     viewModel: RecipeDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val cookedMessage = stringResource(R.string.recipe_marked_cooked)
+    val clearedMessage = stringResource(R.string.rezept_gekocht_entfernt)
+    val keptMessage = stringResource(R.string.rezept_gespeichert)
+    val listMessage = stringResource(R.string.rezept_auf_liste)
+    val openList = stringResource(R.string.rezept_liste_oeffnen)
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             RecipeDetailEvent.Deleted -> onBack()
-            RecipeDetailEvent.MarkedAsCooked -> scope.launch {
-                snackbarHostState.showSnackbar(cookedMessage)
+            RecipeDetailEvent.MarkedAsCooked -> scope.launch { snackbarHostState.showSnackbar(cookedMessage) }
+            RecipeDetailEvent.CookedCleared -> scope.launch { snackbarHostState.showSnackbar(clearedMessage) }
+            RecipeDetailEvent.Kept -> scope.launch { snackbarHostState.showSnackbar(keptMessage) }
+            is RecipeDetailEvent.AddedToShoppingList -> scope.launch {
+                val ergebnis = snackbarHostState.showSnackbar(
+                    message = listMessage.format(event.persons),
+                    actionLabel = openList,
+                    duration = SnackbarDuration.Long,
+                )
+                if (ergebnis == SnackbarResult.ActionPerformed) onOpenShoppingList()
             }
         }
     }
@@ -103,7 +125,12 @@ fun RecipeDetailRoute(
         onDeleteRequest = viewModel::onDeleteRequest,
         onDeleteDismiss = viewModel::onDeleteDismiss,
         onDeleteConfirm = viewModel::onDeleteConfirm,
-        onMarkCooked = viewModel::onMarkCooked,
+        onCookedRequest = viewModel::onCookedRequest,
+        onCookedDismiss = viewModel::onCookedDismiss,
+        onCookedConfirm = viewModel::onCookedConfirm,
+        onCookedClear = viewModel::onCookedClear,
+        onKeep = viewModel::onKeep,
+        onAddToShoppingList = viewModel::onAddToShoppingList,
     )
 }
 
@@ -118,7 +145,12 @@ fun RecipeDetailScreen(
     onDeleteRequest: () -> Unit,
     onDeleteDismiss: () -> Unit,
     onDeleteConfirm: () -> Unit,
-    onMarkCooked: () -> Unit,
+    onCookedRequest: () -> Unit,
+    onCookedDismiss: () -> Unit,
+    onCookedConfirm: () -> Unit,
+    onCookedClear: () -> Unit,
+    onKeep: () -> Unit,
+    onAddToShoppingList: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val recipe = uiState.recipe
@@ -132,17 +164,37 @@ fun RecipeDetailScreen(
                 onBack = onBack,
                 actions = {
                     if (recipe != null) {
-                        BouncyIconButton(onClick = onMarkCooked) {
+                        // Der Haken ist gefuellt, sobald das Rezept einmal gekocht wurde.
+                        BouncyIconButton(onClick = onCookedRequest) {
                             Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = stringResource(R.string.recipe_mark_cooked),
+                                imageVector = if (recipe.lastCookedAt != null) {
+                                    Icons.Filled.CheckCircle
+                                } else {
+                                    Icons.Outlined.CheckCircle
+                                },
+                                contentDescription = stringResource(R.string.rezept_gekocht_titel),
+                                tint = if (recipe.lastCookedAt != null) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                             )
                         }
-                        BouncyIconButton(onClick = onDeleteRequest) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
-                            )
+                        if (recipe.inCollection) {
+                            BouncyIconButton(onClick = onDeleteRequest) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = stringResource(R.string.rezept_entfernen),
+                                )
+                            }
+                        } else {
+                            // Ein Rezept aus dem Wochenplan: Es gibt nichts zu entfernen, aber etwas zu behalten.
+                            BouncyIconButton(onClick = onKeep) {
+                                Icon(
+                                    imageVector = Icons.Filled.BookmarkAdd,
+                                    contentDescription = stringResource(R.string.rezept_speichern),
+                                )
+                            }
                         }
                     }
                 },
@@ -219,6 +271,9 @@ fun RecipeDetailScreen(
             else -> RecipeDetailContent(
                 recipe = recipe,
                 persons = uiState.persons,
+                isAddingToList = uiState.isAddingToList,
+                onKeep = onKeep,
+                onAddToShoppingList = onAddToShoppingList,
                 contentPadding = innerPadding,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -226,20 +281,15 @@ fun RecipeDetailScreen(
     }
 
     if (uiState.isDeleteDialogVisible && recipe != null) {
-        AlertDialog(
-            onDismissRequest = onDeleteDismiss,
-            title = { Text(stringResource(R.string.recipe_delete_title)) },
-            text = { Text(stringResource(R.string.recipe_delete_message, recipe.title)) },
-            confirmButton = {
-                BouncyTextButton(onClick = onDeleteConfirm) {
-                    Text(stringResource(R.string.action_delete))
-                }
-            },
-            dismissButton = {
-                BouncyTextButton(onClick = onDeleteDismiss) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+        RemoveRecipeDialog(title = recipe.title, onConfirm = onDeleteConfirm, onDismiss = onDeleteDismiss)
+    }
+    if (uiState.isCookedDialogVisible && recipe != null) {
+        CookedDialog(
+            title = recipe.title,
+            lastCookedAt = recipe.lastCookedAt,
+            onConfirm = onCookedConfirm,
+            onClear = onCookedClear,
+            onDismiss = onCookedDismiss,
         )
     }
 }
@@ -249,6 +299,9 @@ fun RecipeDetailScreen(
 private fun RecipeDetailContent(
     recipe: Recipe,
     persons: Int,
+    isAddingToList: Boolean,
+    onKeep: () -> Unit,
+    onAddToShoppingList: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -306,6 +359,31 @@ private fun RecipeDetailContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                recipe.lastCookedAt?.let { CookedLabel(it) }
+                // Ein Rezept aus dem Wochenplan gehoert nicht von selbst zur Sammlung.
+                if (!recipe.inCollection) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .cardSurface(Tokens.Radius.LgShape)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.rezept_nur_im_plan),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        BouncyButton(onClick = onKeep, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Icon(
+                                imageVector = Icons.Filled.BookmarkAdd,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(stringResource(R.string.rezept_speichern), modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
                 val uriHandler = LocalUriHandler.current
                 val quelle = recipe.sourceUrl
                 val quellenName = recipe.sourceName ?: quelle?.substringAfter("//")?.substringBefore('/')
@@ -338,21 +416,46 @@ private fun RecipeDetailContent(
                         }
                     }
                 }
-                // Bring liest die Zutaten selbst von der Quelle und rechnet sie auf die
-                // eigene Personenzahl um. Geht nur fuer Rezepte mit Quelladresse.
-                BringLink.forRecipe(quelle, recipe.servings, persons)?.let { link ->
-                    BouncyOutlinedButton(
-                        onClick = { uriHandler.openUri(link) },
-                        modifier = Modifier.heightIn(min = 48.dp),
-                    ) {
-                        MotionIcon(
-                            imageVector = Icons.Filled.ShoppingCart,
-                            contentDescription = null,
-                            motion = IconMotion.WIGGLE,
-                            playOnAppear = true,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(stringResource(R.string.rezept_in_bring), modifier = Modifier.padding(start = 8.dp))
+                // Zwei Wege zum Einkauf: die Liste der App - geht fuer jedes Rezept mit Zutaten -
+                // und Bring, das die Zutaten selbst von der Quelle liest. Bring geht nur fuer
+                // Rezepte mit Quelladresse.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (recipe.ingredients.isNotEmpty()) {
+                        BouncyFilledTonalButton(
+                            onClick = onAddToShoppingList,
+                            enabled = !isAddingToList,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
+                            MotionIcon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = null,
+                                motion = IconMotion.POP,
+                                playOnAppear = true,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                stringResource(R.string.rezept_in_einkaufsliste),
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                    BringLink.forRecipe(quelle, recipe.servings, persons)?.let { link ->
+                        BouncyOutlinedButton(
+                            onClick = { uriHandler.openUri(link) },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
+                            MotionIcon(
+                                imageVector = Icons.Filled.ShoppingCart,
+                                contentDescription = null,
+                                motion = IconMotion.WIGGLE,
+                                playOnAppear = true,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(stringResource(R.string.rezept_in_bring), modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
             }

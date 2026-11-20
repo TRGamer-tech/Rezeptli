@@ -31,6 +31,8 @@ data class SwipeUiState(
     val canUndo: Boolean = false,
     val isFinished: Boolean = false,
     val isExitDialogVisible: Boolean = false,
+    /** Die Angaben zur angetippten Karte, solange das Blatt offen ist. */
+    val info: CardInfo? = null,
 ) {
     val topCard: RecipeSummary? get() = cards.firstOrNull()
 }
@@ -169,6 +171,32 @@ class SwipeViewModel @Inject constructor(
             refreshCards()
             _events.send(SwipeEvent.UndoDone)
         }
+    }
+
+    /**
+     * Zeigt, woher das Rezept einer Karte kommt und was hineingehoert - ohne die Runde zu
+     * verlassen. Die Zutaten stehen in der eigenen Sammlung; ein Abruf ist nicht noetig.
+     */
+    fun onInfoRequest(recipeId: Long) {
+        viewModelScope.launch {
+            val recipe = recipeRepository.getRecipe(recipeId) ?: return@launch
+            _uiState.update {
+                it.copy(
+                    info = CardInfo(
+                        title = recipe.title,
+                        sourceName = recipe.sourceName,
+                        sourceUrl = recipe.sourceUrl,
+                        minutes = recipe.prepTimeMinutes,
+                        servings = recipe.servings?.toString(),
+                        ingredients = recipe.ingredients,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun onInfoDismiss() {
+        _uiState.update { it.copy(info = null) }
     }
 
     fun onShowResults() {

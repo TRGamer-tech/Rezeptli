@@ -20,6 +20,10 @@ abstract class RecipeDao {
     /**
      * Seitenweise Liste fuer die Rezeptuebersicht. Die Suche beruecksichtigt Titel,
      * Zubereitung und Zutatennamen; Tags werden mit UND-Semantik gefiltert.
+     *
+     * Gezeigt wird nur die Sammlung - Rezepte, die bloss fuer den Wochenplan gespeichert
+     * sind, gehoeren nicht dazu. Mit [cooked] laesst sich auf schon Gekochtes (`true`) oder
+     * noch nie Gekochtes (`false`) einschraenken.
      */
     @Query(
         """
@@ -32,7 +36,8 @@ abstract class RecipeDao {
             (SELECT group_concat(rt.tag, '|') FROM recipe_tags rt WHERE rt.recipeId = r.id) AS tags
         FROM recipes r
         WHERE
-            (:query = ''
+            r.inCollection = 1
+            AND (:query = ''
             OR r.title LIKE '%' || :query || '%'
             OR r.instructions LIKE '%' || :query || '%'
             OR EXISTS (SELECT 1 FROM ingredients i WHERE i.recipeId = r.id AND i.name LIKE '%' || :query || '%'))
@@ -41,6 +46,9 @@ abstract class RecipeDao {
             AND (:tagCount = 0
             OR (SELECT COUNT(DISTINCT t.tag) FROM recipe_tags t
             WHERE t.recipeId = r.id AND t.tag IN (:tags)) = :tagCount)
+            AND (:cooked IS NULL
+            OR (:cooked = 1 AND r.lastCookedAt IS NOT NULL)
+            OR (:cooked = 0 AND r.lastCookedAt IS NULL))
         ORDER BY r.title COLLATE NOCASE ASC
         """,
     )
@@ -49,6 +57,7 @@ abstract class RecipeDao {
         tags: List<String>,
         tagCount: Int,
         maxPrepTimeMinutes: Int?,
+        cooked: Boolean?,
     ): PagingSource<Int, RecipeSummaryProjection>
 
     /**
@@ -61,7 +70,8 @@ abstract class RecipeDao {
         SELECT r.id
         FROM recipes r
         WHERE
-            (:query = ''
+            r.inCollection = 1
+            AND (:query = ''
             OR r.title LIKE '%' || :query || '%'
             OR r.instructions LIKE '%' || :query || '%'
             OR EXISTS (SELECT 1 FROM ingredients i WHERE i.recipeId = r.id AND i.name LIKE '%' || :query || '%'))
@@ -70,6 +80,9 @@ abstract class RecipeDao {
             AND (:tagCount = 0
             OR (SELECT COUNT(DISTINCT t.tag) FROM recipe_tags t
             WHERE t.recipeId = r.id AND t.tag IN (:tags)) = :tagCount)
+            AND (:cooked IS NULL
+            OR (:cooked = 1 AND r.lastCookedAt IS NOT NULL)
+            OR (:cooked = 0 AND r.lastCookedAt IS NULL))
         ORDER BY RANDOM()
         """,
     )
@@ -78,6 +91,7 @@ abstract class RecipeDao {
         tags: List<String>,
         tagCount: Int,
         maxPrepTimeMinutes: Int?,
+        cooked: Boolean?,
     ): List<Long>
 
     @Query(
@@ -95,10 +109,17 @@ abstract class RecipeDao {
     )
     abstract suspend fun summariesByIds(ids: List<Long>): List<RecipeSummaryProjection>
 
-    @Query("SELECT COUNT(*) FROM recipes")
+    @Query("SELECT COUNT(*) FROM recipes WHERE inCollection = 1")
     abstract fun observeRecipeCount(): Flow<Int>
 
-    @Query("SELECT DISTINCT tag FROM recipe_tags ORDER BY tag COLLATE NOCASE ASC")
+    @Query(
+        """
+        SELECT DISTINCT t.tag FROM recipe_tags t
+        JOIN recipes r ON r.id = t.recipeId
+        WHERE r.inCollection = 1
+        ORDER BY t.tag COLLATE NOCASE ASC
+        """,
+    )
     abstract fun observeAllTags(): Flow<List<String>>
 
     @Transaction
@@ -115,14 +136,28 @@ abstract class RecipeDao {
     @Update
     abstract suspend fun updateRecipe(recipe: RecipeEntity)
 
-    @Query("SELECT id FROM recipes WHERE sourceUrl = :url LIMIT 1")
+    /** Das Rezept zu einer Adresse - bevorzugt eines aus der Sammlung, sonst eines aus dem Plan. */
+    @Query("SELECT id FROM recipes WHERE sourceUrl = :url ORDER BY inCollection DESC, id ASC LIMIT 1")
     abstract suspend fun idBySourceUrl(url: String): Long?
+
+    @Query("SELECT sourceUrl FROM recipes WHERE inCollection = 1 AND sourceUrl IS NOT NULL")
+    abstract suspend fun savedSourceUrls(): List<String>
+
+    @Query("UPDATE recipes SET inCollection = :inCollection, updatedAt = :now WHERE id = :id")
+    abstract suspend fun setInCollection(id: Long, inCollection: Boolean, now: Long)
 
     @Query("DELETE FROM recipes WHERE id = :id")
     abstract suspend fun deleteRecipe(id: Long)
 
-    @Query("UPDATE recipes SET lastCookedAt = :cookedAt, updatedAt = :cookedAt WHERE id = :id")
-    abstract suspend fun updateLastCookedAt(id: Long, cookedAt: Long)
+    /**
+     * Raeumt Rezepte weg, die nur fuer den Plan gespeichert wurden und dort nicht mehr
+     * stehen. Was zur Sammlung gehoert, bleibt unberuehrt.
+     */
+    @Query("DELETE FROM recipes WHERE inCollection = 0 AND id NOT IN (SELECT recipeId FROM plan_entries)")
+    abstract suspend fun deleteUnusedPlanRecipes()
+
+    @Query("UPDATE recipes SET lastCookedAt = :cookedAt WHERE id = :id")
+    abstract suspend fun updateLastCookedAt(id: Long, cookedAt: Long?)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertIngredients(ingredients: List<IngredientEntity>)

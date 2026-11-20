@@ -76,6 +76,114 @@ class CuratedDeckBuilderTest {
         assertEquals(0, stapel.count { it.sourceId == "cuisineaz" })
     }
 
+    // Eine Quelle aus dem eigenen Land mit drei Sorten Gerichten: Die Kueche steht im Titel.
+    private fun gemischteQuelle(curry: Int, pizza: Int, gratin: Int): Map<String, List<DeckEntry>> = mapOf(
+        "gutekueche" to
+            eintraege("gutekueche", curry + pizza + gratin).mapIndexed { index, eintrag ->
+                val gericht = when {
+                    index < curry -> "Curry"
+                    index < curry + pizza -> "Pizza"
+                    else -> "Gratin"
+                }
+                eintrag.copy(title = "$gericht ${index + 1}")
+            },
+    )
+
+    private val kuecheAmTitel: (DeckEntry) -> Set<Cuisine> = { eintrag ->
+        when {
+            eintrag.title.startsWith("Curry") -> setOf(Cuisine.ASIATISCH)
+            eintrag.title.startsWith("Pizza") -> setOf(Cuisine.ITALIENISCH)
+            else -> emptySet()
+        }
+    }
+
+    private fun List<DeckEntry>.anzahl(gericht: String) = count { it.title.startsWith(gericht) }
+
+    @Test
+    fun `eine gewaehlte Kueche faerbt den Stapel - die Haelfte Gemochtes, anderes nur ab und zu`() {
+        val profil = schweizerin.copy(cuisines = setOf(Cuisine.ASIATISCH))
+
+        val stapel = builder.build(
+            gemischteQuelle(curry = 100, pizza = 100, gratin = 100),
+            herkunft,
+            profil,
+            size = 40,
+            random = random(),
+            cuisinesOf = kuecheAmTitel,
+        )
+
+        assertEquals(20, stapel.anzahl("Curry"))
+        assertEquals(4, stapel.anzahl("Pizza"))
+        // Was zu keiner Kueche gehoert, fuellt den Rest - es wird weder bevorzugt noch zurueckgestellt.
+        assertEquals(16, stapel.anzahl("Gratin"))
+    }
+
+    @Test
+    fun `ohne gewaehlte Kueche spielt die Kueche eines Gerichts keine Rolle`() {
+        val stapel = builder.build(
+            gemischteQuelle(curry = 100, pizza = 100, gratin = 100),
+            herkunft,
+            schweizerin,
+            size = 40,
+            random = random(),
+            cuisinesOf = { error("Ohne Vorliebe darf niemand nach der Kueche fragen") },
+        )
+
+        assertEquals(40, stapel.size)
+    }
+
+    @Test
+    fun `eine Vorliebe verkleinert den Stapel nicht, wenn es zu wenig Gemochtes gibt`() {
+        val profil = schweizerin.copy(cuisines = setOf(Cuisine.ASIATISCH))
+
+        val stapel = builder.build(
+            gemischteQuelle(curry = 3, pizza = 100, gratin = 100),
+            herkunft,
+            profil,
+            size = 40,
+            random = random(),
+            cuisinesOf = kuecheAmTitel,
+        )
+
+        assertEquals(40, stapel.size)
+        assertEquals(3, stapel.anzahl("Curry"))
+        // Eine Vorliebe ist kein Filter - anderes bleibt aber auch dann die Ausnahme.
+        assertEquals(4, stapel.anzahl("Pizza"))
+        assertEquals(33, stapel.anzahl("Gratin"))
+    }
+
+    @Test
+    fun `gibt es nur Gemochtes und anderes, kommt zuerst mehr Gemochtes`() {
+        val profil = schweizerin.copy(cuisines = setOf(Cuisine.ASIATISCH))
+
+        val stapel = builder.build(
+            gemischteQuelle(curry = 100, pizza = 100, gratin = 0),
+            herkunft,
+            profil,
+            size = 40,
+            random = random(),
+            cuisinesOf = kuecheAmTitel,
+        )
+
+        assertEquals(36, stapel.anzahl("Curry"))
+        assertEquals(4, stapel.anzahl("Pizza"))
+    }
+
+    @Test
+    fun `wer italienisch mag, bekommt auch Pizza aus den eigenen Quellen haeufiger`() {
+        val profil = schweizerin.copy(cuisines = setOf(Cuisine.ITALIENISCH))
+        val quellen = gemischteQuelle(curry = 100, pizza = 100, gratin = 100) +
+            ("cookaround" to eintraege("cookaround", 200))
+
+        val stapel = builder.build(quellen, herkunft, profil, size = 100, random = random(), cuisinesOf = kuecheAmTitel)
+
+        // 40 aus der italienischen Quelle; von den 60 eigenen ist die Haelfte Pizza.
+        assertEquals(40, stapel.count { it.sourceId == "cookaround" })
+        assertEquals(30, stapel.anzahl("Pizza"))
+        assertEquals(6, stapel.anzahl("Curry"))
+        assertEquals(24, stapel.anzahl("Gratin"))
+    }
+
     @Test
     fun `eine grosse Quelle verdraengt die kleine nicht`() {
         val gemischt = mapOf(
