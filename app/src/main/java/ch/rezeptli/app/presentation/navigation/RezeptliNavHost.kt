@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.rezeptli.app.presentation.common.components.aboveBarsAndKeyboard
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.cooking.CookingRoute
 import ch.rezeptli.app.presentation.deck.DeckRoute
@@ -87,7 +87,8 @@ fun RezeptliNavHost(
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.padding(leistenAbstand),
+            // Ueber der Leiste - und ueber der Tastatur, damit sie kein Eingabefeld verdeckt.
+            modifier = Modifier.aboveBarsAndKeyboard(leistenAbstand),
             // Vorwaerts schiebt sich der neue Bildschirm von der Seite herein, zurueck
             // gleitet er wieder hinaus. Zwischen Tabs gibt es keine Richtung - dort
             // blendet der Inhalt nur weich ueber.
