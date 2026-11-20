@@ -8,27 +8,36 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -39,6 +48,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.Dislike
+import ch.rezeptli.app.presentation.common.components.KeyboardAwareScaffold
 import ch.rezeptli.app.presentation.common.components.aboveBarsAndKeyboard
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.multiplayer.MultiplayerActions
@@ -71,7 +81,13 @@ class KeyboardSpaceTest {
 
     private fun text(id: Int): String = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
-    /** Baut das Geruest der App nach: Leiste unten, Inhalt darueber - mit oder ohne Platz fuer die Tastatur. */
+    /** Was Compose an Abstaenden sieht - fuer die Meldung, wenn eine Messung fehlschlaegt. */
+    private var abstaende = ""
+
+    /**
+     * Zeigt [inhalt] im Geruest der App ([KeyboardAwareScaffold]) - oder, fuer die Gegenprobe,
+     * so, wie die App vorher gebaut war: Leiste unten, Inhalt darueber, kein Platz fuer die Tastatur.
+     */
     private fun zeige(mitPlatz: Boolean = true, inhalt: @Composable () -> Unit) {
         composeTestRule.activityRule.scenario.onActivity { activity ->
             activity.enableEdgeToEdge()
@@ -80,21 +96,47 @@ class KeyboardSpaceTest {
         }
         composeTestRule.setContent {
             RezeptliTheme(reduceMotion = true) {
-                Scaffold(
-                    bottomBar = {
+                Abstaende()
+                if (mitPlatz) {
+                    KeyboardAwareScaffold(
+                        bottomBar = { tastaturOffen -> if (!tastaturOffen) Leiste() },
+                    ) { platz ->
+                        Box(modifier = platz.fillMaxSize()) { inhalt() }
+                    }
+                } else {
+                    Scaffold(bottomBar = { Leiste() }) { leiste: PaddingValues ->
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .height(LEISTE),
-                        )
-                    },
-                ) { leiste: PaddingValues ->
-                    val platz = if (mitPlatz) Modifier.aboveBarsAndKeyboard(leiste) else Modifier.padding(leiste)
-                    Box(modifier = platz.fillMaxSize()) { inhalt() }
+                                .padding(leiste)
+                                .fillMaxSize(),
+                        ) { inhalt() }
+                    }
                 }
             }
         }
+    }
+
+    /** Steht fuer die Leiste der App: so hoch wie sie, und wie sie ueber der Navigationsleiste. */
+    @Composable
+    private fun Leiste() {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(LEISTE),
+        )
+    }
+
+    /** Merkt sich, was Compose gerade an Abstaenden sieht. */
+    @Composable
+    private fun Abstaende() {
+        val dichte = LocalDensity.current
+        val gesehen = "Status ${WindowInsets.statusBars.getTop(dichte)}, " +
+            "Navigation ${WindowInsets.navigationBars.getBottom(dichte)}, " +
+            "Tastatur ${WindowInsets.ime.getBottom(dichte)}, " +
+            "Titelleiste ${WindowInsets.captionBar.getTop(dichte)}/${WindowInsets.captionBar.getBottom(dichte)}, " +
+            "sicher ${WindowInsets.safeDrawing.getTop(dichte)}/${WindowInsets.safeDrawing.getBottom(dichte)}"
+        SideEffect { abstaende = gesehen }
     }
 
     /** Die Hoehe der Tastatur in Pixeln - 0, solange sie nicht zu sehen ist. */
@@ -161,7 +203,8 @@ class KeyboardSpaceTest {
         val ebenen = generateSequence(knoten.parent) { it.parent }
             .joinToString(" < ") { "${it.positionInWindow.y.toInt()}+${it.size.height}" }
         return "$fenster; Feld von ${feld.oberkante()} bis ${feld.unterkante()} px, " +
-            "sichtbar ${knoten.boundsInWindow}, platziert ${knoten.layoutInfo.isPlaced}; Ebenen $ebenen"
+            "sichtbar ${knoten.boundsInWindow}, platziert ${knoten.layoutInfo.isPlaced}; Ebenen $ebenen; " +
+            "Compose sieht: $abstaende"
     }
 
     /** Tippt in das Feld und prueft, dass es danach ganz ueber der Tastatur steht. */
@@ -249,6 +292,16 @@ class KeyboardSpaceTest {
             "Zwischen Feld und Tastatur sind $luft px frei, erlaubt sind $erlaubt. ${lage(feld)}",
             luft <= erlaubt,
         )
+
+        // Oben dasselbe: Der Titel bleibt, wo er ohne Tastatur steht - gleich unter der Statusleiste.
+        val titel = composeTestRule.onNodeWithText(text(R.string.shopping_title))
+        titel.assertIsDisplayed()
+        val titelOben = titel.fetchSemanticsNode().positionInWindow.y
+        val titelGrenze = with(composeTestRule.density) { TITEL_HOECHSTENS.toPx() }
+        assertTrue(
+            "Der Titel beginnt bei $titelOben px, erwartet waren hoechstens $titelGrenze. ${lage(feld)}",
+            titelOben <= titelGrenze,
+        )
     }
 
     /**
@@ -307,6 +360,9 @@ class KeyboardSpaceTest {
         /** Der Rand um die Eingabezeile der Einkaufsliste - und etwas Spiel fuer Rundungen. */
         val ZEILENRAND = 16.dp
         val SPIEL = 8.dp
+
+        /** Statusleiste und obere Leiste zusammen sind keine 100 dp hoch - der Titel steht darin. */
+        val TITEL_HOECHSTENS = 100.dp
         const val ANDROID_15 = 35
         const val FUELLZEILEN = 12
         const val WARTEN_MS = 20_000L
