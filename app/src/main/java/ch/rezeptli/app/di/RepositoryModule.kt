@@ -1,5 +1,6 @@
 package ch.rezeptli.app.di
 
+import ch.rezeptli.app.data.local.AppearanceStore
 import ch.rezeptli.app.data.local.UserProfileStore
 import ch.rezeptli.app.data.pairing.ActiveRoundStore
 import ch.rezeptli.app.data.pairing.PairingRepositoryImpl
@@ -17,6 +18,7 @@ import ch.rezeptli.app.domain.repository.ShoppingListRepository
 import ch.rezeptli.app.domain.repository.SwipeSessionRepository
 import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
+import ch.rezeptli.app.domain.settings.AppearanceRepository
 import ch.rezeptli.app.domain.translate.RecipeTranslator
 import dagger.Binds
 import dagger.Module
@@ -62,4 +64,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindRecipeTranslator(impl: MlKitRecipeTranslator): RecipeTranslator
+
+    @Binds
+    @Singleton
+    abstract fun bindAppearanceRepository(impl: AppearanceStore): AppearanceRepository
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ladezustand mit dem brodelnden Topf -->
+    <string name="laden_einen_moment">Einen Moment …</string>
+    <string name="laden_stapel">Der Stapel wird gemischt …</string>
+
+    <!-- Einstellungen: Darstellung -->
+    <string name="einstellungen_darstellung">Darstellung</string>
+    <string name="einstellungen_bewegung">Bewegung reduzieren</string>
+    <string name="einstellungen_bewegung_text">Keine federnden Übergänge, kein Konfetti, nichts was hüpft – nur ruhige Blenden.</string>
+    <string name="einstellungen_bewegung_system">Android hat «Animationen entfernen» eingeschaltet – Rezeptli bleibt deshalb ohnehin ruhig.</string>
+</resources>

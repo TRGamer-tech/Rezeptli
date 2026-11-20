@@ -51,6 +51,7 @@ import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
 
@@ -203,16 +204,22 @@ private fun SearchProgress(finished: Int, total: Int) {
  */
 @Composable
 private fun SkeletonCard() {
-    val transition = rememberInfiniteTransition(label = "Platzhalter")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(Tokens.Duration.Loader, easing = Tokens.Ease.OutQuad),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "Puls",
-    )
+    // Bei reduzierter Bewegung pulsiert nichts - der Platzhalter steht dann einfach da.
+    val alpha = if (RezeptliTheme.motion.reduced) {
+        SKELETON_ALPHA
+    } else {
+        val transition = rememberInfiniteTransition(label = "Platzhalter")
+        val puls by transition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0.7f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(Tokens.Duration.Loader, easing = Tokens.Ease.Standard),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "Puls",
+        )
+        puls
+    }
 
     Column(
         modifier = Modifier
@@ -266,3 +273,5 @@ private fun WebResultCard(
 
 /** So viele Platzhalter, wie ohne Scrollen sichtbar sind. */
 private const val SKELETON_COUNT = 3
+
+private const val SKELETON_ALPHA = 0.5f

@@ -25,19 +25,15 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -55,7 +51,11 @@ import ch.rezeptli.app.domain.model.BringLink
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.RecipeImage
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
 import ch.rezeptli.app.presentation.common.displayText
@@ -121,13 +121,13 @@ fun RecipeDetailScreen(
                 onBack = onBack,
                 actions = {
                     if (recipe != null) {
-                        IconButton(onClick = onMarkCooked) {
+                        BouncyIconButton(onClick = onMarkCooked) {
                             Icon(
                                 imageVector = Icons.Filled.CheckCircle,
                                 contentDescription = stringResource(R.string.recipe_mark_cooked),
                             )
                         }
-                        IconButton(onClick = onDeleteRequest) {
+                        BouncyIconButton(onClick = onDeleteRequest) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
                                 contentDescription = stringResource(R.string.action_delete),
@@ -173,7 +173,7 @@ fun RecipeDetailScreen(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                RezeptliLoader()
             }
 
             recipe == null -> Box(
@@ -200,12 +200,12 @@ fun RecipeDetailScreen(
             title = { Text(stringResource(R.string.recipe_delete_title)) },
             text = { Text(stringResource(R.string.recipe_delete_message, recipe.title)) },
             confirmButton = {
-                TextButton(onClick = onDeleteConfirm) {
+                BouncyTextButton(onClick = onDeleteConfirm) {
                     Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDeleteDismiss) {
+                BouncyTextButton(onClick = onDeleteDismiss) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -285,7 +285,7 @@ private fun RecipeDetailContent(
                 // Bring liest die Zutaten selbst von der Quelle und rechnet sie auf die
                 // eigene Personenzahl um. Geht nur fuer Rezepte mit Quelladresse.
                 BringLink.forRecipe(quelle, recipe.servings, persons)?.let { link ->
-                    OutlinedButton(
+                    BouncyOutlinedButton(
                         onClick = { uriHandler.openUri(link) },
                         modifier = Modifier.heightIn(min = 48.dp),
                     ) {

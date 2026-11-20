@@ -12,15 +12,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -30,6 +27,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeFilter
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 
 /** Kurzer Zwischenschritt vor dem Swipen: was soll auf den Stapel? */
@@ -148,7 +148,7 @@ fun SwipeSetupScreen(
                 },
             )
 
-            Button(
+            BouncyButton(
                 onClick = onStart,
                 enabled = uiState.canStart && !uiState.isCounting,
                 modifier = Modifier.fillMaxWidth(),
@@ -158,7 +158,7 @@ fun SwipeSetupScreen(
 
             // Der gemeinsame Modus steht gleichberechtigt daneben und nicht in einem
             // Menue: Er war bisher nirgends zu finden, und genau das war das Problem.
-            OutlinedButton(
+            BouncyOutlinedButton(
                 onClick = onStartTogether,
                 enabled = uiState.canStart && !uiState.isCounting,
                 modifier = Modifier
@@ -169,7 +169,7 @@ fun SwipeSetupScreen(
                 Text(text = "  " + stringResource(R.string.mehrspieler_starten))
             }
 
-            TextButton(onClick = onResetFilter, modifier = Modifier.fillMaxWidth()) {
+            BouncyTextButton(onClick = onResetFilter, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.recipes_filter_reset))
             }
         }

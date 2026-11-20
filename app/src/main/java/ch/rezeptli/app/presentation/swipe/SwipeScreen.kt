@@ -1,37 +1,26 @@
 package ch.rezeptli.app.presentation.swipe
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -40,9 +29,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
+import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
-import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import kotlinx.coroutines.launch
 
 /** Der Swipe-Modus: ein Rezept pro Karte, wischen oder tippen. */
@@ -99,7 +91,7 @@ fun SwipeScreen(
             RezeptliTopBar(
                 title = stringResource(R.string.swipe_title),
                 navigationIcon = {
-                    IconButton(onClick = onExitRequest) {
+                    BouncyIconButton(onClick = onExitRequest) {
                         Icon(
                             imageVector = Icons.Filled.Close,
                             contentDescription = stringResource(R.string.swipe_finish),
@@ -107,7 +99,7 @@ fun SwipeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onUndo, enabled = uiState.canUndo) {
+                    BouncyIconButton(onClick = onUndo, enabled = uiState.canUndo) {
                         Icon(
                             imageVector = Icons.Filled.Undo,
                             contentDescription = stringResource(R.string.action_undo),
@@ -123,12 +115,7 @@ fun SwipeScreen(
                 .padding(innerPadding),
         ) {
             when {
-                uiState.isLoading -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+                uiState.isLoading -> RezeptliLoader()
 
                 uiState.isFinished -> EmptyState(
                     icon = Icons.Filled.DoneAll,
@@ -161,7 +148,7 @@ fun SwipeScreen(
                             .padding(horizontal = 20.dp, vertical = 8.dp),
                     )
 
-                    DecisionButtons(
+                    SwipeDecisionButtons(
                         onNo = { cardStackState.swipe(false) },
                         onYes = { cardStackState.swipe(true) },
                         modifier = Modifier
@@ -179,12 +166,12 @@ fun SwipeScreen(
             title = { Text(stringResource(R.string.swipe_exit_title)) },
             text = { Text(stringResource(R.string.swipe_exit_message)) },
             confirmButton = {
-                TextButton(onClick = onExitConfirm) {
+                BouncyTextButton(onClick = onExitConfirm) {
                     Text(stringResource(R.string.swipe_exit_confirm))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onExitDismiss) {
+                BouncyTextButton(onClick = onExitDismiss) {
                     Text(stringResource(R.string.swipe_exit_keep))
                 }
             },
@@ -204,58 +191,8 @@ private fun SwipeProgress(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LinearProgressIndicator(
-            progress = { if (total == 0) 0f else decided.toFloat() / total.toFloat() },
-            modifier = Modifier.fillMaxWidth(),
+        RezeptliProgressBar(
+            progress = if (total == 0) 0f else decided.toFloat() / total.toFloat(),
         )
-    }
-}
-
-/**
- * Ja und Nein auch als Schaltflaechen - nicht jede und jeder kann oder will wischen,
- * und fuer Screenreader ist das der zuverlaessige Weg.
- */
-@Composable
-private fun DecisionButtons(
-    onNo: () -> Unit,
-    onYes: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val accents = RezeptliTheme.accents
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilledTonalIconButton(
-            onClick = onNo,
-            modifier = Modifier.size(72.dp),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = accents.swipeNo.copy(alpha = 0.15f),
-                contentColor = accents.swipeNo,
-            ),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = stringResource(R.string.swipe_no),
-                modifier = Modifier.size(32.dp),
-            )
-        }
-
-        FilledTonalIconButton(
-            onClick = onYes,
-            modifier = Modifier.size(72.dp),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = accents.swipeYes.copy(alpha = 0.15f),
-                contentColor = accents.swipeYes,
-            ),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = stringResource(R.string.swipe_yes),
-                modifier = Modifier.size(32.dp),
-            )
-        }
     }
 }

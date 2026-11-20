@@ -1,6 +1,10 @@
 package ch.rezeptli.app.presentation.cooking
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,30 +19,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
@@ -53,13 +52,21 @@ import ch.rezeptli.app.domain.model.AmountFormatter
 import ch.rezeptli.app.domain.model.Ingredient
 import ch.rezeptli.app.presentation.common.KeepScreenOn
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyFilledTonalButton
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.IconMotion
+import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
+import ch.rezeptli.app.presentation.common.components.RezeptliProgressBar
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.label
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 import ch.rezeptli.app.presentation.common.theme.cardSurface
-import ch.rezeptli.app.presentation.common.theme.glassPanel
-import ch.rezeptli.app.presentation.common.theme.glowRing
+import ch.rezeptli.app.presentation.common.theme.floatingPanel
+import ch.rezeptli.app.presentation.common.theme.highlightRing
 import kotlin.math.abs
 
 /**
@@ -114,7 +121,7 @@ fun CookingScreen(
                 title = uiState.recipe?.title.orEmpty(),
                 titleStyle = MaterialTheme.typography.titleMedium,
                 navigationIcon = {
-                    IconButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) {
+                    BouncyIconButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) {
                         Icon(
                             imageVector = Icons.Filled.Close,
                             contentDescription = stringResource(R.string.kochmodus_beenden),
@@ -130,9 +137,7 @@ fun CookingScreen(
                 .padding(padding),
         ) {
             when {
-                uiState.isLoading -> CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                uiState.isLoading -> RezeptliLoader()
 
                 !uiState.hasSteps -> Text(
                     text = stringResource(R.string.kochmodus_keine_schritte),
@@ -180,10 +185,7 @@ private fun CookingContent(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            LinearProgressIndicator(
-                progress = { uiState.stepNumber.toFloat() / uiState.stepCount },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            RezeptliProgressBar(progress = uiState.stepNumber.toFloat() / uiState.stepCount)
         }
 
         Box(
@@ -204,18 +206,24 @@ private fun CookingContent(
                     ) { _, amount -> dragged += amount }
                 },
         ) {
+            // Wie Umblaettern: Der naechste Schritt gleitet von rechts herein und federt ein.
+            val motion = RezeptliTheme.motion
             AnimatedContent(
                 targetState = uiState.stepIndex,
                 transitionSpec = {
                     val forward = targetState > initialState
                     val width = if (forward) 1 else -1
-                    (
-                        slideInHorizontally(tween(Tokens.Duration.Base)) { full -> width * full } +
-                            fadeIn(tween(Tokens.Duration.Base))
-                    ) togetherWith (
-                        slideOutHorizontally(tween(Tokens.Duration.Base)) { full -> -width * full } +
-                            fadeOut(tween(Tokens.Duration.Base))
-                    )
+                    if (motion.reduced) {
+                        fadeIn(motion.fade()) togetherWith fadeOut(motion.fade())
+                    } else {
+                        (
+                            slideInHorizontally(motion.offsetSpring()) { full -> width * full } +
+                                fadeIn(tween(Tokens.Duration.Base))
+                        ) togetherWith (
+                            slideOutHorizontally(motion.offsetSpring()) { full -> -width * full } +
+                                fadeOut(tween(Tokens.Duration.Fast))
+                        )
+                    }
                 },
                 label = "Schrittwechsel",
             ) { index ->
@@ -240,7 +248,7 @@ private fun CookingContent(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(
+            BouncyOutlinedButton(
                 onClick = onPreviousStep,
                 enabled = uiState.hasPrevious,
                 modifier = Modifier.heightIn(min = 48.dp),
@@ -252,11 +260,11 @@ private fun CookingContent(
             }
             Spacer(Modifier.weight(1f))
             if (uiState.isLastStep) {
-                Button(onClick = onFinish, modifier = Modifier.heightIn(min = 48.dp)) {
+                BouncyButton(onClick = onFinish, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.kochmodus_fertig))
                 }
             } else {
-                Button(onClick = onNextStep, modifier = Modifier.heightIn(min = 48.dp)) {
+                BouncyButton(onClick = onNextStep, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.kochmodus_weiter))
                 }
             }
@@ -279,7 +287,7 @@ private fun StepCard(
             .cardSurface(Tokens.Radius.XxlShape)
             .then(
                 if (timer != null && !timer.isFinished) {
-                    Modifier.glowRing(Tokens.Radius.XxlShape, intensity = 0.6f)
+                    Modifier.highlightRing(Tokens.Radius.XxlShape, intensity = 0.6f)
                 } else {
                     Modifier
                 },
@@ -326,17 +334,21 @@ private fun TimerSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .glassPanel(Tokens.Radius.LgShape)
+            .floatingPanel(Tokens.Radius.LgShape)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         when {
-            timer == null -> FilledTonalButton(
+            timer == null -> BouncyFilledTonalButton(
                 onClick = onStartTimer,
                 modifier = Modifier.heightIn(min = 48.dp),
             ) {
-                Icon(imageVector = Icons.Filled.Timer, contentDescription = null)
-                Spacer(Modifier.height(0.dp))
+                MotionIcon(
+                    imageVector = Icons.Filled.Timer,
+                    contentDescription = null,
+                    motion = IconMotion.WIGGLE,
+                    playOnAppear = true,
+                )
                 Text(
                     text = "  " + pluralStringResource(
                         R.plurals.kochmodus_timer_minuten,
@@ -347,12 +359,19 @@ private fun TimerSection(
             }
 
             timer.isFinished -> {
-                Text(
-                    text = stringResource(R.string.kochmodus_timer_abgelaufen),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                OutlinedButton(
+                // Abgelaufen: Die Uhr klingelt - sie wackelt, bis jemand reagiert.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RingingIcon()
+                    Text(
+                        text = stringResource(R.string.kochmodus_timer_abgelaufen),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+                BouncyOutlinedButton(
                     onClick = onStopTimer,
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
@@ -368,11 +387,8 @@ private fun TimerSection(
                         contentDescription = "${timer.remainingSeconds / 60} Minuten verbleibend"
                     },
                 )
-                LinearProgressIndicator(
-                    progress = { timer.progress },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedButton(
+                RezeptliProgressBar(progress = timer.progress, color = RezeptliTheme.accents.butter)
+                BouncyOutlinedButton(
                     onClick = onStopTimer,
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
@@ -392,6 +408,44 @@ private fun Ingredient.displayLine(): String {
         .joinToString(" ")
 }
 
+/**
+ * Die klingelnde Uhr eines abgelaufenen Timers: wackelt in kurzen Schueben, solange sie
+ * zu sehen ist. Bei reduzierter Bewegung steht sie still - die Farbe und der Text sagen
+ * es dann.
+ */
+@Composable
+private fun RingingIcon() {
+    val motion = RezeptliTheme.motion
+    val winkel = if (motion.reduced) {
+        0f
+    } else {
+        val transition = rememberInfiniteTransition(label = "klingeln")
+        val wert by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 0f,
+            animationSpec = infiniteRepeatable(
+                keyframes {
+                    durationMillis = RING_CYCLE_MS
+                    0f at 0
+                    -18f at 60
+                    16f at 120
+                    -12f at 180
+                    10f at 240
+                    0f at 300
+                },
+            ),
+            label = "winkel",
+        )
+        wert
+    }
+    Icon(
+        imageVector = Icons.Filled.Alarm,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.tertiary,
+        modifier = Modifier.graphicsLayer { rotationZ = winkel },
+    )
+}
+
 /** Sekunden als "12:05" - beim Kochen liest sich das schneller als eine Zahl. */
 private fun Int.asClock(): String {
     val safe = coerceAtLeast(0)
@@ -399,3 +453,4 @@ private fun Int.asClock(): String {
 }
 
 private const val SWIPE_FRACTION = 4
+private const val RING_CYCLE_MS = 1200

@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Basis-Theme der Activity. Das eigentliche Aussehen kommt aus Compose. -->
-    <style name="Theme.Rezeptli" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Rezeptli" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
 
-    <!-- Startbildschirm ueber androidx.core.splashscreen. -->
-    <style name="Theme.Rezeptli.Starting" parent="Theme.SplashScreen">
+    <!-- Startbildschirm ueber androidx.core.splashscreen. Ab Android 12 bewegt sich das
+         Symbol (Dampf, Deckel); davor steht es still. -->
+    <style name="Theme.Rezeptli.Starting" parent="Theme.SplashScreen.IconBackground">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_icon_background</item>
+        <item name="windowSplashScreenAnimationDuration">900</item>
         <item name="postSplashScreenTheme">@style/Theme.Rezeptli</item>
     </style>
 </resources>

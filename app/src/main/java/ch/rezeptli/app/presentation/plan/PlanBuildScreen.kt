@@ -1,11 +1,6 @@
 package ch.rezeptli.app.presentation.plan
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,13 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,6 +32,15 @@ import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.plan.PlanFailure
 import ch.rezeptli.app.domain.plan.PlanStage
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
+import ch.rezeptli.app.presentation.common.components.BouncyButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
+import ch.rezeptli.app.presentation.common.components.CookingPot
+import ch.rezeptli.app.presentation.common.components.IconMotion
+import ch.rezeptli.app.presentation.common.components.MotionIcon
+import ch.rezeptli.app.presentation.common.components.entrance
+import ch.rezeptli.app.presentation.common.components.popOnChange
+import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.common.theme.Tokens
 
 /** "Wir bauen deine Woche": die drei Schritte, die wirklich laufen. */
@@ -94,22 +93,16 @@ fun PlanBuildScreen(
 
 @Composable
 private fun Building(stage: PlanStage) {
-    val pulse by rememberInfiniteTransition(label = "Puls").animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(Tokens.Duration.Loader), RepeatMode.Reverse),
-        label = "Puls",
-    )
-
+    // Der Topf brodelt, waehrend die Woche zusammengestellt wird.
     Box(
         modifier = Modifier
-            .size(88.dp)
-            .alpha(pulse)
+            .entrance(0)
+            .size(148.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+            .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(40.dp))
+        CookingPot(size = 100.dp)
     }
     Spacer(Modifier.size(32.dp))
     Text(
@@ -143,7 +136,7 @@ private fun StageRow(labelRes: Int, own: PlanStage, current: PlanStage) {
             active -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
             else -> MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        animationSpec = tween(Tokens.Duration.Base),
+        animationSpec = RezeptliTheme.motion.fade(),
         label = "Schrittfarbe",
     )
 
@@ -151,14 +144,18 @@ private fun StageRow(labelRes: Int, own: PlanStage, current: PlanStage) {
         Box(
             modifier = Modifier
                 .size(28.dp)
+                .popOnChange(done)
                 .clip(CircleShape)
                 .background(dot),
             contentAlignment = Alignment.Center,
         ) {
             if (done) {
-                Icon(
-                    Icons.Filled.Check,
+                // Der Haken springt auf, sobald ein Schritt erledigt ist.
+                MotionIcon(
+                    imageVector = Icons.Filled.Check,
                     contentDescription = null,
+                    motion = IconMotion.POP,
+                    playOnAppear = true,
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(18.dp),
                 )
@@ -202,7 +199,7 @@ private fun Failure(
         textAlign = TextAlign.Center,
     )
     Spacer(Modifier.size(32.dp))
-    Button(
+    BouncyButton(
         onClick = onRetry,
         shape = Tokens.Radius.PillShape,
         modifier = Modifier
@@ -210,7 +207,7 @@ private fun Failure(
             .heightIn(min = 52.dp),
     ) { Text(stringResource(R.string.bauen_nochmal)) }
     if (failure == PlanFailure.NOTHING_FITS) {
-        OutlinedButton(
+        BouncyOutlinedButton(
             onClick = onEditPreferences,
             shape = Tokens.Radius.PillShape,
             modifier = Modifier
@@ -218,7 +215,7 @@ private fun Failure(
                 .heightIn(min = 52.dp),
         ) { Text(stringResource(R.string.bauen_vorlieben)) }
     }
-    TextButton(onClick = onSkip, modifier = Modifier.heightIn(min = 48.dp)) {
+    BouncyTextButton(onClick = onSkip, modifier = Modifier.heightIn(min = 48.dp)) {
         Text(stringResource(R.string.bauen_ohne_plan))
     }
 }

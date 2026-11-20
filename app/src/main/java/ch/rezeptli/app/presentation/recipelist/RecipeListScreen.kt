@@ -24,20 +24,17 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.SwipeRight
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -54,8 +51,11 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.RecipeSummary
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.EmptyState
 import ch.rezeptli.app.presentation.common.components.RecipeListCard
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import kotlinx.coroutines.launch
 
@@ -137,7 +137,7 @@ fun RecipeListScreen(
                         BadgedBox(
                             badge = { Badge { Text(uiState.openShoppingItems.toString()) } },
                         ) {
-                            IconButton(onClick = onOpenShoppingList) {
+                            BouncyIconButton(onClick = onOpenShoppingList) {
                                 Icon(
                                     imageVector = Icons.Filled.ShoppingCart,
                                     contentDescription = stringResource(
@@ -148,19 +148,19 @@ fun RecipeListScreen(
                             }
                         }
                     }
-                    IconButton(onClick = onImportRecipe) {
+                    BouncyIconButton(onClick = onImportRecipe) {
                         Icon(
                             imageVector = Icons.Filled.ContentPaste,
                             contentDescription = stringResource(R.string.recipes_import),
                         )
                     }
-                    IconButton(onClick = onOpenSettings) {
+                    BouncyIconButton(onClick = onOpenSettings) {
                         Icon(
                             imageVector = Icons.Filled.Settings,
                             contentDescription = stringResource(R.string.einstellungen_oeffnen),
                         )
                     }
-                    IconButton(onClick = { onFilterVisibilityChange(!uiState.isFilterVisible) }) {
+                    BouncyIconButton(onClick = { onFilterVisibilityChange(!uiState.isFilterVisible) }) {
                         Icon(
                             imageVector = Icons.Filled.FilterList,
                             contentDescription = stringResource(R.string.recipes_filter),
@@ -270,7 +270,7 @@ private fun RecipeListContent(
         )
 
         isLoading -> Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            RezeptliLoader()
         }
 
         else -> LazyColumn(
@@ -310,7 +310,7 @@ private fun SearchField(
         },
         trailingIcon = {
             if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
+                BouncyIconButton(onClick = { onQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.recipes_search_clear),
@@ -378,7 +378,7 @@ private fun FilterSection(
         }
 
         if (uiState.isFilterActive) {
-            TextButton(onClick = onResetFilter) {
+            BouncyTextButton(onClick = onResetFilter) {
                 Text(stringResource(R.string.recipes_filter_reset))
             }
         }

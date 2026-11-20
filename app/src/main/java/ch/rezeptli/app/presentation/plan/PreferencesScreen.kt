@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.profile.UserProfile
+import ch.rezeptli.app.presentation.common.components.BouncyButton
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.components.SectionCard
 import ch.rezeptli.app.presentation.common.theme.Tokens
@@ -74,7 +74,7 @@ fun PreferencesRoute(
             SectionCard(title = stringResource(R.string.setup_geraete_titel)) {
                 AppliancePicker(selected = profile.appliances, onToggle = viewModel::onApplianceToggle)
             }
-            Button(
+            BouncyButton(
                 onClick = onBuildPlan,
                 shape = Tokens.Radius.PillShape,
                 modifier = Modifier

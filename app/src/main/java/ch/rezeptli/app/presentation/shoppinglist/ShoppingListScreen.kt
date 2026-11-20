@@ -24,18 +24,15 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -53,7 +50,10 @@ import ch.rezeptli.app.domain.model.AmountFormatter
 import ch.rezeptli.app.domain.model.IngredientCategory
 import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.ShoppingItem
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyTextButton
 import ch.rezeptli.app.presentation.common.components.EmptyState
+import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
 import ch.rezeptli.app.presentation.common.formatChf
 import ch.rezeptli.app.presentation.common.label
@@ -122,13 +122,13 @@ fun ShoppingListScreen(
                 actions = {
                     if (!uiState.isEmpty) {
                         val context = LocalContext.current
-                        IconButton(onClick = { onCopy(uiState.asText(context)) }) {
+                        BouncyIconButton(onClick = { onCopy(uiState.asText(context)) }) {
                             Icon(
                                 imageVector = Icons.Filled.ContentCopy,
                                 contentDescription = stringResource(R.string.einkauf_kopieren),
                             )
                         }
-                        IconButton(onClick = { onShare(uiState.asText(context)) }) {
+                        BouncyIconButton(onClick = { onShare(uiState.asText(context)) }) {
                             Icon(
                                 imageVector = Icons.Filled.Share,
                                 contentDescription = stringResource(R.string.einkauf_teilen),
@@ -136,7 +136,7 @@ fun ShoppingListScreen(
                         }
                     }
                     if (uiState.checkedCount > 0) {
-                        IconButton(onClick = onRemoveChecked) {
+                        BouncyIconButton(onClick = onRemoveChecked) {
                             Icon(
                                 imageVector = Icons.Filled.DeleteSweep,
                                 contentDescription = stringResource(R.string.shopping_remove_checked),
@@ -144,7 +144,7 @@ fun ShoppingListScreen(
                         }
                     }
                     if (!uiState.isEmpty) {
-                        IconButton(onClick = onClearRequest) {
+                        BouncyIconButton(onClick = onClearRequest) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
                                 contentDescription = stringResource(R.string.shopping_clear),
@@ -162,7 +162,7 @@ fun ShoppingListScreen(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                RezeptliLoader()
             }
 
             uiState.isEmpty -> Column(
@@ -257,12 +257,12 @@ fun ShoppingListScreen(
             title = { Text(stringResource(R.string.shopping_clear_title)) },
             text = { Text(stringResource(R.string.shopping_clear_message)) },
             confirmButton = {
-                TextButton(onClick = onClearConfirm) {
+                BouncyTextButton(onClick = onClearConfirm) {
                     Text(stringResource(R.string.shopping_clear))
                 }
             },
             dismissButton = {
-                TextButton(onClick = onClearDismiss) {
+                BouncyTextButton(onClick = onClearDismiss) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -353,7 +353,7 @@ private fun ShoppingItemRow(
                 }
             }
         }
-        IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+        BouncyIconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = stringResource(R.string.shopping_delete_item, item.name),
@@ -382,7 +382,7 @@ private fun NewItemField(
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        IconButton(
+        BouncyIconButton(
             onClick = onAdd,
             enabled = value.isNotBlank(),
             modifier = Modifier.size(48.dp),

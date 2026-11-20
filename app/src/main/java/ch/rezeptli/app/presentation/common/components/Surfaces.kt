@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -29,9 +28,8 @@ import ch.rezeptli.app.presentation.common.theme.cardSurface
  * Die Bausteine, aus denen die Bildschirme bestehen.
  *
  * Farben und Schrift kommen aus dem Thema und gelten ueberall von selbst. Was sich
- * nicht von selbst ergibt, ist die Flaechensprache des Kits: gerundete Karten mit
- * Haarlinie, eine ruhige Kopfzeile, gleiche Abstaende. Frueher stand das auf jedem
- * Bildschirm einzeln - oder eben gar nicht. Hier steht es einmal.
+ * nicht von selbst ergibt, ist die Flaechensprache: Karten wie Papier auf Creme, Titel
+ * in der Kochbuchschrift, gleiche Abstaende. Hier steht sie einmal.
  */
 
 /** Die Kopfzeile aller Bildschirme: gleiche Farbe, gleiche Hoehe, gleicher Rueckweg. */
@@ -50,7 +48,7 @@ fun RezeptliTopBar(
         title = {
             Text(
                 text = title,
-                style = titleStyle ?: MaterialTheme.typography.titleLarge,
+                style = titleStyle ?: MaterialTheme.typography.headlineSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -59,7 +57,7 @@ fun RezeptliTopBar(
             when {
                 navigationIcon != null -> navigationIcon()
                 onBack != null ->
-                    IconButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
+                    BouncyIconButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
@@ -70,7 +68,10 @@ fun RezeptliTopBar(
         actions = { actions() },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
+            navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     )
 }
@@ -78,28 +79,30 @@ fun RezeptliTopBar(
 /**
  * Ein abgesetzter Abschnitt - die Grundform fuer alles, was zusammengehoert.
  *
- * Ohne [title] ist es einfach eine Karte; mit Titel eine benannte Gruppe. Der Rahmen
- * ist eine Haarlinie, keine Schattenkante: Das Kit setzt Tiefe ueber Kontrast, nicht
- * ueber Schlagschatten.
+ * Ohne [title] ist es einfach eine Karte; mit Titel eine benannte Gruppe, der Titel in
+ * der Kochbuchschrift. Beim ersten Erscheinen steigt die Karte leicht auf - mit [index]
+ * kommen mehrere Abschnitte nacheinander.
  */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
     title: String? = null,
     spacing: Int = 12,
+    index: Int = 0,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
+            .entrance(index)
             .fillMaxWidth()
             .cardSurface(Tokens.Radius.LgShape)
-            .padding(16.dp),
+            .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(spacing.dp),
     ) {
         if (title != null) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
             )
         }
         content()

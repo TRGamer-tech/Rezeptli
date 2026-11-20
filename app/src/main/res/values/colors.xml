@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Nur fuer App-Icon und Splash-Screen. Die Farben der App selbst leben im
+    <!-- Nur fuer App-Symbol und Startbild. Die Farben der App selbst leben im
          Compose-Theme (presentation/common/theme/Tokens.kt). -->
-    <color name="ic_launcher_background">#1A1A1A</color>
-    <color name="splash_background">#FBF8FC</color>
-    <color name="splash_background_dark">#1A1A1A</color>
+    <color name="ic_launcher_background">#2F6B4F</color>
+
+    <!-- Startbild: Creme am Tag, Waldnacht im Dunkeln; das Symbol sitzt immer auf Kraeutergruen. -->
+    <color name="splash_background">#FBF6EC</color>
+    <color name="splash_background_dark">#0F1E18</color>
+    <color name="splash_icon_background">#2F6B4F</color>
 </resources>

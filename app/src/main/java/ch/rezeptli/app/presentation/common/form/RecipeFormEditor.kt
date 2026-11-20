@@ -24,10 +24,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +42,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ch.rezeptli.app.R
 import ch.rezeptli.app.domain.model.IngredientUnit
+import ch.rezeptli.app.presentation.common.components.BouncyIconButton
+import ch.rezeptli.app.presentation.common.components.BouncyOutlinedButton
 import ch.rezeptli.app.presentation.common.label
 
 /** Aktionen, die das Rezept-Formular ausloest. Der Zustand selbst lebt im ViewModel. */
@@ -136,7 +136,7 @@ fun LazyListScope.recipeFormFields(
     }
 
     item(key = "addIngredient") {
-        OutlinedButton(
+        BouncyOutlinedButton(
             onClick = actions.onIngredientAdd,
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -188,7 +188,7 @@ private fun TagEditor(
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(
+            BouncyIconButton(
                 onClick = onTagAdd,
                 enabled = tagInput.isNotBlank(),
                 modifier = Modifier.size(48.dp),
@@ -285,7 +285,7 @@ private fun IngredientRowEditor(
                     onUnitChange = { onChange(draft.copy(unit = it)) },
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(
+                BouncyIconButton(
                     onClick = onRemove,
                     modifier = Modifier.size(48.dp),
                 ) {
