@@ -1,5 +1,7 @@
 package ch.rezeptli.app.keyboard
 
+import android.os.Build
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -23,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -124,7 +127,36 @@ class KeyboardSpaceTest {
         return fensterHoehe() - tastatur()
     }
 
-    private fun SemanticsNodeInteraction.unterkante(): Float = fetchSemanticsNode().boundsInWindow.bottom
+    /**
+     * Wo das Feld wirklich endet - nicht, wo sein sichtbarer Teil endet.
+     *
+     * `boundsInWindow` schneidet an allem ab, was das Feld verdeckt oder abschneidet: Ein Feld,
+     * das ganz unter dem Rand einer Scroll-Liste liegt, endete danach genau an diesem Rand und
+     * saehe aus wie "gerade noch sichtbar". Gerechnet wird darum mit Lage und Groesse.
+     */
+    private fun SemanticsNodeInteraction.unterkante(): Float {
+        val knoten = fetchSemanticsNode()
+        return knoten.positionInWindow.y + knoten.size.height
+    }
+
+    private fun SemanticsNodeInteraction.oberkante(): Float = fetchSemanticsNode().positionInWindow.y
+
+    /** Alles, was man braucht, um eine fehlgeschlagene Messung zu verstehen. */
+    private fun lage(feld: SemanticsNodeInteraction): String {
+        val knoten = feld.fetchSemanticsNode()
+        var fenster = ""
+        composeTestRule.activityRule.scenario.onActivity { activity ->
+            val decor = activity.window.decorView
+            val insets = ViewCompat.getRootWindowInsets(decor)
+            val inhalt = activity.findViewById<View>(android.R.id.content)
+            fenster = "Fenster ${decor.width}x${decor.height} px, Inhalt ${inhalt.height} px, " +
+                "Tastatur ${insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom} px, " +
+                "Leisten ${insets?.getInsets(WindowInsetsCompat.Type.systemBars())}, " +
+                "Dichte ${activity.resources.displayMetrics.density}, Android ${Build.VERSION.SDK_INT}"
+        }
+        return "$fenster; Feld von ${feld.oberkante()} bis ${feld.unterkante()} px, " +
+            "sichtbar ${knoten.boundsInWindow}"
+    }
 
     /** Tippt in das Feld und prueft, dass es danach ganz ueber der Tastatur steht. */
     private fun pruefeFrei(feld: SemanticsNodeInteraction) {
@@ -134,15 +166,16 @@ class KeyboardSpaceTest {
         runCatching {
             composeTestRule.waitUntil(timeoutMillis = RUHE_MS) { feld.unterkante() <= oberkante }
         }
-        val unterkante = feld.unterkante()
         assertTrue(
-            "Das Feld endet bei $unterkante px, die Tastatur beginnt bei $oberkante px - sie verdeckt es",
-            unterkante <= oberkante,
+            "Die Tastatur beginnt bei $oberkante px und verdeckt das Feld. ${lage(feld)}",
+            feld.unterkante() <= oberkante,
         )
+        assertTrue("Das Feld ist oben aus dem Bild gerutscht. ${lage(feld)}", feld.oberkante() >= 0f)
+        feld.assertIsDisplayed()
         // Und es laesst sich hineinschreiben, waehrend man es sieht.
         feld.performTextInput("Pilze")
         composeTestRule.waitForIdle()
-        assertTrue(feld.unterkante() <= oberkante)
+        assertTrue("Nach dem Tippen verdeckt: ${lage(feld)}", feld.unterkante() <= oberkante)
     }
 
     @Test
@@ -216,7 +249,7 @@ class KeyboardSpaceTest {
         val oberkante = oberkanteDerTastatur()
 
         assertTrue(
-            "Erwartet war ein verdecktes Feld: Unterkante ${feld.unterkante()} px, Tastatur ab $oberkante px",
+            "Erwartet war ein verdecktes Feld, die Tastatur beginnt bei $oberkante px. ${lage(feld)}",
             feld.unterkante() > oberkante,
         )
     }
