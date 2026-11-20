@@ -69,9 +69,13 @@ import org.junit.runner.RunWith
  * Die Tastatur darf das Feld nicht verdecken, in das gerade getippt wird.
  *
  * Gemeldet war genau das: beim Vornamen, bei den Abneigungen und beim Code einer gemeinsamen
- * Runde. Hier laeuft die echte Tastatur des Geraets im echten Fenster der App ([MainActivity]) -
- * ein nachgebautes Fenster verhielt sich anders als ihres. Gemessen wird, wo das Feld steht,
- * sobald die Tastatur offen ist: Seine Unterkante muss ueber ihrer Oberkante liegen.
+ * Runde. Hier laeuft die echte Tastatur des Geraets im echten Fenster der App ([MainActivity]).
+ * Gemessen wird, wo das Feld steht, sobald die Tastatur offen ist: Seine Unterkante muss ueber
+ * ihrer Oberkante liegen.
+ *
+ * Ein nachgebautes Fenster taugt dafuer nicht. Es verhielt sich anders als das der App: Auf
+ * Android 14 schob das System es als Ganzes nach oben, und der Fehler schien dort nicht zu
+ * bestehen; ausserdem hatte es eine Titelleiste, die die App nicht hat.
  */
 @RunWith(AndroidJUnit4::class)
 class KeyboardSpaceTest {
