@@ -138,6 +138,31 @@ class PairingLiveTest {
         }
     }
 
+    /**
+     * Wer erneut beitritt - nach einem Abbruch oder zum Fortsetzen -, mischt nichts mehr
+     * dazu: Der Stapel ist seit dem ersten Beitritt eingefroren, sonst saehen beide nicht
+     * mehr dieselben Karten in derselben Reihenfolge.
+     */
+    @Test
+    fun einErneuterBeitrittVeraendertDenStapelNicht(): Unit = runBlocking {
+        withTimeout(TEST_TIMEOUT_MS) {
+            val erstellt = repository.createSession(rezepte)
+            assertTrue("Einladen fehlgeschlagen: $erstellt", erstellt is PairingResult.Success)
+            val sitzung = (erstellt as PairingResult.Success).value
+
+            try {
+                val gast = "test-gast-" + System.nanoTime()
+                val erster = beitreten(sitzung.code, gast, listOf(SharedRecipe(recipeId = 4L, title = "Zopf")))
+                val zweiter =
+                    beitreten(sitzung.code, gast, listOf(SharedRecipe(recipeId = 5L, title = "Birchermüesli")))
+
+                assertEquals(erster.map { it.title }, zweiter.map { it.title })
+            } finally {
+                repository.closeSession(sitzung.code)
+            }
+        }
+    }
+
     /** Der Beitritt der zweiten Person - ohne die App, mit eigener Kennung. */
     private fun beitreten(
         code: String,
