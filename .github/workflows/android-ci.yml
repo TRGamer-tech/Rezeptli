@@ -516,26 +516,60 @@ jobs:
     name: Gemeldete Fehler nachstellen
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.aufgabe == 'fehler-pruefen'
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Fehler nachstellen
+      - name: Gemeinsame Runde am echten Dienst
         run: |
           set -o pipefail
           python3 tools/fehler-pruefen.py 2>&1 | tee /tmp/fehler.txt
+        continue-on-error: true
+
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
+      - name: Gradle einrichten
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Einstufung an echten Rezeptseiten
+        # Liest Karten aus dem Verzeichnis mit den Bausteinen der App - samt robots.txt und
+        # den Wartezeiten der Quellen - und schreibt auf, woran die Einstufung haengt.
+        timeout-minutes: 20
+        env:
+          REZEPTLI_AUDIT: '1'
+        run: |
+          # Ohne Zwischenspeicher: Sonst kaeme das Ergebnis eines frueheren Laufs zurueck,
+          # und gelesen wuerde gar nichts.
+          ./gradlew testDebugUnitTest --tests "ch.rezeptli.app.audit.FilterAuditTest" \
+            --no-build-cache --console=plain > /tmp/audit-gradle.log 2>&1 || tail -40 /tmp/audit-gradle.log
+          cat app/build/audit/filter-audit.txt || echo "Kein Bericht geschrieben."
         continue-on-error: true
 
       - name: Bericht anhängen
         if: always()
         run: |
           {
-            echo '## Fehleranalyse'
+            echo '## Gemeinsame Runde am echten Dienst'
             echo
             echo '```'
             cat /tmp/fehler.txt
+            echo '```'
+            echo
+            echo '## Einstufung an echten Rezeptseiten'
+            echo
+            echo '```'
+            cat app/build/audit/filter-audit.txt 2>/dev/null || echo 'Kein Bericht.'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
