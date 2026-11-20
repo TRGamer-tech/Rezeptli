@@ -410,7 +410,8 @@ class RecipeClassifier @Inject constructor() {
         val STRONG_CHEESE = WordSet(
             "ziegen*, gorgonzola, roquefort, blauschimmel, edelpilz, bluecheese, stilton, limburger, harzer, " +
                 "=munster, munsterkäse, taleggio, romadur, handkäse, chevre, schafskäse, schafkäse, cambozola, " +
-                "bavariablu, danablu, cabrales, fourme, epoisses, weisslacker, quargel",
+                "bavariablu, danablu, cabrales, fourme, epoisses, weisslacker, quargel, =schimmelkäse, " +
+                "edelschimmel, grünschimmel, blaukäse",
             except = "ziegenfleisch",
         )
 
@@ -470,7 +471,7 @@ class RecipeClassifier @Inject constructor() {
                 "waffel, spekulatius, lebkuchen",
             except = "buchweizen, mais, kichererbsen, kartoffel, reismehl, mandel, glutenfrei, mehlig, polenta, " +
                 "kokos, johannisbrot, guarkern, linsenmehl, sojamehl, tapioka, maniok, reisnudel, glasnudel, " +
-                "reispapier, reiswaffel, maiswaffel, kastanienmehl",
+                "reispapier, reiswaffel, maiswaffel, kastanienmehl, *gewürz, *gewürzmischung",
         )
 
         /** Die Kalbsnuss ist ein Stueck Fleisch, die Butternuss ein Kuerbis. */

@@ -315,6 +315,10 @@ class RealWorldClassificationTest {
         assertTrue(Dislike.KRAEFTIGER_KAESE in zutat("Ziegencamembert"))
         assertTrue(Dislike.KRAEFTIGER_KAESE in zutat("Schafkäse"))
         assertTrue(Dislike.KRAEFTIGER_KAESE in zutat("Blauschimmelkäse"))
+        // "Tartiflette mit Schimmelkäse": Ohne Farbe ist fast immer der blaue gemeint.
+        assertTrue(Dislike.KRAEFTIGER_KAESE in zutat("Schimmelkäse"))
+        assertTrue(Dislike.KRAEFTIGER_KAESE in zutat("Edelschimmelkäse"))
+        assertFalse(Dislike.KRAEFTIGER_KAESE in zutat("Weissschimmelkäse"))
         assertFalse(Dislike.KRAEFTIGER_KAESE in zutat("Gruyère"))
     }
 
@@ -372,6 +376,10 @@ class RealWorldClassificationTest {
         assertFalse(Intolerance.GLUTEN in traits("Stock", "mehligkochende Kartoffeln", "Salz").allergens)
         assertFalse(Intolerance.GLUTEN in traits("Brei", "Polentamehl").allergens)
         assertTrue(Intolerance.GLUTEN in traits("Znüni", "Baguette").allergens)
+        // Ein Gewuerz, das nach einem Gebaeck heisst, ist kein Gebaeck.
+        assertFalse(Intolerance.GLUTEN in traits("Gugelhupf", "Kürbis", "Spekulatiusgewürz").allergens)
+        assertFalse(Intolerance.GLUTEN in traits("Braten", "Brotgewürz", "Lebkuchengewürz").allergens)
+        assertTrue(Intolerance.GLUTEN in traits("Dessert", "Spekulatius").allergens)
         assertFalse(Intolerance.NUESSE in traits("Braten", "Kalbsnuss").allergens)
         assertFalse(Intolerance.NUESSE in traits("Suppe", "Butternusskürbis").allergens)
         assertTrue(Intolerance.NUESSE in traits("Kuchen", "Baumnüsse").allergens)
