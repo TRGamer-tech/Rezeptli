@@ -9,6 +9,7 @@ import ch.rezeptli.app.data.web.WebFetchException
 import ch.rezeptli.app.data.web.WebRecipeSearcher
 import ch.rezeptli.app.di.IoDispatcher
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.domain.deck.RecipeTitles
 import ch.rezeptli.app.domain.model.WebSearchResult
 import ch.rezeptli.app.domain.repository.DeckPool
 import ch.rezeptli.app.domain.repository.WebImportError
@@ -114,7 +115,7 @@ class WebRecipeRepositoryImpl @Inject constructor(
                     eintraege.map { eintrag ->
                         DeckEntry(
                             url = eintrag.url,
-                            title = eintrag.title,
+                            title = RecipeTitles.clean(eintrag.title, eintrag.url, namen.getValue(quelle)),
                             imageUrl = eintrag.imageUrl,
                             sourceId = quelle,
                             sourceName = namen.getValue(quelle),
@@ -139,7 +140,7 @@ class WebRecipeRepositoryImpl @Inject constructor(
                 val umgewandelt = gefunden.map { eintrag ->
                     DeckEntry(
                         url = eintrag.url,
-                        title = eintrag.title,
+                        title = RecipeTitles.clean(eintrag.title, eintrag.url, source.name),
                         imageUrl = eintrag.imageUrl,
                         sourceId = source.id,
                         sourceName = source.name,

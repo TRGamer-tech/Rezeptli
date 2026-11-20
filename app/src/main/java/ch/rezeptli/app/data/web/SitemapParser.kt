@@ -1,5 +1,6 @@
 package ch.rezeptli.app.data.web
 
+import ch.rezeptli.app.domain.deck.RecipeTitles
 import javax.inject.Inject
 
 /** Ein Eintrag aus dem Verzeichnis einer Quelle. */
@@ -72,35 +73,11 @@ class SitemapParser @Inject constructor() {
         return treffer.groupValues[1].trim().takeIf { it.isNotEmpty() }
     }
 
-    fun titleFromUrl(url: String): String {
-        val slug = url
-            .trimEnd('/')
-            .substringAfterLast('/')
-            .substringBefore('?')
-            .replace(PAGE_SUFFIX, "")
-            .replace(TRAILING_ID, "")
-            .replace(TRAILING_NOISE, "")
-
-        return slug
-            .split('-', '_')
-            .filter { it.isNotBlank() && !it.all { char -> char.isDigit() } }
-            .joinToString(" ") { part ->
-                part.replaceFirstChar { char -> char.uppercase() }
-            }.ifBlank { url }
-    }
+    fun titleFromUrl(url: String): String = RecipeTitles.fromUrl(url) ?: url
 
     private companion object {
         val LOC = Regex("<loc>\\s*([^<\\s]+)\\s*</loc>", RegexOption.IGNORE_CASE)
         val URL_BLOCK = Regex("<url>(.*?)</url>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         val IMAGE_LOC = Regex("<image:loc>\\s*([^<\\s]+)\\s*</image:loc>", RegexOption.IGNORE_CASE)
-
-        /** Cookaround endet auf .html, CuisineAZ auf .aspx. */
-        val PAGE_SUFFIX = Regex("\\.(html?|aspx)$", RegexOption.IGNORE_CASE)
-
-        /** Gutekueche haengt "-rezept-6" an, Betty Bossi eine lange Nummer. */
-        val TRAILING_ID = Regex("-\\d+$")
-
-        /** Ptitchef schreibt "-fid" vor die Nummer. */
-        val TRAILING_NOISE = Regex("-(rezept|recipe|recette|ricetta|fid)$", RegexOption.IGNORE_CASE)
     }
 }

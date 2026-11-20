@@ -11,15 +11,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +31,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
@@ -40,12 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ch.rezeptli.app.R
+import ch.rezeptli.app.domain.model.BringLink
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.steps.RecipeStep
 import ch.rezeptli.app.presentation.common.ObserveAsEvents
@@ -181,6 +187,7 @@ fun RecipeDetailScreen(
 
             else -> RecipeDetailContent(
                 recipe = recipe,
+                persons = uiState.persons,
                 contentPadding = innerPadding,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -210,6 +217,7 @@ fun RecipeDetailScreen(
 @Composable
 private fun RecipeDetailContent(
     recipe: Recipe,
+    persons: Int,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -242,11 +250,47 @@ private fun RecipeDetailContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (recipe.tags.isNotEmpty()) {
+                val uriHandler = LocalUriHandler.current
+                val quelle = recipe.sourceUrl
+                val quellenName = recipe.sourceName ?: quelle?.substringAfter("//")?.substringBefore('/')
+                // Fehlt die Quelle unter den Etiketten, kommt sie dazu - sonst gaebe es keinen Weg zum Original.
+                val etiketten = if (quelle != null && quellenName != null && quellenName !in recipe.tags) {
+                    recipe.tags + quellenName
+                } else {
+                    recipe.tags
+                }
+                if (etiketten.isNotEmpty()) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        recipe.tags.forEach { tag ->
-                            AssistChip(onClick = {}, label = { Text(tag) })
+                        etiketten.forEach { tag ->
+                            // Das Etikett der Quelle fuehrt zum Originalrezept.
+                            val istQuelle = quelle != null && tag == quellenName
+                            AssistChip(
+                                onClick = { if (istQuelle && quelle != null) uriHandler.openUri(quelle) },
+                                label = { Text(tag) },
+                                trailingIcon = if (istQuelle) {
+                                    {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.OpenInNew,
+                                            contentDescription = stringResource(R.string.rezept_quelle_oeffnen),
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                            )
                         }
+                    }
+                }
+                // Bring liest die Zutaten selbst von der Quelle und rechnet sie auf die
+                // eigene Personenzahl um. Geht nur fuer Rezepte mit Quelladresse.
+                BringLink.forRecipe(quelle, recipe.servings, persons)?.let { link ->
+                    OutlinedButton(
+                        onClick = { uriHandler.openUri(link) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Icon(Icons.Filled.ShoppingCart, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("  " + stringResource(R.string.rezept_in_bring))
                     }
                 }
             }

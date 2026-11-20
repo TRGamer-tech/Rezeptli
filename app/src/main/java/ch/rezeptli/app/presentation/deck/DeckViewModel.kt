@@ -7,6 +7,10 @@ import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.model.RecipeSummary
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
+import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
+import ch.rezeptli.app.domain.plan.DietaryFilter
+import ch.rezeptli.app.domain.profile.LanguageRegion
+import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.repository.WebRecipeRepository
 import ch.rezeptli.app.domain.usecase.BuildSwipeDeckUseCase
 import ch.rezeptli.app.domain.usecase.LoadWebRecipeUseCase
@@ -16,8 +20,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 
 /** Wo in einer Wischrunde man gerade steht. */
@@ -43,6 +50,10 @@ data class DeckUiState(
     val isSaving: Boolean = false,
     val savedCount: Int = 0,
     val loadFailed: Boolean = false,
+    /** Ernaehrung und Allergien aus den Vorlieben - ist er aktiv, wird jede Karte vorher geprueft. */
+    val filter: DietaryFilter = DietaryFilter(),
+    /** Karten, die die Pruefung bestanden haben. Nur bei aktivem Filter von Bedeutung. */
+    val approved: Set<String> = emptySet(),
 ) {
     /**
      * Die noch offenen Karten, in der Form, die der bestehende Stapel erwartet.
@@ -54,7 +65,7 @@ data class DeckUiState(
      */
     val remainingCards: List<RecipeSummary>
         get() = cards
-            .filter { it.imageUrl != null }
+            .filter { it.imageUrl != null && (!filter.isActive || it.url in approved) }
             .map { eintrag ->
                 RecipeSummary(
                     id = eintrag.url.hashCode().toLong(),
@@ -97,6 +108,8 @@ class DeckViewModel @Inject constructor(
     private val webRepository: WebRecipeRepository,
     private val loadWebRecipe: LoadWebRecipeUseCase,
     private val saveRecipe: SaveRecipeUseCase,
+    private val profileRepository: UserProfileRepository,
+    private val checkCard: CheckRecipeCardUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DeckUiState())
     val uiState: StateFlow<DeckUiState> = _uiState.asStateFlow()
@@ -106,6 +119,12 @@ class DeckViewModel @Inject constructor(
 
     /** Adressen, fuer die ein Bild schon versucht wurde - erfolgreich oder nicht. */
     private val bildVersucht = mutableSetOf<String>()
+
+    /** Adressen, deren Pruefung schon laeuft oder lief. */
+    private val pruefungVersucht = mutableSetOf<String>()
+
+    /** Nicht zu viele Rezeptseiten auf einmal - die Quellen sollen nicht ueberrannt werden. */
+    private val pruefSchranke = Semaphore(PARALLEL_CHECKS)
 
     /** `null` waehlt die endlose Runde ohne Ziel. */
     fun onTargetChange(value: Int?) {
@@ -117,10 +136,16 @@ class DeckViewModel @Inject constructor(
         _uiState.update { it.copy(step = DeckStep.LADEN, liked = emptyList(), loadFailed = false) }
 
         viewModelScope.launch {
+            // Ernaehrung und Allergien aus den Vorlieben gelten auch beim Entdecken. Geprueft
+            // werden kann nur, was deutsch ist - fremdsprachige Quellen bleiben dann draussen.
+            val filter = DietaryFilter.of(profileRepository.profile.first())
+            _uiState.update { it.copy(filter = filter, approved = emptySet()) }
+            region = if (filter.isActive) LanguageRegion.DEUTSCH else null
+
             // Etwas mehr Karten als Ziele: Es wird ja auch abgelehnt. Ohne Ziel gibt es
             // keine Zahl, von der sich das ableiten liesse - dann ein fester Vorrat.
             val groesse = target?.let { CuratedDeckBuilder.deckSizeFor(it) } ?: ENDLESS_INITIAL_SIZE
-            val deck = buildDeck(size = groesse, exclude = gesehen)
+            val deck = buildDeck(size = groesse, exclude = gesehen, onlyRegion = region)
             gesehen += deck.map { it.url }
 
             _uiState.update {
@@ -130,9 +155,12 @@ class DeckViewModel @Inject constructor(
                     loadFailed = deck.isEmpty(),
                 )
             }
-            bilderNachladen()
+            nachladenOderPruefen()
         }
     }
+
+    /** Sprachraum, auf den der Stapel beschraenkt ist - nur bei aktivem Filter gesetzt. */
+    private var region: LanguageRegion? = null
 
     fun onSwiped(entry: DeckEntry, liked: Boolean) {
         val state = _uiState.value
@@ -152,7 +180,7 @@ class DeckViewModel @Inject constructor(
         }
 
         if (!fertig) {
-            bilderNachladen()
+            nachladenOderPruefen()
             refillWennNoetig()
         }
     }
@@ -263,18 +291,70 @@ class DeckViewModel @Inject constructor(
      */
     private fun refillWennNoetig() {
         if (nachschubLaeuft) return
-        val sichtbar = _uiState.value.cards.count { it.imageUrl != null }
+        // Bei aktivem Filter zaehlen auch Karten, die noch geprueft werden: Sie kommen
+        // wahrscheinlich bald dazu. Sonst wuerde waehrend jeder Pruefung nachgelegt.
+        val state = _uiState.value
+        val sichtbar = if (state.filter.isActive) {
+            state.cards.size
+        } else {
+            state.cards.count { it.imageUrl != null }
+        }
         if (sichtbar > REFILL_THRESHOLD) return
 
         nachschubLaeuft = true
         viewModelScope.launch {
-            val nachschub = buildDeck(size = REFILL_SIZE, exclude = gesehen)
+            val nachschub = buildDeck(size = REFILL_SIZE, exclude = gesehen, onlyRegion = region)
             gesehen += nachschub.map { it.url }
             if (nachschub.isNotEmpty()) {
                 _uiState.update { it.copy(cards = it.cards + nachschub) }
             }
             nachschubLaeuft = false
-            bilderNachladen()
+            nachladenOderPruefen()
+        }
+    }
+
+    private fun nachladenOderPruefen() {
+        if (_uiState.value.filter.isActive) kartenPruefen() else bilderNachladen()
+    }
+
+    /**
+     * Prueft die naechsten Karten gegen Ernaehrung und Allergien, bevor sie erscheinen.
+     *
+     * Die Pruefung laedt die Rezeptseite und bringt damit auch gleich das Bild mit. Eine
+     * Karte, die nicht passt oder sich nicht pruefen laesst, faellt aus dem Stapel.
+     */
+    private fun kartenPruefen() {
+        val state = _uiState.value
+        val offen = state.cards
+            .filterNot { it.url in state.approved || it.url in pruefungVersucht }
+            .take(PRUEF_VORAUS)
+        if (offen.isEmpty()) return
+        pruefungVersucht += offen.map { it.url }
+
+        offen.forEach { eintrag ->
+            viewModelScope.launch {
+                val ergebnis = pruefSchranke.withPermit { checkCard(eintrag.url, state.filter) }
+                _uiState.update { aktuell ->
+                    if (ergebnis.allowed && (eintrag.imageUrl != null || ergebnis.imageUrl != null)) {
+                        aktuell.copy(
+                            approved = aktuell.approved + eintrag.url,
+                            cards = aktuell.cards.map { karte ->
+                                if (karte.url == eintrag.url && karte.imageUrl == null) {
+                                    karte.copy(imageUrl = ergebnis.imageUrl)
+                                } else {
+                                    karte
+                                }
+                            },
+                        )
+                    } else {
+                        aktuell.copy(cards = aktuell.cards.filterNot { it.url == eintrag.url })
+                    }
+                }
+                if (!ergebnis.allowed) {
+                    refillWennNoetig()
+                    kartenPruefen()
+                }
+            }
         }
     }
 
@@ -287,5 +367,11 @@ class DeckViewModel @Inject constructor(
 
         /** Fuer so viele Karten im Voraus wird ein fehlendes Bild geholt. */
         const val VORAUSLADEN = 5
+
+        /** So viele Karten werden im Voraus gegen Ernaehrung und Allergien geprueft. */
+        const val PRUEF_VORAUS = 6
+
+        /** So viele Rezeptseiten werden gleichzeitig geladen. */
+        const val PARALLEL_CHECKS = 3
     }
 }

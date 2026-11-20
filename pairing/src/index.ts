@@ -112,6 +112,8 @@ async function sitzungAnlegen(request: Request, env: Env): Promise<Response> {
         env.DB.prepare(
             "INSERT INTO teilnehmer (code, teilnehmer_id, beigetreten_am) VALUES (?1, ?2, ?3)",
         ).bind(code, gastgeberId, zeitpunkt),
+        // Gerade Plaetze fuer den Gastgeber, ungerade fuer die beitretende Person: So
+        // ergibt die Sortierung nach Platz einen abwechselnd gemischten Stapel.
         ...gepruefte.map((rezept, index) =>
             env.DB.prepare(
                 "INSERT INTO rezepte (code, rezept_id, position, titel, quelle_url, bild_url, " +
@@ -119,7 +121,7 @@ async function sitzungAnlegen(request: Request, env: Env): Promise<Response> {
             ).bind(
                 code,
                 rezept.rezeptId,
-                index,
+                index * 2,
                 rezept.titel,
                 rezept.quelleUrl,
                 rezept.bildUrl,
@@ -189,56 +191,53 @@ async function beitreten(code: string, request: Request, env: Env): Promise<Resp
         .bind(code, kennung)
         .first();
 
-    // Ein erneuter Beitritt derselben Person ist kein Fehler - das Netz bricht
-    // schon mal ab, und dann versucht es die App noch einmal.
+    // Ein erneuter Beitritt derselben Person ist kein Fehler - das Netz bricht schon
+    // mal ab, oder die App wurde geschlossen und die Runde fortgesetzt. Mitgebrachte
+    // Rezepte zaehlen dann aber nicht: Der Stapel ist seit dem ersten Beitritt
+    // eingefroren, sonst saehen beide nicht mehr dieselben Karten in derselben Reihenfolge.
     if (istBekannt === null) {
         if ((bisher?.anzahl ?? 0) >= Math.min(sitzung.max_teilnehmer, MAX_TEILNEHMER)) {
             return fehler("sitzung ist voll", 409);
         }
-        await env.DB.prepare(
-            "INSERT INTO teilnehmer (code, teilnehmer_id, beigetreten_am) VALUES (?1, ?2, ?3)",
-        )
-            .bind(code, kennung, jetzt())
-            .run();
-    }
 
-    const gepruefte = rezeptEingabenLesen(mitgebracht);
-    if (gepruefte.length > 0) {
-        const vorhandenePosition = await env.DB.prepare(
-            "SELECT COALESCE(MAX(position), -1) AS maxPosition FROM rezepte WHERE code = ?1",
+        const vorhanden = await env.DB.prepare(
+            "SELECT COUNT(*) AS anzahl FROM rezepte WHERE code = ?1",
         )
             .bind(code)
-            .first<{ maxPosition: number }>();
+            .first<{ anzahl: number }>();
 
         // Nur so viel dazu, wie insgesamt noch unter das Limit passt - lieber eine
         // gekuerzte Mischung als ein abgelehnter Beitritt.
-        const platz = MAX_REZEPTE - ((vorhandenePosition?.maxPosition ?? -1) + 1);
-        const passt = gepruefte.slice(0, Math.max(0, platz));
+        const platz = MAX_REZEPTE - (vorhanden?.anzahl ?? 0);
+        const passt = rezeptEingabenLesen(mitgebracht).slice(0, Math.max(0, platz));
 
-        if (passt.length > 0) {
-            const start = (vorhandenePosition?.maxPosition ?? -1) + 1;
-            await env.DB.batch(
-                passt.map((rezept, index) =>
-                    env.DB.prepare(
-                        "INSERT OR IGNORE INTO rezepte (code, rezept_id, position, titel, quelle_url, " +
-                            "bild_url, zubereitungszeit) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                    ).bind(
-                        code,
-                        rezept.rezeptId,
-                        start + index,
-                        rezept.titel,
-                        rezept.quelleUrl,
-                        rezept.bildUrl,
-                        rezept.zubereitungszeit,
-                    ),
+        // Teilnehmer und Rezepte in einem Rutsch: Wer gerade auf die zweite Person
+        // wartet, darf sie nie schon "da" sehen, ohne dass ihre Rezepte im Stapel sind -
+        // sonst finge die eine Seite mit einem unvollstaendigen Stapel an.
+        await env.DB.batch([
+            env.DB.prepare(
+                "INSERT INTO teilnehmer (code, teilnehmer_id, beigetreten_am) VALUES (?1, ?2, ?3)",
+            ).bind(code, kennung, jetzt()),
+            ...passt.map((rezept, index) =>
+                env.DB.prepare(
+                    "INSERT OR IGNORE INTO rezepte (code, rezept_id, position, titel, quelle_url, " +
+                        "bild_url, zubereitungszeit) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                ).bind(
+                    code,
+                    rezept.rezeptId,
+                    index * 2 + 1,
+                    rezept.titel,
+                    rezept.quelleUrl,
+                    rezept.bildUrl,
+                    rezept.zubereitungszeit,
                 ),
-            );
-        }
+            ),
+        ]);
     }
 
     const rezepte = await env.DB.prepare(
         "SELECT rezept_id, titel, quelle_url, bild_url, zubereitungszeit FROM rezepte " +
-            "WHERE code = ?1 ORDER BY position",
+            "WHERE code = ?1 ORDER BY position, rezept_id",
     )
         .bind(code)
         .all<{
@@ -365,7 +364,7 @@ async function stand(code: string, env: Env): Promise<Response> {
 
     const rezepte = await env.DB.prepare(
         "SELECT rezept_id, titel, quelle_url, bild_url, zubereitungszeit FROM rezepte " +
-            "WHERE code = ?1 ORDER BY position",
+            "WHERE code = ?1 ORDER BY position, rezept_id",
     )
         .bind(code)
         .all<{

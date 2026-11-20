@@ -108,4 +108,27 @@
     <string name="tab_plan">Plan</string>
     <string name="tab_vorlieben">Vorlieben</string>
     <string name="tab_einstellungen">Einstellungen</string>
+
+    <!-- Wischen: nicht versehentlich hinaus -->
+    <string name="stapel_verlassen_titel">Runde abbrechen?</string>
+    <string name="stapel_verlassen_text">Die Karten, die dir gefallen haben, gehen verloren, wenn du jetzt gehst.</string>
+    <string name="stapel_verlassen">Abbrechen</string>
+    <string name="stapel_weiterwischen">Weiterwischen</string>
+
+    <!-- Zu zweit: Filter, Fortsetzen, Verlassen -->
+    <string name="zuzweit_filter_titel">Was darf nicht auf den Tisch?</string>
+    <string name="zuzweit_filter_text">Gilt für diese Runde. Vorbelegt aus deinen Vorlieben – ergänze, was die andere Person nicht isst.</string>
+    <string name="zuzweit_filter_hinweis">Jede Karte wird vorher anhand ihrer Zutaten geprüft. Das dauert einen Moment, und es kommen nur deutschsprachige Rezepte. Rezeptli kann Spuren und Fertigprodukte nicht prüfen – verlass dich bei Allergien auf die Zutatenliste.</string>
+    <string name="zuzweit_fortsetzen_titel">Runde %1$s unterbrochen</string>
+    <string name="zuzweit_fortsetzen_text">Mach dort weiter, wo du aufgehört hast – mit denselben Karten in derselben Reihenfolge.</string>
+    <string name="zuzweit_fortsetzen">Runde fortsetzen</string>
+    <string name="zuzweit_verlassen_titel">Runde verlassen?</string>
+    <string name="zuzweit_verlassen_text">Du kannst die Runde %1$s später fortsetzen. Beenden schliesst sie für beide.</string>
+    <string name="zuzweit_weiterwischen">Weiterwischen</string>
+    <string name="zuzweit_unterbrechen">Unterbrechen</string>
+    <string name="zuzweit_beenden">Beenden</string>
+
+    <!-- Rezept -->
+    <string name="rezept_quelle_oeffnen">Originalrezept öffnen</string>
+    <string name="rezept_in_bring">In Bring! öffnen</string>
 </resources>

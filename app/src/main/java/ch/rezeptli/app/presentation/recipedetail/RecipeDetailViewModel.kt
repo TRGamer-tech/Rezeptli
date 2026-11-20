@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ch.rezeptli.app.domain.model.Recipe
+import ch.rezeptli.app.domain.repository.UserProfileRepository
 import ch.rezeptli.app.domain.usecase.DeleteRecipeUseCase
 import ch.rezeptli.app.domain.usecase.MarkRecipeCookedUseCase
 import ch.rezeptli.app.domain.usecase.ObserveRecipeUseCase
@@ -24,6 +25,8 @@ data class RecipeDetailUiState(
     val isLoading: Boolean = true,
     val recipe: Recipe? = null,
     val isDeleteDialogVisible: Boolean = false,
+    /** Fuer so viele wird gekocht - Bring rechnet die Zutaten darauf um. */
+    val persons: Int = 2,
 )
 
 /** Einmalige Ereignisse, die die UI ausloest - Navigation und kurze Rueckmeldungen. */
@@ -39,6 +42,7 @@ class RecipeDetailViewModel @Inject constructor(
     observeRecipe: ObserveRecipeUseCase,
     private val deleteRecipe: DeleteRecipeUseCase,
     private val markRecipeCooked: MarkRecipeCookedUseCase,
+    profileRepository: UserProfileRepository,
 ) : ViewModel() {
     private val recipeId: Long = savedStateHandle.get<Long>(Destinations.ARG_RECIPE_ID) ?: 0L
 
@@ -51,6 +55,9 @@ class RecipeDetailViewModel @Inject constructor(
     init {
         observeRecipe(recipeId)
             .onEach { recipe -> _uiState.update { it.copy(recipe = recipe, isLoading = false) } }
+            .launchIn(viewModelScope)
+        profileRepository.profile
+            .onEach { profile -> _uiState.update { it.copy(persons = profile.persons) } }
             .launchIn(viewModelScope)
     }
 

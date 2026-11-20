@@ -2,12 +2,15 @@ package ch.rezeptli.app.presentation.multiplayer
 
 import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
+import ch.rezeptli.app.domain.multiplayer.ActiveRound
 import ch.rezeptli.app.domain.multiplayer.PairingError
 import ch.rezeptli.app.domain.multiplayer.SharedRecipe
 import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.multiplayer.SharedSessionState
+import ch.rezeptli.app.domain.multiplayer.SharedVote
 import ch.rezeptli.app.domain.parser.IngredientTextParser
 import ch.rezeptli.app.domain.plan.AddToPlanUseCase
+import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.PlanGenerator
 import ch.rezeptli.app.domain.plan.PlanPersister
 import ch.rezeptli.app.domain.plan.RecipeClassifier
@@ -27,6 +30,7 @@ import ch.rezeptli.app.domain.usecase.ObserveSharedSessionUseCase
 import ch.rezeptli.app.domain.usecase.SaveRecipeUseCase
 import ch.rezeptli.app.domain.usecase.SendSharedVotesUseCase
 import ch.rezeptli.app.domain.usecase.StartSharedSessionUseCase
+import ch.rezeptli.app.fake.FakeActiveRoundRepository
 import ch.rezeptli.app.fake.FakePairingRepository
 import ch.rezeptli.app.fake.FakePlanRepository
 import ch.rezeptli.app.fake.FakeRecipeRepository
@@ -38,6 +42,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -116,6 +121,7 @@ class MultiplayerViewModelTest {
     private val selectionHolder = SharedSelectionHolder()
     private val shoppingRepository = FakeShoppingListRepository()
     private val planRepository = FakePlanRepository()
+    private val activeRounds = FakeActiveRoundRepository()
     private val planRecipes = FakeRecipeRepository()
 
     /**
@@ -162,6 +168,9 @@ class MultiplayerViewModelTest {
         sendVotes = SendSharedVotesUseCase(pairing),
         closeSession = CloseSharedSessionUseCase(pairing),
         observeSession = ObserveSharedSessionUseCase(pairing),
+        activeRounds = activeRounds,
+        profileRepository = FakeUserProfileRepository(),
+        checkCard = CheckRecipeCardUseCase(FakeWebRecipeRepository(), IngredientTextParser(), RecipeClassifier()),
     )
 
     @Test
@@ -343,15 +352,70 @@ class MultiplayerViewModelTest {
     }
 
     @Test
-    fun `verlassen schliesst die Runde des Gastgebers beim Dienst`() = runTest {
+    fun `beenden schliesst die Runde des Gastgebers beim Dienst`() = runTest {
         mitViewModel { viewModel ->
             viewModel.onHost()
 
-            viewModel.onLeave()
+            viewModel.onEndRound()
+            advanceUntilIdle()
 
             assertEquals(FakePairingRepository.CODE, pairing.closedCode)
             assertEquals(MultiplayerStep.ANZAHL, viewModel.uiState.value.step)
             assertEquals("", viewModel.uiState.value.code)
+            assertNull(activeRounds.round, "Eine beendete Runde laesst sich nicht fortsetzen")
+        }
+    }
+
+    @Test
+    fun `verlassen unterbricht nur - die Runde bleibt beim Dienst und laesst sich fortsetzen`() = runTest {
+        mitViewModel(createViewModel(webRepository = FakeWebRecipeRepository())) { viewModel ->
+            viewModel.onCodeInputChange(FakePairingRepository.CODE)
+            viewModel.onJoin()
+            viewModel.onSwiped(1L, liked = true)
+            // runCurrent statt advanceUntilIdle: Die Runde fragt den Dienst laufend ab,
+            // und advanceUntilIdle wuerde die virtuelle Uhr dabei endlos weiterdrehen.
+            runCurrent()
+
+            viewModel.onLeave()
+            runCurrent()
+
+            assertNull(pairing.closedCode)
+            assertEquals(FakePairingRepository.CODE, viewModel.uiState.value.resumableCode)
+            assertEquals(listOf(1L), activeRounds.round?.votes?.map { it.recipeId })
+        }
+    }
+
+    @Test
+    fun `fortsetzen holt denselben Stapel und macht bei der naechsten Karte weiter`() = runTest {
+        activeRounds.round = ActiveRound(
+            code = FakePairingRepository.CODE,
+            isHost = false,
+            votes = listOf(SharedVote(recipeId = 1L, liked = true)),
+            expiresAt = FakePairingRepository.EXPIRY,
+        )
+        mitViewModel(createViewModel(webRepository = FakeWebRecipeRepository())) { viewModel ->
+            runCurrent()
+            assertEquals(FakePairingRepository.CODE, viewModel.uiState.value.resumableCode)
+
+            viewModel.onResume()
+            // Nach dem Fortsetzen laeuft die Abfrage des Dienstes - siehe oben.
+            runCurrent()
+
+            val state = viewModel.uiState.value
+            assertEquals(MultiplayerStep.WISCHEN, state.step)
+            assertEquals(1, state.decidedCount)
+            assertTrue(pairing.joinedRecipes.isEmpty(), "Beim Fortsetzen wird nichts dazugemischt")
+            assertEquals(2L, state.remainingCards.first().id)
+        }
+    }
+
+    @Test
+    fun `der Gastgeber kann nicht vor der zweiten Person loswischen`() = runTest {
+        mitViewModel { viewModel ->
+            viewModel.onHost()
+            advanceTimeBy(FIVE_SECONDS)
+
+            assertEquals(MultiplayerStep.WARTET_AUF_PERSON, viewModel.uiState.value.step)
         }
     }
 

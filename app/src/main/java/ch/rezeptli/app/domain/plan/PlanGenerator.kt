@@ -2,7 +2,6 @@ package ch.rezeptli.app.domain.plan
 
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.ShoppingItem
-import ch.rezeptli.app.domain.profile.Diet
 import ch.rezeptli.app.domain.profile.Mood
 import ch.rezeptli.app.domain.profile.UserProfile
 import ch.rezeptli.app.domain.profile.Weekday
@@ -129,20 +128,11 @@ class PlanGenerator @Inject constructor(
         val recipe = candidate.recipe
         if (recipe.ingredients.size < MIN_INGREDIENTS) return false
         if (recipe.instructions.isBlank() && recipe.steps.isEmpty()) return false
-        if (profile.diets.any { !satisfies(traits, it) }) return false
-        if (profile.intolerances.any { it in traits.allergens }) return false
+        if (!DietaryFilter.of(profile).allows(traits)) return false
         if (profile.appliances.isNotEmpty()) {
             if (!profile.appliances.containsAll(traits.requiredAppliances)) return false
         }
         return true
-    }
-
-    private fun satisfies(traits: RecipeTraits, diet: Diet): Boolean = when (diet) {
-        Diet.VEGAN -> traits.diet == DietClass.VEGAN
-        Diet.VEGETARISCH ->
-            traits.diet == DietClass.VEGAN || traits.diet == DietClass.VEGETARISCH
-        Diet.PESCETARISCH -> traits.diet != DietClass.FLEISCH
-        Diet.KOHLENHYDRATARM -> traits.lowCarb
     }
 
     private fun score(candidate: PlanCandidate, profile: UserProfile): Double {
