@@ -6,6 +6,7 @@ import ch.rezeptli.app.domain.profile.Appliance
 import ch.rezeptli.app.domain.profile.Dislike
 import ch.rezeptli.app.domain.profile.Intolerance
 import ch.rezeptli.app.domain.profile.Mood
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
@@ -34,14 +35,30 @@ class RecipeClassifier @Inject constructor() {
         val all = ingredientWords + titleWords
         val everything = all + notes.flatMap { it.words }
         val tagWords = recipe.tags.flatMap(::words).toSet()
-        val text = IngredientNameNormalizer.normalize(
-            recipe.title + " " + recipe.tags.joinToString(" ") + " " + recipe.instructions,
-        )
+        // Die Zubereitung wird nur einmal geglaettet - sie ist der laengste Text am Rezept.
+        val steps = IngredientNameNormalizer.normalize(recipe.instructions)
+        val text = IngredientNameNormalizer.normalize(recipe.title + " " + recipe.tags.joinToString(" ")) + " " + steps
 
-        val animals = animalsIn(content)
+        // Was die Zubereitung nennt, zaehlt mit - siehe [mentionsIn]. Bei einem Rezept, das sich
+        // als vegetarisch ausweist oder auf Fleischersatz baut, meint "die Wuerstchen anbraten"
+        // den Ersatz: Dort zaehlen aus der Zubereitung nur die Pflanzen.
+        val labels = titleWords.toSet() + tagWords
+        val mentions = mentionsIn(steps)
+        val meatless = labels.any(MEATLESS_LABELS::matches) ||
+            content.has(SUBSTITUTES) ||
+            content.plantBased.any(::namesMeat)
+        val animalMentions = if (meatless) emptySet() else mentions
+
+        val listed = animalsIn(content)
+        val animals = listed + mentionedAnimals(animalMentions, known = listed)
         val hasMeat = animals.isNotEmpty() || content.real.any { OTHER_MEAT.isIn(it) }
-        val hasSeafood = content.real.any { SEAFOOD.isIn(it) }
-        val hasFish = hasSeafood || content.real.any { FISH.isIn(it) }
+        val hasSeafood = content.real.any { SEAFOOD.isIn(it) } || Mention.SEAFOOD in animalMentions
+        val hasFishItself = content.real.any { FISH.isIn(it) } || Mention.FISH in animalMentions
+        val hasFish = hasSeafood || hasFishItself
+        val fromTheSea = setOfNotNull(
+            Dislike.FISCH.takeIf { hasFishItself },
+            Dislike.MEERESFRUECHTE.takeIf { hasSeafood },
+        )
         val hasDairy = content.real.any { DAIRY.isIn(it) }
         val hasEgg = everything.any(::isEgg)
         val hasHoney = content.has(HONEY)
@@ -59,7 +76,7 @@ class RecipeClassifier @Inject constructor() {
             if (content.has(NUTS)) add(Intolerance.NUESSE)
             if (hasEgg) add(Intolerance.EIER)
             if (content.has(SOY)) add(Intolerance.SOJA)
-            if (content.has(SEAFOOD)) add(Intolerance.MEERESFRUECHTE)
+            if (content.has(SEAFOOD) || Mention.SEAFOOD in animalMentions) add(Intolerance.MEERESFRUECHTE)
         }
 
         // Suess und herzhaft zaehlen nur an den Zutaten - der Titel entscheidet in CourseRules.
@@ -77,7 +94,7 @@ class RecipeClassifier @Inject constructor() {
             moods = moodsOf(recipe, all, titleWords.toSet(), diet, text),
             requiredAppliances = appliancesOf(text),
             lowCarb = all.none { word -> CARBS.any { word.contains(it) } },
-            dislikes = dislikesOf(content, animals, ingredientWords, titleWords.toSet() + tagWords),
+            dislikes = dislikesOf(content, animals + fromTheSea, ingredientWords, labels, mentions),
             course = CourseRules.of(titleWords, tagWords, sweet, savory),
             cuisines = CuisineRules.of(titleWords, tagWords),
             words = everything,
@@ -148,25 +165,25 @@ class RecipeClassifier @Inject constructor() {
     /**
      * Was das Rezept enthaelt, das jemand nicht moegen koennte.
      *
-     * [labels] sind Titel und Schlagworte: Nur dort steht, ob ein Rezept als vegan oder
-     * scharf ausgeschrieben ist.
+     * [animals] sind die Tiere, Fisch und Meeresfruechte - sie stehen schon fest. [labels] sind
+     * Titel und Schlagworte: Nur dort steht, ob ein Rezept als vegan oder scharf ausgeschrieben
+     * ist. [mentions] ist, was nur die Zubereitung nennt.
      */
     private fun dislikesOf(
         content: Content,
         animals: Set<Dislike>,
         ingredientWords: Set<String>,
         labels: Set<String>,
+        mentions: Set<Mention>,
     ): Set<Dislike> = buildSet {
         addAll(animals)
-        if (content.real.any { SEAFOOD.isIn(it) }) add(Dislike.MEERESFRUECHTE)
-        if (content.real.any { FISH.isIn(it) }) add(Dislike.FISCH)
-        if (hasMushrooms(content)) add(Dislike.PILZE)
-        if (content.has(ONIONS)) add(Dislike.ZWIEBELN)
-        if (content.has(GARLIC)) add(Dislike.KNOBLAUCH)
-        if (content.has(CORIANDER)) add(Dislike.KORIANDER)
-        if (content.has(OLIVES)) add(Dislike.OLIVEN)
-        if (content.has(AUBERGINE)) add(Dislike.AUBERGINE)
-        if (content.has(CABBAGE)) add(Dislike.KOHL)
+        if (hasMushrooms(content, mentions)) add(Dislike.PILZE)
+        if (content.has(ONIONS) || Mention.ONION in mentions) add(Dislike.ZWIEBELN)
+        if (content.has(GARLIC) || Mention.GARLIC in mentions) add(Dislike.KNOBLAUCH)
+        if (content.has(CORIANDER) || Mention.CORIANDER in mentions) add(Dislike.KORIANDER)
+        if (content.has(OLIVES) || Mention.OLIVE in mentions) add(Dislike.OLIVEN)
+        if (content.has(AUBERGINE) || Mention.AUBERGINE in mentions) add(Dislike.AUBERGINE)
+        if (content.has(CABBAGE) || Mention.CABBAGE in mentions) add(Dislike.KOHL)
         // "Scharf" als Wort zaehlt nur am Namen ("Senf scharf") und am Etikett - in einer Notiz
         // heisst es meist "scharf angebraten".
         if (content.has(HOT_FOOD) || (ingredientWords + labels).any(HOT_LABELS::matches)) add(Dislike.SCHARF)
@@ -178,8 +195,71 @@ class RecipeClassifier @Inject constructor() {
     }
 
     /** Trueffel sind Pilze - ausser sie sind aus Schokolade. */
-    private fun hasMushrooms(content: Content): Boolean =
-        content.has(MUSHROOMS) || (content.has(TRUFFLES) && !content.has(CONFECTIONERY))
+    private fun hasMushrooms(content: Content, mentions: Set<Mention>): Boolean =
+        content.has(MUSHROOMS) ||
+            Mention.MUSHROOM in mentions ||
+            ((content.has(TRUFFLES) || Mention.TRUFFLE in mentions) && !content.has(CONFECTIONERY))
+
+    /**
+     * Was die Zubereitung an Zutaten nennt.
+     *
+     * Die Zutatenliste einer Seite ist nicht immer vollstaendig. An den echten Seiten gemessen:
+     * Bei rund jeder fuenfzigsten steht etwas nur in der Zubereitung - "Gebackene Champignons"
+     * mit vier verstuemmelten Zutaten, waehrend der Text Zwiebel und Sardellen nennt, oder
+     * Backerbsen, die "in Schmalz" gebacken werden. Wer keinen Fisch isst, will das nicht sehen.
+     *
+     * Gelesen wird mit Bedacht, denn in einer Zubereitung steht vieles, was nicht im Topf landet:
+     *
+     * - Nur Fleisch, Fisch, Meeresfruechte und die Lebensmittel unter "Mag ich nicht". Nicht
+     *   Gluten, Milch, Eier oder Nuesse - dort stand fast immer ein Serviervorschlag ("dazu
+     *   Baguette") - und nicht "scharf", das im Text "scharf anbraten" heisst.
+     * - Nur einzelne, bestimmte Woerter. Gerichte ("wie ein Schnitzel panieren"), Geraete
+     *   ("Knoblauchpresse") und Vergleiche ("in walnussgrosse Stuecke") zaehlen nicht.
+     */
+    private fun mentionsIn(steps: String): Set<Mention> {
+        if (steps.isBlank()) return emptySet()
+        var bits = 0
+        // [steps] ist schon geglaettet: Kleinbuchstaben, Woerter durch je ein Leerzeichen getrennt.
+        steps.split(' ').forEach { word -> if (word.length >= MIN_WORD) bits = bits or mentionBits(word) }
+        if (bits == 0) return emptySet()
+        return Mention.entries.filterTo(mutableSetOf()) { bits and (1 shl it.ordinal) != 0 }
+    }
+
+    /**
+     * Die Tiere aus der Zubereitung, als Abneigungen. Hackfleisch ohne Tierangabe zaehlt wie in
+     * der Zutatenliste als Rind und Schwein - ausser das Tier steht schon fest ([known]).
+     */
+    private fun mentionedAnimals(mentions: Set<Mention>, known: Set<Dislike>): Set<Dislike> = buildSet {
+        if (Mention.POULTRY in mentions) add(Dislike.POULET)
+        if (Mention.BEEF in mentions) add(Dislike.RIND)
+        if (Mention.PORK in mentions) add(Dislike.SCHWEIN)
+        if (Mention.LAMB in mentions) add(Dislike.LAMM)
+        if (Mention.OFFAL in mentions) add(Dislike.INNEREIEN)
+        if (Mention.MINCED in mentions && isEmpty() && known.none { it in MEAT_ANIMALS }) {
+            add(Dislike.RIND)
+            add(Dislike.SCHWEIN)
+        }
+    }
+
+    /** Was sich aus der Zubereitung herauslesen laesst - jedes haengt an einer der Wortlisten. */
+    private enum class Mention {
+        POULTRY,
+        BEEF,
+        PORK,
+        LAMB,
+        OFFAL,
+        MINCED,
+        FISH,
+        SEAFOOD,
+        MUSHROOM,
+        TRUFFLE,
+        ONION,
+        GARLIC,
+        CORIANDER,
+        OLIVE,
+        AUBERGINE,
+        CABBAGE,
+    }
 
     /** Nennt der Name ein Fleischprodukt? Zusammen mit "vegan" ist es dann ein Fleischersatz. */
     private fun namesMeat(phrase: Phrase): Boolean =
@@ -253,10 +333,79 @@ class RecipeClassifier @Inject constructor() {
     private companion object {
         const val QUICK_MINUTES = 30
 
+        val MEAT_ANIMALS = setOf(Dislike.POULET, Dislike.RIND, Dislike.SCHWEIN, Dislike.LAMM)
+
+        /** Kuerzere Woerter der Zubereitung sagen nichts ("in", "g", "l"). */
+        const val MIN_WORD = 3
+
+        /** So viele Woerter merkt sich [mentionBits] hoechstens. */
+        const val MAX_REMEMBERED_WORDS = 20_000
+
+        /**
+         * Was ein Wort der Zubereitung bedeutet - gemerkt, weil dieselben Woerter in jedem Rezept
+         * wiederkehren. Ohne das kostete eine grosse Sammlung beim Einstufen Sekunden.
+         */
+        private val remembered = ConcurrentHashMap<String, Int>()
+
+        private val mentionSets: List<Pair<Mention, WordSet>> by lazy {
+            listOf(
+                Mention.POULTRY to POULTRY,
+                Mention.BEEF to BEEF,
+                Mention.PORK to PORK,
+                Mention.LAMB to LAMB,
+                Mention.OFFAL to OFFAL,
+                Mention.MINCED to MINCED,
+                Mention.FISH to FISH,
+                Mention.SEAFOOD to SEAFOOD,
+                Mention.MUSHROOM to MUSHROOMS,
+                Mention.TRUFFLE to TRUFFLES,
+                Mention.ONION to ONIONS,
+                Mention.GARLIC to GARLIC,
+                Mention.CORIANDER to CORIANDER,
+                Mention.OLIVE to OLIVES,
+                Mention.AUBERGINE to AUBERGINE,
+                Mention.CABBAGE to CABBAGE,
+            )
+        }
+
+        /** Die Bedeutungen eines Worts der Zubereitung, als Bits nach [Mention]. */
+        fun mentionBits(word: String): Int {
+            remembered[word]?.let { return it }
+            val bits = if (NOT_FOOD_IN_TEXT.matches(word)) {
+                0
+            } else {
+                mentionSets.fold(0) { found, (mention, set) ->
+                    if (set.matches(word)) found or (1 shl mention.ordinal) else found
+                }
+            }
+            if (remembered.size >= MAX_REMEMBERED_WORDS) remembered.clear()
+            remembered[word] = bits
+            return bits
+        }
+
+        /**
+         * Woerter der Zubereitung, in denen ein Lebensmittel steckt und die doch keines sind:
+         * Vergleiche ("walnussgross", "lachsfarben"), Geraete ("Knoblauchpresse", "Fischheber"),
+         * Ersatz und Aroma - und ein paar Tunwoerter und Redensarten ("das Fleisch braet",
+         * "herausfischen", "zergeht auf der Zunge").
+         */
+        val NOT_FOOD_IN_TEXT = WordSet(
+            "*gross, *grosse, *grossen, *grosser, *grosses, *artig, *artige, *artigen, *ähnlich, *ähnliche, " +
+                "*ähnlichen, *farben, *farbene, *farbenen, *farbig, *farbige, *hacker, *presse, *messer, " +
+                "*klopfer, *schere, *heber, *zange, *gabel, *besteck, *brett, *hobel, *ersatz, *alternative, " +
+                "*aroma, *geschmack, =brät, =anbrät, =zunge, speckig*, herausfischen, rausfischen, auffischen, " +
+                "abfischen, herausgefischt",
+        )
+
         // ------------------------------------------------------------------------------
         // Die Wortlisten. Sie sind an echten Rezeptseiten der Quellen gemessen (siehe
         // FilterAuditTest): Was dort als Treffer oder als Fehlalarm auffiel, steht hier.
         // ------------------------------------------------------------------------------
+
+        /** So weist sich ein Rezept in Titel oder Schlagworten als fleischlos aus. */
+        val MEATLESS_LABELS = WordSet(
+            "vegan*, veggie*, =vegi, vegi*, vegetarisch*, vegetarian, pflanzlich*, fleischlos*, plantbased",
+        )
 
         /** Als pflanzlicher Ersatz ausgeschrieben - dann zaehlt das Tier im Namen nicht. */
         val PLANT_MARKER = WordSet(
@@ -269,7 +418,9 @@ class RecipeClassifier @Inject constructor() {
                 "=enten, enten*, knusperente, pekingente, wildente, flugente, mastente, bauernente, barbarie, " +
                 "=gans, gänse*, *gans, wachtel, fasan, stubenküken, mistkratzer, coquelet, poularde, =kapaun, " +
                 "güggeli, =pollo, =broiler, =taube, tauben*, =poussin",
-            except = "wachtelei, gänseblümchen",
+            // Das Ei eines Huhns ist kein Huhn - der Huehnereintopf dagegen schon, darum als ganze Woerter.
+            except = "wachtelei, gänseblümchen, =hühnerei, =hühnereier, =hühnereiern, hühnereiweiss, " +
+                "hühnereigelb, =entenei, =enteneier, =gänseei, =gänseeier, =straussenei, computer",
         )
 
         val BEEF = WordSet(
@@ -277,7 +428,8 @@ class RecipeClassifier @Inject constructor() {
                 "ochsen, =ochse, bündnerfleisch, tafelspitz, =huft, huft*, *huft, rumpsteak, ribeye, =boeuf, " +
                 "bresaola, pastrami, mostbröckli, bindenfleisch, vitello, wagyu, =angus, tbone, sauerbraten, " +
                 "beiried, rostbraten, ossobuco",
-            except = "ochsenherz, tamarind, tomate",
+            // "Ochsenaugen" sind Spiegeleier.
+            except = "ochsenherz, ochsenauge, kochsendung, tamarind, tomate",
         )
 
         /** Gilt nur als Zutat - im Titel ist ein "Tatar" oft aus Gemuese oder Fisch. */
@@ -349,7 +501,9 @@ class RecipeClassifier @Inject constructor() {
                 "steinbutt, =butt, karpfen, =hecht, hecht*, seehecht, tilapia, =wels, welsfilet, =aal, räucheraal, " +
                 "kaviar, =rogen, surimi, sushi, sashimi, bacalhau, bacalao, =salmon, bottarga, sprotte, =renke, " +
                 "renken*, rollmops, =lox, gravlax, =graved, bonito, =dashi",
-            except = "fischerl, tintenfisch, lachsschinken, flachs, auberginenkaviar, veggiekaviar, algenkaviar",
+            // Sushi-Reis ist Reis.
+            except = "fischerl, tintenfisch, lachsschinken, flachs, auberginenkaviar, veggiekaviar, algenkaviar, " +
+                "sushireis, sushiessig, sushimatte, sushiingwer, sushinori, spezifisch, pazifisch",
         )
 
         val SEAFOOD = WordSet(
