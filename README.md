@@ -50,7 +50,9 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
   schon gespeichert ist), wahlweise Essen, Getränke oder beides. Ein Tipp auf die Karte
   zeigt Quelle und Zutaten, die letzte Entscheidung lässt sich zurücknehmen. Die
   Vorlieben gelten sofort – auch für eine Runde, die schon läuft – und ebenso beim
-  Wischen durch die eigene Sammlung.
+  Wischen durch die eigene Sammlung. Geprüft wird an Titel und Zutaten; Fleisch, Fisch und
+  was du nicht magst, auch an der Zubereitung, falls die Zutatenliste einer Seite lückenhaft
+  ist.
 - **Kalorien und Eiweiss** – unter jeder Zutatenliste, im Rezept wie beim Antippen einer
   Wischkarte: pro Portion in kcal und Gramm. Nennt die Rezeptseite die Werte, gelten ihre;
   sonst schätzt die App aus den Zutaten und schreibt „ca.“ und „geschätzt“ dazu.
