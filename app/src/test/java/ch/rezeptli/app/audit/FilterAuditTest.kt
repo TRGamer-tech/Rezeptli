@@ -158,6 +158,7 @@ class FilterAuditTest {
         val pilzTitel = SUSPECTS.getValue(Dislike.PILZE)
         val stats = mutableMapOf<String, IntArray>()
         val unreadable = Collections.synchronizedList(mutableListOf<String>())
+        val markup = Collections.synchronizedList(mutableListOf<String>())
 
         val loaded = coroutineScope {
             entries
@@ -193,6 +194,17 @@ class FilterAuditTest {
                                     else -> {
                                         zahlen[READ] += 1
                                         seiten += page
+                                        // Je Quelle einmal: der Quelltext um die Zutaten und was daraus
+                                        // gelesen wurde. Nur so faellt auf, wenn ein Rezept zwar
+                                        // gelesen wird, aber verstuemmelt.
+                                        // Dazu jede Seite, deren Titel Pilze nennt und deren Zutaten
+                                        // nicht: Dort ist beim Lesen etwas verloren gegangen.
+                                        val verstuemmelt = pilzTitel.containsMatchIn(normalized(page.title)) &&
+                                            page.lines.none { pilzTitel.containsMatchIn(normalized(it)) }
+                                        if (zahlen[READ] == 1 || verstuemmelt) {
+                                            markup += diagnose(entry.url, html) +
+                                                "\n      [gelesen] " + page.lines.joinToString(" | ").take(LINE_LIMIT)
+                                        }
                                     }
                                 }
                             }
@@ -214,6 +226,8 @@ class FilterAuditTest {
             line("Geladen, aber kein Rezept gefunden - was auf der Seite steht:")
             unreadable.sorted().forEach { line("  $it") }
         }
+        line("Wie jede Quelle ihre Zutaten auszeichnet (erste gelesene Seite):")
+        markup.sorted().forEach { line("  $it") }
         Dislike.entries.forEach { dislike ->
             line("  ${dislike.name}: ${loaded.count { dislike in it.traits.dislikes }}")
         }
@@ -277,6 +291,25 @@ class FilterAuditTest {
         allergen.print(TOP_TRIGGERS)
         line("\n-- Verdacht, aber nicht erkannt (wo gefunden)")
         missed.print(TOP_SUSPECTS)
+        // Dieselbe Frage mit den echten Listen statt mit groben Mustern: Was nennt nur die
+        // Zubereitung? Daran haengt, ob es sich lohnt, sie mitzulesen.
+        val textOnly = Tally()
+        val affected = sortedMapOf<String, MutableSet<String>>()
+        loaded.forEach { page ->
+            wordsOf(page.instructions).toSet().forEach { word ->
+                val wort = asIngredient(word)
+                val gruppen = (wort.dislikes - page.traits.dislikes).map { it.name } +
+                    (wort.allergens - page.traits.allergens).map { "UNVERTRAEGLICH ${it.name}" } +
+                    listOfNotNull("ERNAEHRUNG ${wort.diet}".takeIf { wort.diet.ordinal < page.traits.diet.ordinal })
+                gruppen.forEach { gruppe ->
+                    textOnly.add(gruppe, word, page.title)
+                    affected.getOrPut(gruppe) { sortedSetOf() } += page.title
+                }
+            }
+        }
+        line("\n-- Nur in der Zubereitung genannt (mit den Listen der App)")
+        affected.forEach { (gruppe, titel) -> line("  $gruppe: ${titel.size} von ${loaded.size} Seiten") }
+        textOnly.print(TOP_SUSPECTS)
         line("\n-- Im Titel erkannt, in den Zutaten nicht")
         titleOnly.forEach { line("  $it") }
         line("\n-- Zutatenwoerter, die nichts ausloesen (Wort Seiten)")
@@ -310,6 +343,8 @@ class FilterAuditTest {
             traits = classifier.classify(recipe),
         )
     }
+
+    private fun normalized(text: String): String = IngredientNameNormalizer.normalize(text)
 
     /** Was eine Seite enthaelt, aus der sich kein Rezept lesen liess - in einer Zeile. */
     private fun diagnose(url: String, html: String): String {
@@ -401,9 +436,9 @@ class FilterAuditTest {
         /** Fuer so viele unlesbare Seiten je Quelle steht da, was sie enthalten. */
         const val DIAGNOSED = 2
         const val MAX_TYPES = 10
-        const val SNIPPETS = 2
+        const val SNIPPETS = 4
         const val SNIPPET_BEFORE = 220
-        const val SNIPPET_AFTER = 380
+        const val SNIPPET_AFTER = 520
         const val SEED = 20_261_120
         const val SOURCE_BUDGET_MS = 240_000L
         const val PAGE_TIMEOUT_MS = 25_000L
