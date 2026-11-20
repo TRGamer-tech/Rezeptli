@@ -330,7 +330,18 @@ class FilterAuditTest {
             "itemtype Recipe" to Regex("itemtype=\"https?://schema.org/Recipe\"").containsMatchIn(html),
             "Zutaten" to html.contains("Zutaten"),
         ).filter { it.second }.map { it.first }
-        return "$url | ${html.length} Zeichen | Titel: $titel | JSON-LD: $bloecke $arten | $merkmale"
+        // Wie die Seite ihre Zutaten auszeichnet, zeigt erst der Text darum herum.
+        val stellen = listOf("recipeIngredient", "recipeInstructions").joinToString(" ") { marke ->
+            Regex(marke)
+                .findAll(html)
+                .take(SNIPPETS)
+                .joinToString(" ") { treffer ->
+                    val von = (treffer.range.first - SNIPPET_BEFORE).coerceAtLeast(0)
+                    val bis = (treffer.range.last + SNIPPET_AFTER).coerceAtMost(html.length)
+                    "\n      [$marke] " + html.substring(von, bis).replace(Regex("\\s+"), " ")
+                }
+        }
+        return "$url | ${html.length} Zeichen | Titel: $titel | JSON-LD: $bloecke $arten | $merkmale$stellen"
     }
 
     // ------------------------------------------------------------------ Hilfen
@@ -388,8 +399,11 @@ class FilterAuditTest {
         const val TARGETED = 6
 
         /** Fuer so viele unlesbare Seiten je Quelle steht da, was sie enthalten. */
-        const val DIAGNOSED = 3
+        const val DIAGNOSED = 2
         const val MAX_TYPES = 10
+        const val SNIPPETS = 2
+        const val SNIPPET_BEFORE = 220
+        const val SNIPPET_AFTER = 380
         const val SEED = 20_261_120
         const val SOURCE_BUDGET_MS = 240_000L
         const val PAGE_TIMEOUT_MS = 25_000L

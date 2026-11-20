@@ -123,13 +123,13 @@ class StructuredRecipeExtractor @Inject constructor() {
         // Mehrere Elemente mit recipeInstructions sind bereits die Gliederung der
         // Seite - jedes davon ist ein Schritt.
         val steps = bereich
-            .select("[itemprop=recipeInstructions]")
+            .select(prop("recipeInstructions"))
             .flatMap { block ->
                 // Steht die Anleitung als Liste im Block, ist jeder Punkt ein Schritt;
                 // sonst der Block selbst. Ohne das wurde die ganze Zubereitung zu einem
                 // einzigen, seitenlangen Schritt.
                 val punkte = block.select("li, p").map { it.text().cleanText().trim() }
-                punkte.filter { it.isNotBlank() }.ifEmpty { listOf(block.text().cleanText().trim()) }
+                punkte.filter { it.isNotBlank() }.ifEmpty { listOf(block.microdataValue().trim()) }
             }.filter { it.isNotBlank() }
             .distinct()
 
@@ -152,13 +152,12 @@ class StructuredRecipeExtractor @Inject constructor() {
      * verschachtelten Objekt steht - sonst heisst das Rezept am Ende "Mehl".
      */
     private fun Element.recipeName(): String? =
-        select("[itemprop=name]")
+        select(prop("name"))
             .firstOrNull { kandidat ->
                 kandidat.parents().none { eltern ->
                     eltern !== this && eltern.hasAttr("itemscope")
                 }
-            }?.text()
-            ?.cleanText()
+            }?.microdataValue()
             ?.takeIf { it.isNotBlank() }
 
     /**
@@ -181,10 +180,22 @@ class StructuredRecipeExtractor @Inject constructor() {
     }
 
     private fun Element.microdataIngredients(): List<String> =
-        select("[itemprop=recipeIngredient], [itemprop=ingredients]")
-            .map { it.text().cleanText() }
+        select("${prop("recipeIngredient")}, ${prop("ingredients")}")
+            .map { it.microdataValue() }
             .filter { it.isNotBlank() }
             .distinct()
+
+    /**
+     * Der Wert einer Microdata-Eigenschaft: der sichtbare Text - oder, bei einem unsichtbaren
+     * `meta`-Element, sein `content`.
+     */
+    private fun Element.microdataValue(): String = text().cleanText().ifBlank { attr("content").cleanText() }
+
+    /**
+     * Sucht eine Microdata-Eigenschaft. `itemprop` darf mehrere Namen tragen
+     * ("ingredients recipeIngredient") - ein Vergleich auf Gleichheit faende sie dann nicht.
+     */
+    private fun prop(name: String): String = "[itemprop~=(?:^|\\s)$name(?:\\s|$)]"
 
     /**
      * Nur die Bildadresse einer Seite - fuer Karten, deren Quelle im Verzeichnis
