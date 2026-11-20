@@ -120,3 +120,22 @@ Zweifel löscht sie nichts.
   übernehmen – geteilt wird davon nur der Titel. Die App sagt das, statt still nichts zu tun.
 - Wer neue Einstellungen ergänzt, ergänzt den Test, der ihre Wirkung zeigt. Eine
   Einstellung ohne Folge ist ein Fehler, kein Platzhalter.
+
+## Nachtrag: Frist und selbst erfasste Treffer
+
+Zwei Lücken der Fassung 2 fielen im Gebrauch auf und sind geschlossen, ohne die
+Schnittstelle zu brechen (ältere Apps spielen weiter mit):
+
+- **Eine Runde wartet nicht mehr endlos auf Karten.** Schickte ein Telefon seinen Beitrag
+  nie, blieb die Runde stehen. Jetzt läuft mit dem ersten Beitrag eine Frist von einer
+  Minute; danach baut der Dienst den Stapel aus dem, was da ist. Die App zeigt die Frist an.
+- **Ein selbst erfasster Treffer lässt sich übernehmen.** Er hat keine Adresse, von der die
+  andere Person ihn holen könnte. Die App hinterlegt deshalb Zutaten und Zubereitung beim
+  Dienst – nur für gemeinsame Treffer, nur vom Gerät, das die Karte beigesteuert hat, ohne
+  Foto, und gelöscht mit der Runde. Das weicht den Satz "Zutaten und Zubereitung bleiben auf
+  dem Gerät" auf; die App sagt es vor dem Start, und es steht in der Datenschutzerklärung.
+
+Dazu in der App: "Übernehmen" unterscheidet jetzt, *warum* etwas nicht ging (Woche voll,
+schon im Plan, Seite nicht erreichbar, Inhalt noch unterwegs), bietet "Nochmal versuchen" an
+und fragt bei voller Woche, ob noch nicht Gekochtes weichen soll. Auf die Einkaufsliste
+kommt dabei nichts mehr von selbst. Einzelheiten: `pairing/README.md`.
