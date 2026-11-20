@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.util.Collections
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
@@ -156,6 +157,7 @@ class FilterAuditTest {
         val random = Random(SEED)
         val pilzTitel = SUSPECTS.getValue(Dislike.PILZE)
         val stats = mutableMapOf<String, IntArray>()
+        val unreadable = Collections.synchronizedList(mutableListOf<String>())
 
         val loaded = coroutineScope {
             entries
@@ -183,7 +185,10 @@ class FilterAuditTest {
                                 }
                                 val page = read(entry, source, html)
                                 when {
-                                    page == null -> zahlen[NO_RECIPE] += 1
+                                    page == null -> {
+                                        zahlen[NO_RECIPE] += 1
+                                        if (zahlen[NO_RECIPE] <= DIAGNOSED) unreadable += diagnose(entry.url, html)
+                                    }
                                     page.recipe.ingredients.isEmpty() -> zahlen[NO_INGREDIENTS] += 1
                                     else -> {
                                         zahlen[READ] += 1
@@ -203,6 +208,12 @@ class FilterAuditTest {
             line("  $id: ${z[TRIED]} / ${z[READ]} / ${z[FAILED]} / ${z[NO_RECIPE]} / ${z[NO_INGREDIENTS]}")
         }
         line("Gelesen: ${loaded.size} Seiten")
+        if (unreadable.isNotEmpty()) {
+            // Eine Quelle, deren Seiten sich nicht lesen lassen, liefert bei aktivem Filter keine
+            // einzige Karte - hier steht, woran es liegt.
+            line("Geladen, aber kein Rezept gefunden - was auf der Seite steht:")
+            unreadable.sorted().forEach { line("  $it") }
+        }
         Dislike.entries.forEach { dislike ->
             line("  ${dislike.name}: ${loaded.count { dislike in it.traits.dislikes }}")
         }
@@ -300,6 +311,28 @@ class FilterAuditTest {
         )
     }
 
+    /** Was eine Seite enthaelt, aus der sich kein Rezept lesen liess - in einer Zeile. */
+    private fun diagnose(url: String, html: String): String {
+        val titel = Regex("<title[^>]*>([^<]{0,90})", RegexOption.IGNORE_CASE)
+            .find(html)
+            ?.groupValues
+            ?.get(1)
+            ?.trim()
+        val bloecke = Regex("application/ld\\+json", RegexOption.IGNORE_CASE).findAll(html).count()
+        val arten = Regex("\"@type\"\\s*:\\s*(\"[^\"]{1,40}\"|\\[[^\\]]{1,80}\\])")
+            .findAll(html)
+            .map { it.groupValues[1].replace("\"", "") }
+            .distinct()
+            .take(MAX_TYPES)
+            .toList()
+        val merkmale = listOf(
+            "recipeIngredient" to html.contains("recipeIngredient"),
+            "itemtype Recipe" to Regex("itemtype=\"https?://schema.org/Recipe\"").containsMatchIn(html),
+            "Zutaten" to html.contains("Zutaten"),
+        ).filter { it.second }.map { it.first }
+        return "$url | ${html.length} Zeichen | Titel: $titel | JSON-LD: $bloecke $arten | $merkmale"
+    }
+
     // ------------------------------------------------------------------ Hilfen
 
     private val alsZutat = HashMap<String, RecipeTraits>()
@@ -353,6 +386,10 @@ class FilterAuditTest {
     private companion object {
         const val DEFAULT_PAGES = 30
         const val TARGETED = 6
+
+        /** Fuer so viele unlesbare Seiten je Quelle steht da, was sie enthalten. */
+        const val DIAGNOSED = 3
+        const val MAX_TYPES = 10
         const val SEED = 20_261_120
         const val SOURCE_BUDGET_MS = 240_000L
         const val PAGE_TIMEOUT_MS = 25_000L
