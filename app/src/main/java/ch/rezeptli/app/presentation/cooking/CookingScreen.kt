@@ -314,7 +314,9 @@ private fun CookingContent(
                     StepCard(
                         text = step.text,
                         ingredients = uiState.ingredientsByStep[step.position].orEmpty(),
-                        timer = uiState.timerForCurrentStep,
+                        // Der Timer dieses Schritts - nicht der des aktuellen: Waehrend des Umblaetterns
+                        // sind kurz zwei Karten zu sehen, und nur eine davon traegt den Timer.
+                        timer = uiState.timer?.takeIf { it.stepPosition == step.position },
                         timerMinutes = uiState.minutesFor(step),
                         timerActions = timerActions,
                     )

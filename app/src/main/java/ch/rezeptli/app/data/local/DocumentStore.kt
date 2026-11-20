@@ -20,14 +20,26 @@ import javax.inject.Singleton
 class DocumentStore @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : DocumentAccess {
-    // "wt": von vorn schreiben und kuerzen - sonst bliebe vom alten Inhalt einer ersetzten Datei ein Rest stehen.
-    override fun openForWriting(uri: String): OutputStream? =
-        runCatching { context.contentResolver.openOutputStream(Uri.parse(uri), "wt") }.getOrNull()
+    /**
+     * Zuerst "wt" - von vorn schreiben und kuerzen: Sonst bliebe vom alten Inhalt einer ersetzten
+     * Datei ein Rest stehen. Manche Ablagen (etwa in der Cloud) kennen nur das schlichte "w";
+     * fuer die frisch angelegte, leere Datei kommt das aufs selbe hinaus.
+     */
+    override fun openForWriting(uri: String): OutputStream? {
+        val target = Uri.parse(uri)
+        return WRITE_MODES.firstNotNullOfOrNull { mode ->
+            runCatching { context.contentResolver.openOutputStream(target, mode) }.getOrNull()
+        }
+    }
 
     override fun openForReading(uri: String): InputStream? =
         runCatching { context.contentResolver.openInputStream(Uri.parse(uri)) }.getOrNull()
 
     override fun discard(uri: String) {
         runCatching { DocumentsContract.deleteDocument(context.contentResolver, Uri.parse(uri)) }
+    }
+
+    private companion object {
+        val WRITE_MODES = listOf("wt", "w")
     }
 }
