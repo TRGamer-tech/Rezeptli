@@ -5,7 +5,8 @@ Laeuft in der CI, weil die Entwicklungsumgebung den Dienst nicht erreicht. Gespi
 eine ganze gemeinsame Runde mit zwei gedachten Telefonen - so, wie die App sie spielt:
 
 1. Gilt, was die eingeladene Person nicht mag, danach auch fuer die Person, die eroeffnet hat?
-2. Kommen grosse Beitraege an - alle gespeicherten Rezepte beider, nicht nur ein Dutzend?
+2. Kommen grosse Beitraege an - alle gespeicherten Rezepte beider, nicht nur ein Dutzend,
+   bis an die Grenze des Dienstes und nicht darueber?
 
 Die Einstufung der Rezepte selbst (erkennt die App Pilze in einer Zutatenliste?) prueft der
 Lauf `FilterAuditTest` in derselben CI-Aufgabe.
@@ -20,6 +21,13 @@ import urllib.request
 
 UA = "Rezeptli/1.0 (Open-Source-Rezept-App; +https://github.com/TRGamer-tech/Rezeptli)"
 PAIRING = "https://rezeptli-pairing.rezeptli.workers.dev"
+
+# So viele Karten nimmt der Dienst je Person an (MAX_BEITRAG in pairing/src/v2.ts).
+GRENZE = 500
+
+# Die Runden: klein wie frueher, die alte Grenze von achtzig, eine grosse Sammlung, beide bis an
+# die Grenze - und eine darueber, von der genau die Grenze uebrig bleiben muss.
+GROESSEN = ((12, 12), (45, 30), (80, 80), (300, 250), (GRENZE, GRENZE), (GRENZE + 20, 20))
 
 abweichungen = []
 
@@ -136,10 +144,14 @@ def main():
         print("  Der Dienst ist nicht erreichbar - mehr laesst sich nicht pruefen.")
         return 0
 
-    for gastgeber, gast in ((12, 12), (45, 30), (80, 80), (300, 250)):
+    for gastgeber, gast in GROESSEN:
         anzahl = runde(gastgeber, gast)
         if anzahl is not None:
-            print(f"  => im Stapel: {anzahl} von {gastgeber + gast} beigesteuerten Karten")
+            erwartet = min(gastgeber, GRENZE) + min(gast, GRENZE)
+            pruefe(
+                anzahl == erwartet,
+                f"im Stapel: {anzahl} von {gastgeber + gast} beigesteuerten Karten (erwartet {erwartet})",
+            )
 
     print(f"\n{len(abweichungen)} Abweichung(en)")
     for text in abweichungen:
