@@ -91,12 +91,13 @@ class DeckViewModelTest {
         },
         recipeRepository: FakeRecipeRepository = FakeRecipeRepository(),
         profile: UserProfile = UserProfile(country = Country.SCHWEIZ),
+        profileRepository: FakeUserProfileRepository = FakeUserProfileRepository(profile),
     ): DeckViewModel {
         val readCard = ReadRecipeCardUseCase(webRepository, IngredientTextParser(), RecipeClassifier())
         return DeckViewModel(
             buildDeck = BuildSwipeDeckUseCase(
                 webRepository = webRepository,
-                profileRepository = FakeUserProfileRepository(profile),
+                profileRepository = profileRepository,
                 builder = CuratedDeckBuilder(),
                 titles = DeckTitles(RecipeClassifier()),
                 dispatcher = mainDispatcher.testDispatcher,
@@ -110,7 +111,7 @@ class DeckViewModelTest {
                 NoTranslation,
             ),
             saveRecipe = SaveRecipeUseCase(recipeRepository, InstructionSplitter()),
-            profileRepository = FakeUserProfileRepository(profile),
+            profileRepository = profileRepository,
             recipeRepository = recipeRepository,
             checkCard = CheckRecipeCardUseCase(readCard),
             readCard = readCard,
@@ -170,6 +171,87 @@ class DeckViewModelTest {
         viewModel.onStart()
 
         assertEquals(listOf("Kartoffelgratin"), viewModel.sichtbareTitel())
+    }
+
+    @Test
+    fun `wer mitten in der Runde etwas ausschliesst, sieht es danach nicht mehr`() = runTest {
+        // Gemeldet: Pilzgerichte trotz "keine Pilze". Der Stapel bleibt liegen, waehrend man im
+        // Tab "Vorlieben" etwas antippt - und zeigte danach weiter, was vorher gezogen war.
+        val imTitel = karte("Pilzrisotto")
+        val versteckt = karte("Sommerliche Gemüsepfanne")
+        val harmlos = karte("Kartoffelgratin")
+        val schonGemocht = karte("Rahmschnitzel")
+        val web = FakeWebRecipeRepository(
+            pool = pool(imTitel, versteckt, harmlos, schonGemocht),
+            recipeByUrl = mapOf(
+                seite(imTitel, "300 g Risottoreis", "250 g Steinpilze"),
+                seite(versteckt, "2 Zucchetti", "200 g braune Champignons"),
+                seite(harmlos, "800 g Kartoffeln", "2 dl Rahm"),
+                seite(schonGemocht, "4 Schweinsschnitzel", "150 g Eierschwämmli"),
+            ),
+        )
+        val vorlieben = FakeUserProfileRepository(UserProfile(country = Country.SCHWEIZ))
+        val viewModel = createViewModel(webRepository = web, profileRepository = vorlieben)
+        viewModel.onTargetChange(null)
+        viewModel.onStart()
+        assertEquals(4, viewModel.sichtbareTitel().size)
+        viewModel.wischen("Rahmschnitzel", liked = true)
+
+        vorlieben.update { it.copy(dislikes = setOf(Dislike.PILZE)) }
+
+        assertEquals(listOf("Kartoffelgratin"), viewModel.sichtbareTitel())
+        assertTrue(
+            viewModel.uiState.value.rules.filter.dislikes
+                .contains(Dislike.PILZE),
+        )
+        // Was schon gefallen hat, bleibt - das war eine eigene Entscheidung.
+        assertEquals(
+            listOf("Rahmschnitzel"),
+            viewModel.uiState.value.liked
+                .map { it.title },
+        )
+        assertEquals(DeckStep.WISCHEN, viewModel.uiState.value.step)
+    }
+
+    @Test
+    fun `faellt eine Einschraenkung weg, kommen die Karten zurueck`() = runTest {
+        val fisch = karte("Lachsfilet mit Dill")
+        val harmlos = karte("Kartoffelgratin")
+        val web = FakeWebRecipeRepository(
+            pool = pool(fisch, harmlos),
+            recipeByUrl = mapOf(
+                seite(fisch, "400 g Lachsfilet", "1 Bund Dill"),
+                seite(harmlos, "800 g Kartoffeln", "2 dl Rahm"),
+            ),
+        )
+        val vorlieben =
+            FakeUserProfileRepository(UserProfile(country = Country.SCHWEIZ, dislikes = setOf(Dislike.FISCH)))
+        val viewModel = createViewModel(webRepository = web, profileRepository = vorlieben)
+        viewModel.onTargetChange(null)
+        viewModel.onStart()
+        assertEquals(listOf("Kartoffelgratin"), viewModel.sichtbareTitel())
+
+        vorlieben.update { it.copy(dislikes = emptySet()) }
+
+        assertEquals(setOf("Kartoffelgratin", "Lachsfilet mit Dill"), viewModel.sichtbareTitel().toSet())
+    }
+
+    @Test
+    fun `eine Aenderung, die mit dem Essen nichts zu tun hat, laesst den Stapel in Ruhe`() = runTest {
+        val vorlieben = FakeUserProfileRepository(UserProfile(country = Country.SCHWEIZ))
+        val viewModel = createViewModel(
+            webRepository = FakeWebRecipeRepository(pool = vieleKarten),
+            profileRepository = vorlieben,
+        )
+        viewModel.onTargetChange(null)
+        viewModel.onStart()
+        viewModel.wischen(viewModel.sichtbareTitel().first(), liked = false)
+        val vorher = viewModel.uiState.value.cards
+
+        vorlieben.update { it.copy(firstName = "Mia", householdSize = 4) }
+
+        assertEquals(vorher, viewModel.uiState.value.cards)
+        assertTrue(viewModel.uiState.value.canUndo, "die letzte Entscheidung laesst sich weiter zuruecknehmen")
     }
 
     @Test

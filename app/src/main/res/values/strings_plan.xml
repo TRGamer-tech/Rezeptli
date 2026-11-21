@@ -68,6 +68,7 @@
     <string name="plan_karte_portion">1 Portion</string>
     <string name="plan_tauschen">Mahlzeit tauschen</string>
     <string name="plan_tauschen_keine">Es gibt keine andere passende Mahlzeit.</string>
+    <string name="plan_passt_nicht">Passt nicht mehr zu deinen Vorlieben. Mit dem Pfeil oben rechts tauschst du es aus.</string>
     <string name="plan_neu_bauen">Plan neu bauen</string>
     <string name="plan_neu_bauen_titel">Plan neu bauen?</string>
     <string name="plan_neu_bauen_text">Die Mahlzeiten und die Einkaufsliste dieses Plans werden ersetzt. Von Hand Ergänztes bleibt stehen.</string>
@@ -226,7 +227,7 @@
     <string name="zuzweit_lobby_quelle">Womit fangt ihr an?</string>
     <string name="zuzweit_quelle_gespeichert">Eure gespeicherten Rezepte</string>
     <string name="zuzweit_quelle_neu">Neue Rezepte</string>
-    <string name="zuzweit_quelle_hinweis">Sind eure gespeicherten Rezepte durch, entscheidest du, ob es mit neuen weitergeht.</string>
+    <string name="zuzweit_quelle_hinweis">In den Stapel kommen alle gespeicherten Rezepte von euch beiden, die für beide passen. Sind sie durch, entscheidest du, ob es mit neuen weitergeht.</string>
     <string name="zuzweit_gilt_titel">Das gilt für euch beide</string>
     <string name="zuzweit_lobby_start_allein">Sobald dein Gegenüber da ist, kann es losgehen.</string>
     <string name="zuzweit_gast_titel">Du bist dabei</string>
@@ -235,7 +236,7 @@
     <string name="zuzweit_gast_quelle_gespeichert">Zuerst aus euren gespeicherten Rezepten</string>
     <string name="zuzweit_gast_quelle_neu">Aus neuen Rezepten</string>
     <string name="zuzweit_sammeln_titel">Der Stapel wird gemischt</string>
-    <string name="zuzweit_sammeln_gespeichert">Deine gespeicherten Rezepte, die für euch beide passen, kommen in den Stapel.</string>
+    <string name="zuzweit_sammeln_gespeichert">Alle deine gespeicherten Rezepte, die für euch beide passen, kommen in den Stapel.</string>
     <string name="zuzweit_sammeln_neu">Neue Rezepte werden ausgesucht und geprüft. Das kann einen Moment dauern.</string>
     <string name="zuzweit_sammeln_wartet">Deine Karten sind dabei. Es fehlen noch die deines Gegenübers.</string>
     <string name="zuzweit_fortschritt">%1$d von %2$d gemeinsam gefunden</string>
@@ -363,4 +364,14 @@
     <string name="naehrwerte_kalorien_quelle">Kalorien laut Quelle, Eiweiss aus den Zutaten geschätzt.</string>
     <string name="naehrwerte_eiweiss_quelle">Eiweiss laut Quelle, Kalorien aus den Zutaten geschätzt.</string>
     <string name="naehrwerte_unbekannt">Für eine Schätzung von Kalorien und Eiweiss reichen die Angaben nicht.</string>
+
+    <!-- Zu zweit: fertig -->
+    <string name="zuzweit_fertig">Fertig</string>
+    <string name="zuzweit_verwerfen_titel">Ohne die Treffer gehen?</string>
+    <string name="zuzweit_verwerfen_gehen">Trotzdem gehen</string>
+    <string name="zuzweit_verwerfen_bleiben">Zu den Treffern</string>
+    <plurals name="zuzweit_verwerfen_text">
+        <item quantity="one">Euer Treffer ist auf diesem Telefon noch nirgends gespeichert – weder in deinen Rezepten noch im Wochenplan. Wenn du jetzt gehst, ist er weg.</item>
+        <item quantity="other">Eure %d Treffer sind auf diesem Telefon noch nirgends gespeichert – weder in deinen Rezepten noch im Wochenplan. Wenn du jetzt gehst, sind sie weg.</item>
+    </plurals>
 </resources>

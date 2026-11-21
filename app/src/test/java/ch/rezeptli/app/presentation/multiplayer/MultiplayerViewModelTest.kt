@@ -451,6 +451,25 @@ class MultiplayerViewModelTest {
     }
 
     @Test
+    fun `Vorlieben, die sich bei offenem Bildschirm aendern, gelten fuer die naechste Runde`() = runTest {
+        // Gemeldet: Pilzgerichte trotz "keine Pilze". Dieser Bildschirm bleibt liegen, wenn man
+        // zum Tab "Vorlieben" wechselt - und eroeffnete danach mit dem Stand von vorher.
+        val profil = FakeUserProfileRepository(UserProfile(dislikes = setOf(Dislike.FISCH)))
+        mitViewModel(createViewModel(profileRepository = profil)) { viewModel ->
+            assertEquals(setOf(Dislike.FISCH), viewModel.state.ownRestrictions.dislikes)
+
+            profil.update { it.copy(dislikes = it.dislikes + Dislike.PILZE, customDislikes = listOf("Rosinen")) }
+
+            assertEquals(setOf(Dislike.FISCH, Dislike.PILZE), viewModel.state.ownRestrictions.dislikes)
+
+            viewModel.onHost()
+
+            assertEquals(setOf(Dislike.FISCH, Dislike.PILZE), pairing.restrictions.dislikes)
+            assertEquals(listOf("Rosinen"), pairing.restrictions.customDislikes)
+        }
+    }
+
+    @Test
     fun `nur Getraenke heisst - der eigene Beitrag besteht nur aus Getraenken`() = runTest {
         mitViewModel { viewModel ->
             lobbyAlsGastgeber(viewModel)
@@ -873,6 +892,34 @@ class MultiplayerViewModelTest {
     }
 
     @Test
+    fun `nach einem langen Funkloch kommen alle Entscheidungen an - auch mehr, als in eine Anfrage passen`() = runTest {
+        // Seit die ganze Sammlung im Stapel liegt, kann er hunderte Karten haben. Der Dienst
+        // liest je Anfrage hoechstens 200 Stimmen; was darueber lag, ging frueher verloren.
+        val grosseSammlung = (1..260).map { nummer ->
+            RoundOffer(key = "t:gericht-$nummer", title = "Gericht $nummer")
+        }
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 3, ihreKarten = grosseSammlung.toTypedArray())
+            val karten = viewModel.state.remainingCards
+            assertTrue(karten.size >= 260, "der Stapel enthaelt die ganze Sammlung")
+
+            pairing.failWith = PairingError.NO_CONNECTION
+            karten.take(250).forEach { viewModel.onSwiped(it.id, liked = false) }
+            assertTrue(pairing.receivedVotes.isEmpty())
+
+            pairing.failWith = null
+            nachfragen()
+
+            assertEquals(250, pairing.receivedVotes.size)
+            assertEquals(karten.take(250).map { it.id }, pairing.receivedVotes.map { it.recipeId })
+            assertTrue(
+                pairing.voteRequests.all { it <= FakePairingRepository.MAX_VOTES_PER_REQUEST },
+                "keine Anfrage bringt mehr mit, als der Dienst liest: ${pairing.voteRequests}",
+            )
+        }
+    }
+
+    @Test
     fun `scheitert das Abgeben der eigenen Karten am Netz, wird es beim naechsten Nachfragen wiederholt`() = runTest {
         mitViewModel { viewModel ->
             lobbyAlsGastgeber(viewModel)
@@ -1175,6 +1222,70 @@ class MultiplayerViewModelTest {
             // Geholt wurde beim zweiten Mal nur, was gefehlt hat.
             assertEquals(3, web.loadCalls.count { it == risottoUrl })
             assertEquals(1, sammlung.visible(RecipeFilter()).count { it.title == "Beats Eintopf" })
+        }
+    }
+
+    @Test
+    fun `fertig fragt nur nach, solange mit den Treffern nichts geschehen ist`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+            // Die Treffer stehen da, aber noch nirgends: Wer jetzt geht, verliert sie.
+            assertTrue(viewModel.state.hasUnusedMatches)
+
+            viewModel.onKeepMatches()
+            runCurrent()
+
+            assertTrue(viewModel.state.import.hasOutcome)
+            assertFalse(viewModel.state.hasUnusedMatches, "nach dem Behalten ist Fertig einfach fertig")
+        }
+    }
+
+    @Test
+    fun `auch der Wochenplan zaehlt als etwas, das mit den Treffern geschehen ist`() = runTest {
+        mitViewModel { viewModel ->
+            dreiTreffer(viewModel)
+
+            viewModel.onAddToPlan()
+            runCurrent()
+
+            assertFalse(viewModel.state.hasUnusedMatches)
+        }
+    }
+
+    @Test
+    fun `ein Anlauf, bei dem sich nichts holen liess, hat nichts gerettet - es wird weiter nachgefragt`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel, ziel = 1)
+            val risottoKarte = viewModel.kennung("Risotto")
+            pairing.partnerVotesAll { it.recipeId == risottoKarte }
+            viewModel.state.remainingCards.forEach { viewModel.onSwiped(it.id, liked = it.id == risottoKarte) }
+            assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
+            web.unreachable = setOf(risottoUrl)
+
+            viewModel.onKeepMatches()
+            ladenAbwarten()
+
+            assertTrue(viewModel.state.import.keepTried)
+            assertTrue(
+                viewModel.state.import.kept
+                    .isEmpty(),
+            )
+            assertTrue(viewModel.state.hasUnusedMatches)
+        }
+    }
+
+    @Test
+    fun `ohne Treffer und waehrend der Runde gibt es nichts zu verlieren`() = runTest {
+        mitViewModel { viewModel ->
+            bisZumStapel(viewModel)
+            assertFalse(viewModel.state.hasUnusedMatches, "waehrend des Wischens fragt Zurueck anders nach")
+
+            viewModel.onEndRound()
+            runCurrent()
+
+            assertEquals(MultiplayerStep.TREFFER, viewModel.state.step)
+            assertTrue(viewModel.state.matches.isEmpty())
+            assertFalse(viewModel.state.hasUnusedMatches)
         }
     }
 

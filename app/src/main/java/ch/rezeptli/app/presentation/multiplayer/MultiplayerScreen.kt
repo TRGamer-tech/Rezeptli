@@ -151,6 +151,8 @@ data class MultiplayerActions(
     val onListDismiss: () -> Unit = {},
     val onAddToShoppingList: (Int) -> Unit = {},
     val onNewRound: () -> Unit = {},
+    /** Fertig mit den Treffern: hinaus aus der gemeinsamen Runde. */
+    val onDone: () -> Unit = {},
     val onDismissError: () -> Unit = {},
 )
 
@@ -239,9 +241,22 @@ fun MultiplayerRoute(
             onAddToShoppingList = viewModel::onAddToShoppingList,
             onAddToPlan = viewModel::onAddToPlan,
             onNewRound = viewModel::onNewRound,
+            onDone = {
+                viewModel.onLeave()
+                onBack()
+            },
             onDismissError = viewModel::onDismissError,
         ),
     )
+}
+
+/** Wohin es von den Treffern aus geht - beides laesst sie verschwinden. */
+private enum class Departure {
+    /** Hinaus aus der gemeinsamen Runde. */
+    LEAVE,
+
+    /** Zurueck an den Anfang, fuer eine neue Runde. */
+    NEW_ROUND,
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -252,6 +267,38 @@ fun MultiplayerScreen(
 ) {
     val motion = RezeptliTheme.motion
 
+    // Die Treffer leben nur auf diesem Bildschirm. Wer geht, ohne sie behalten oder eingeplant
+    // zu haben, wird vorher gefragt - sonst ist "Fertig" einfach fertig.
+    var asked by remember { mutableStateOf<Departure?>(null) }
+
+    fun depart(wohin: Departure) {
+        when (wohin) {
+            Departure.LEAVE -> actions.onDone()
+            Departure.NEW_ROUND -> actions.onNewRound()
+        }
+    }
+
+    fun request(wohin: Departure) {
+        if (uiState.hasUnusedMatches) asked = wohin else depart(wohin)
+    }
+    val guarded = actions.copy(
+        onBack = { if (uiState.hasUnusedMatches) asked = Departure.LEAVE else actions.onBack() },
+        onDone = { request(Departure.LEAVE) },
+        onNewRound = { request(Departure.NEW_ROUND) },
+    )
+    BackHandler(enabled = uiState.hasUnusedMatches) { asked = Departure.LEAVE }
+
+    asked?.let { wohin ->
+        DiscardDialog(
+            count = uiState.matches.size,
+            onDiscard = {
+                asked = null
+                depart(wohin)
+            },
+            onDismiss = { asked = null },
+        )
+    }
+
     uiState.info?.let { info -> RecipeInfoSheet(info = info, onDismiss = actions.onInfoDismiss) }
     uiState.import.week?.let { week -> WeekSheet(matches = uiState.matches, week = week, actions = actions) }
 
@@ -259,7 +306,7 @@ fun MultiplayerScreen(
         topBar = {
             RezeptliTopBar(
                 title = stringResource(R.string.mehrspieler_titel),
-                onBack = actions.onBack,
+                onBack = guarded.onBack,
             )
         },
     ) { padding ->
@@ -315,7 +362,7 @@ fun MultiplayerScreen(
 
                     MultiplayerStep.FRAGE -> QuestionStep(uiState = uiState, actions = actions)
 
-                    MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, actions = actions)
+                    MultiplayerStep.TREFFER -> MatchesStep(uiState = uiState, actions = guarded)
                 }
             }
         }
@@ -1078,6 +1125,12 @@ private fun MatchesStep(uiState: MultiplayerUiState, actions: MultiplayerActions
                     .fillMaxWidth()
                     .heightIn(min = 52.dp),
             ) { Text(stringResource(R.string.zuzweit_neue_runde)) }
+            BouncyOutlinedButton(
+                onClick = actions.onDone,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) { Text(stringResource(R.string.zuzweit_fertig)) }
         }
         return
     }
@@ -1230,8 +1283,11 @@ private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerAction
             ) { Text(stringResource(R.string.zuzweit_auf_liste)) }
         }
 
+        DoneButton(used = stand.hasOutcome, enabled = !stand.isBusy, onClick = actions.onDone)
+
         BouncyTextButton(
             onClick = actions.onNewRound,
+            enabled = !stand.isBusy,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp),
@@ -1267,6 +1323,48 @@ private fun MatchActions(uiState: MultiplayerUiState, actions: MultiplayerAction
             onDismiss = actions.onListDismiss,
         )
     }
+}
+
+/**
+ * "Fertig" - der Abschluss der Runde.
+ *
+ * Ist mit den Treffern schon etwas geschehen, ist das der naechste Schritt und der Knopf
+ * entsprechend deutlich. Vorher steht er zurueckhaltender da: Dann waere Gehen ein Verlust,
+ * und die Knoepfe darueber sind die bessere Wahl.
+ */
+@Composable
+private fun DoneButton(used: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val modifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = 52.dp)
+    if (used) {
+        BouncyButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+            Icon(imageVector = Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(stringResource(R.string.zuzweit_fertig), modifier = Modifier.padding(start = 8.dp))
+        }
+    } else {
+        BouncyFilledTonalButton(onClick = onClick, enabled = enabled, modifier = modifier) {
+            Text(stringResource(R.string.zuzweit_fertig))
+        }
+    }
+}
+
+/** Die Rueckfrage, bevor Treffer verschwinden, mit denen noch nichts geschehen ist. */
+@Composable
+private fun DiscardDialog(count: Int, onDiscard: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.zuzweit_verwerfen_titel)) },
+        text = { Text(pluralStringResource(R.plurals.zuzweit_verwerfen_text, count, count)) },
+        confirmButton = {
+            BouncyTextButton(onClick = onDiscard) {
+                Text(stringResource(R.string.zuzweit_verwerfen_gehen), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            BouncyTextButton(onClick = onDismiss) { Text(stringResource(R.string.zuzweit_verwerfen_bleiben)) }
+        },
+    )
 }
 
 /** Was beim Einplanen herauskam - jede Zeile nur, wenn sie etwas zu sagen hat. */

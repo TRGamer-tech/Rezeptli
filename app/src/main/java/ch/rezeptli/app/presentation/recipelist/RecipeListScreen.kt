@@ -75,6 +75,7 @@ import ch.rezeptli.app.presentation.common.components.RemoveRecipeDialog
 import ch.rezeptli.app.presentation.common.components.RezeptliFilterChip
 import ch.rezeptli.app.presentation.common.components.RezeptliLoader
 import ch.rezeptli.app.presentation.common.components.RezeptliTopBar
+import ch.rezeptli.app.presentation.common.components.TagFilterChips
 import ch.rezeptli.app.presentation.common.components.entrance
 import ch.rezeptli.app.presentation.common.components.pressScale
 import ch.rezeptli.app.presentation.common.components.rememberEntranceState
@@ -563,15 +564,11 @@ private fun FilterSection(
                 text = stringResource(R.string.recipes_filter_tags),
                 style = MaterialTheme.typography.labelLarge,
             )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                uiState.availableTags.forEach { tag ->
-                    RezeptliFilterChip(
-                        selected = tag in uiState.selectedTags,
-                        onClick = { onToggleTag(tag) },
-                        label = tag,
-                    )
-                }
-            }
+            TagFilterChips(
+                tags = uiState.availableTags,
+                selected = uiState.selectedTags,
+                onToggle = onToggleTag,
+            )
         }
 
         Text(

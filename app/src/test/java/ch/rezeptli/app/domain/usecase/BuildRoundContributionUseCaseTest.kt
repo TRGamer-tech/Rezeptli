@@ -3,6 +3,8 @@ package ch.rezeptli.app.domain.usecase
 import ch.rezeptli.app.domain.deck.CuratedDeckBuilder
 import ch.rezeptli.app.domain.deck.DeckEntry
 import ch.rezeptli.app.domain.deck.DeckTitles
+import ch.rezeptli.app.domain.model.Ingredient
+import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.model.WebRecipe
 import ch.rezeptli.app.domain.multiplayer.RoundSource
 import ch.rezeptli.app.domain.multiplayer.RoundState
@@ -75,11 +77,13 @@ class BuildRoundContributionUseCaseTest {
         },
     )
 
-    private fun TestScope.useCase(): BuildRoundContributionUseCase {
+    private fun TestScope.useCase(
+        sammlung: FakeRecipeRepository = FakeRecipeRepository(),
+    ): BuildRoundContributionUseCase {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val profile = FakeUserProfileRepository(UserProfile(country = Country.SCHWEIZ))
         return BuildRoundContributionUseCase(
-            recipeRepository = FakeRecipeRepository(),
+            recipeRepository = sammlung,
             classifier = RecipeClassifier(),
             buildDeck = BuildSwipeDeckUseCase(
                 webRepository = web,
@@ -100,6 +104,38 @@ class BuildRoundContributionUseCaseTest {
         target = ziel,
         restrictions = DietaryFilter(dislikes = setOf(Dislike.FISCH)),
     )
+
+    @Test
+    fun `mit den gespeicherten Rezepten kommt die ganze Sammlung - nicht bloss ein Teil`() = runTest {
+        // 130 gespeicherte Rezepte, jedes zehnte mit Pilzen. Frueher war bei sechzig Schluss.
+        val sammlung = FakeRecipeRepository(
+            (1..130).map { nummer ->
+                Recipe(
+                    id = nummer.toLong(),
+                    title = "Gericht $nummer",
+                    ingredients = listOf(
+                        Ingredient(name = if (nummer % 10 == 0) "braune Champignons" else "Kartoffeln"),
+                        Ingredient(name = "Zwiebel"),
+                    ),
+                    sourceUrl = "https://sammlung.example/gericht-$nummer",
+                )
+            },
+        )
+        val gespeichert = RoundState(
+            code = "ABCDEF",
+            source = RoundSource.GESPEICHERT,
+            target = 3,
+            // Die andere Person mag keine Pilze - das gilt auch fuer die eigene Sammlung.
+            restrictions = DietaryFilter(dislikes = setOf(Dislike.PILZE)),
+        )
+
+        val karten = useCase(sammlung)(gespeichert)
+
+        assertEquals(117, karten.size)
+        assertEquals(karten.size, karten.map { it.key }.toSet().size)
+        assertTrue(karten.none { it.title.removePrefix("Gericht ").toInt() % 10 == 0 }, "Pilzgerichte bleiben draussen")
+        assertTrue(web.loadCalls.isEmpty(), "fuer gespeicherte Rezepte wird nichts geladen")
+    }
 
     @Test
     fun `jedes Telefon bringt den ganzen Stapel mit, nicht den halben`() = runTest {

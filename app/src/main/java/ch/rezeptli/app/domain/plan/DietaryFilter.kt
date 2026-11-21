@@ -33,7 +33,13 @@ data class DietaryFilter(
         diets.all { satisfies(traits, it) } &&
             intolerances.none { it in traits.allergens } &&
             dislikes.none { it in traits.dislikes } &&
-            customKeys.none { key -> matches(traits.words, key) }
+            custom.none { word -> word.category in traits.dislikes || word.isIn(traits.words) }
+
+    /**
+     * Die eigenen Stichworte, aufbereitet zum Vergleichen: mit Einzahl und Mehrzahl, mit
+     * Schweizer und hochdeutschem Namen - und "Pilze" meint alle Pilze. Siehe [CustomDislike].
+     */
+    private val custom: List<CustomDislike> by lazy { customDislikes.map(::CustomDislike).filterNot { it.isEmpty } }
 
     /**
      * Beide Wuensche zusammen - fuer die gemeinsame Runde.
@@ -49,22 +55,12 @@ data class DietaryFilter(
         customDislikes = (customDislikes + other.customDislikes).distinctBy(IngredientNameNormalizer::normalize),
     )
 
-    private val customKeys: List<String>
-        get() = customDislikes.map(IngredientNameNormalizer::normalize).filter { it.isNotEmpty() }
-
     private fun satisfies(traits: RecipeTraits, diet: Diet): Boolean = when (diet) {
         Diet.VEGAN -> traits.diet == DietClass.VEGAN
         Diet.VEGETARISCH -> traits.diet == DietClass.VEGAN || traits.diet == DietClass.VEGETARISCH
         Diet.PESCETARISCH -> traits.diet != DietClass.FLEISCH
         Diet.KOHLENHYDRATARM -> traits.lowCarb
     }
-
-    /**
-     * Ein Stichwort trifft, wenn es in einem Wort des Rezepts vorkommt: "rosinen" trifft
-     * "rosinenbroetchen". Bei mehreren Woertern ("rote bete") muessen alle vorkommen.
-     */
-    private fun matches(words: Set<String>, key: String): Boolean =
-        key.split(' ').all { part -> words.any { it.contains(part) } }
 
     companion object {
         fun of(profile: UserProfile) = DietaryFilter(

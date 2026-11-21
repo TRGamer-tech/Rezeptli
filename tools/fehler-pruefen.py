@@ -1,235 +1,149 @@
 #!/usr/bin/env python3
-"""Prueft drei gemeldete Fehler an den echten Diensten.
+"""Stellt Gemeldetes am echten Pairing-Dienst nach.
 
-Laeuft in der CI, weil die Entwicklungsumgebung weder die Rezeptseiten noch
-den Pairing-Dienst erreicht.
+Laeuft in der CI, weil die Entwicklungsumgebung den Dienst nicht erreicht. Gespielt wird
+eine ganze gemeinsame Runde mit zwei gedachten Telefonen - so, wie die App sie spielt:
 
-1. kochrezepte.at: Wird ein Rezeptbild gefunden, und laesst es sich laden?
-2. gutekueche.ch: Funktioniert die Quelle ueberhaupt noch?
-3. Pairing-Dienst: Laeuft eine ganze Runde durch - anlegen, beitreten,
-   abstimmen, Treffer abholen, schliessen?
+1. Gilt, was die eingeladene Person nicht mag, danach auch fuer die Person, die eroeffnet hat?
+2. Kommen grosse Beitraege an - alle gespeicherten Rezepte beider, nicht nur ein Dutzend?
+
+Die Einstufung der Rezepte selbst (erkennt die App Pilze in einer Zutatenliste?) prueft der
+Lauf `FilterAuditTest` in derselben CI-Aufgabe.
 """
 
-import gzip
-import io
 import json
-import re
+import secrets
 import sys
+import time
 import urllib.error
 import urllib.request
 
 UA = "Rezeptli/1.0 (Open-Source-Rezept-App; +https://github.com/TRGamer-tech/Rezeptli)"
 PAIRING = "https://rezeptli-pairing.rezeptli.workers.dev"
 
+abweichungen = []
 
-def hole(url, daten=None, methode=None, timeout=45):
+
+def ruf(methode, pfad, daten=None, timeout=45):
+    """Eine Anfrage an den Dienst: Status, Antwort als Objekt, Dauer in Millisekunden."""
     kopf = {"User-Agent": UA}
+    rumpf = None
     if daten is not None:
         kopf["Content-Type"] = "application/json"
-        daten = json.dumps(daten).encode()
-    anfrage = urllib.request.Request(url, data=daten, headers=kopf, method=methode)
-    with urllib.request.urlopen(anfrage, timeout=timeout) as antwort:
-        roh = antwort.read()
-        status = antwort.status
-    if roh[:2] == b"\x1f\x8b":
-        roh = gzip.GzipFile(fileobj=io.BytesIO(roh)).read()
-    return status, roh
-
-
-def json_ld(html):
-    """Alle JSON-LD-Bloecke einer Seite."""
-    gefunden = []
-    for block in re.findall(
-        r"<script[^>]*application/ld\+json[^>]*>(.*?)</script>", html, re.S,
-    ):
-        try:
-            gefunden.append(json.loads(block))
-        except Exception:
-            pass
-    return gefunden
-
-
-def finde_rezept(knoten):
-    if isinstance(knoten, list):
-        for k in knoten:
-            t = finde_rezept(k)
-            if t:
-                return t
-    elif isinstance(knoten, dict):
-        if "Recipe" in str(knoten.get("@type", "")):
-            return knoten
-        for schluessel in ("@graph", "mainEntity"):
-            if schluessel in knoten:
-                t = finde_rezept(knoten[schluessel])
-                if t:
-                    return t
-    return None
-
-
-def erste_rezeptadresse(sitemap, muster):
-    _, xml = hole(sitemap)
-    adressen = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml.decode("utf-8", "replace"))
-    passende = [a for a in adressen if re.search(muster, a, re.I)]
-    return passende[len(passende) // 2] if passende else None
-
-
-def pruefe_bild(quelle, sitemap, muster):
-    print(f"\n{'=' * 62}\n{quelle}\n{'=' * 62}")
+        rumpf = json.dumps(daten).encode()
+    anfrage = urllib.request.Request(f"{PAIRING}{pfad}", data=rumpf, headers=kopf, method=methode)
+    beginn = time.monotonic()
     try:
-        adresse = erste_rezeptadresse(sitemap, muster)
-    except Exception as fehler:
-        print(f"  Sitemap nicht erreichbar: {str(fehler)[:90]}")
-        return
-    if not adresse:
-        print("  Keine Rezeptadresse im Verzeichnis gefunden")
-        return
-    print(f"  Beispielrezept: {adresse}")
-
-    try:
-        status, roh = hole(adresse)
-    except Exception as fehler:
-        print(f"  Seite nicht erreichbar: {str(fehler)[:90]}")
-        return
-    html = roh.decode("utf-8", "replace")
-    print(f"  Seite: HTTP {status}, {len(html) // 1024} KB")
-
-    bloecke = json_ld(html)
-    typen = set()
-    for b in bloecke:
-        def sammle(k):
-            if isinstance(k, list):
-                for x in k:
-                    sammle(x)
-            elif isinstance(k, dict):
-                if k.get("@type"):
-                    typen.add(str(k["@type"]))
-                for s in ("@graph", "mainEntity", "itemListElement"):
-                    if s in k:
-                        sammle(k[s])
-        sammle(b)
-    print(f"  JSON-LD-Typen: {sorted(typen) or 'keine'}")
-    microdata = html.count('itemprop="recipeIngredient"')
-    print(f"  Microdata-Zutaten: {microdata}")
-
-    rezept = None
-    for b in bloecke:
-        rezept = rezept or finde_rezept(b)
-
-    if rezept is None:
-        print("  KEIN Recipe-Objekt - Quelle liefert keine strukturierten Rezeptdaten")
-        # Trotzdem schauen, was als Bild im HTML steht.
-        og = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
-        print(f"  og:image: {og.group(1) if og else 'keins'}")
-        return
-
-    print(f"  Zutaten: {len(rezept.get('recipeIngredient') or [])}")
-    bild = rezept.get("image")
-    print(f"  image-Feld ({type(bild).__name__}): {json.dumps(bild, ensure_ascii=False)[:200]}")
-
-    # Genau so, wie der Extraktor der App es tut: erst String, dann Liste, dann url.
-    kandidat = None
-    if isinstance(bild, str):
-        kandidat = bild
-    elif isinstance(bild, list) and bild:
-        erstes = bild[0]
-        kandidat = erstes if isinstance(erstes, str) else (erstes or {}).get("url")
-    elif isinstance(bild, dict):
-        kandidat = bild.get("url")
-
-    if not kandidat:
-        og = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
-        print(f"  Kein Bild im Recipe-Objekt. og:image: {og.group(1) if og else 'keins'}")
-        return
-
-    print(f"  Bildadresse: {kandidat}")
-    for beschreibung, kopf in [("ohne Referer", {}), ("mit Referer", {"Referer": adresse})]:
-        try:
-            anfrage = urllib.request.Request(
-                kandidat, headers={"User-Agent": UA, **kopf},
-            )
-            with urllib.request.urlopen(anfrage, timeout=30) as antwort:
-                daten = antwort.read(2048)
-                print(f"    {beschreibung}: HTTP {antwort.status}, "
-                      f"{antwort.headers.get('Content-Type')}, erste Bytes ok ({len(daten)})")
-        except urllib.error.HTTPError as fehler:
-            print(f"    {beschreibung}: HTTP {fehler.code} {fehler.reason}")
-        except Exception as fehler:
-            print(f"    {beschreibung}: {str(fehler)[:80]}")
-
-
-def pruefe_pairing():
-    print(f"\n{'=' * 62}\nPairing-Dienst\n{'=' * 62}")
-    try:
-        status, roh = hole(f"{PAIRING}/gesundheit", timeout=20)
-        print(f"  /gesundheit: HTTP {status} {roh.decode()[:80]}")
-    except Exception as fehler:
-        print(f"  /gesundheit FEHLT: {str(fehler)[:120]}")
-        return
-
-    try:
-        status, roh = hole(
-            f"{PAIRING}/sitzung",
-            {"gastgeber": "pruef-gastgeber", "rezepte": [
-                {"rezeptId": 1, "titel": "Rösti"},
-                {"rezeptId": 2, "titel": "Risotto"},
-            ]},
-        )
-        angelegt = json.loads(roh)
-        code = angelegt["code"]
-        print(f"  Runde angelegt: {code} ({angelegt.get('rezepte')} Rezepte)")
+        with urllib.request.urlopen(anfrage, timeout=timeout) as antwort:
+            status, roh = antwort.status, antwort.read()
     except urllib.error.HTTPError as fehler:
-        print(f"  ANLEGEN FEHLGESCHLAGEN: HTTP {fehler.code} {fehler.read()[:200]}")
-        return
-    except Exception as fehler:
-        print(f"  ANLEGEN FEHLGESCHLAGEN: {str(fehler)[:150]}")
-        return
-
+        status, roh = fehler.code, fehler.read()
+    dauer = int((time.monotonic() - beginn) * 1000)
     try:
-        _, roh = hole(f"{PAIRING}/sitzung/{code}/beitreten", {"teilnehmer": "pruef-gast"})
-        beitritt = json.loads(roh)
-        print(f"  Beigetreten, erhaltene Rezepte: {[r['titel'] for r in beitritt['rezepte']]}")
+        inhalt = json.loads(roh)
+    except Exception:
+        inhalt = {"roh": roh[:200].decode("utf-8", "replace")}
+    return status, inhalt, dauer
 
-        for wer, stimmen in [
-            ("pruef-gastgeber", [{"rezeptId": 1, "mag": True}, {"rezeptId": 2, "mag": True}]),
-            ("pruef-gast", [{"rezeptId": 1, "mag": False}, {"rezeptId": 2, "mag": True}]),
-        ]:
-            _, roh = hole(
-                f"{PAIRING}/sitzung/{code}/stimmen",
-                {"teilnehmer": wer, "stimmen": stimmen, "fertig": True},
-            )
-            print(f"  Stimmen von {wer}: {roh.decode()[:60]}")
 
-        _, roh = hole(f"{PAIRING}/sitzung/{code}")
-        stand = json.loads(roh)
-        print(f"  Stand: {stand['teilnehmer']} Teilnehmer, {stand['fertig']} fertig, "
-              f"alleFertig={stand['alleFertig']}")
-        treffer = [t["titel"] for t in stand.get("treffer", [])]
-        print(f"  Treffer: {treffer}")
-        if treffer == ["Risotto"]:
-            print("  ERWARTUNG ERFUELLT: nur das gemeinsame Rezept")
-        else:
-            print(f"  ABWEICHUNG: erwartet ['Risotto'], bekommen {treffer}")
+def pruefe(bedingung, text):
+    print(f"  {'ok  ' if bedingung else 'FEHLT'} {text}")
+    if not bedingung:
+        abweichungen.append(text)
 
-        _, roh = hole(f"{PAIRING}/sitzung/{code}/schliessen", {"teilnehmer": "pruef-gastgeber"})
-        print(f"  Geschlossen: {roh.decode()[:60]}")
-    except urllib.error.HTTPError as fehler:
-        print(f"  FEHLER: HTTP {fehler.code} {fehler.read()[:250]}")
-    except Exception as fehler:
-        print(f"  FEHLER: {str(fehler)[:200]}")
+
+def karten(praefix, anzahl):
+    return [
+        {
+            "schluessel": f"u{praefix}{nummer:04d}",
+            "titel": f"Rezept {praefix} {nummer}",
+            "quelleUrl": f"https://example.org/{praefix}/{nummer}",
+        }
+        for nummer in range(anzahl)
+    ]
+
+
+def runde(gastgeber_karten, gast_karten):
+    """Spielt eine Runde bis zum fertigen Stapel und gibt zurueck, wie viele Karten er hat."""
+    anna = f"pruef-a-{secrets.token_hex(6)}"
+    beat = f"pruef-b-{secrets.token_hex(6)}"
+    print(f"\n-- Runde mit {gastgeber_karten} + {gast_karten} gespeicherten Rezepten")
+
+    status, stand, _ = ruf("POST", "/v2/sitzung", {
+        "teilnehmer": anna,
+        "einschraenkungen": {"ernaehrung": [], "unvertraeglich": [], "ohne": [], "eigene": []},
+    })
+    pruefe(status == 201, f"eroeffnet (HTTP {status})")
+    if status != 201:
+        print(f"    {stand}")
+        return None
+    code = stand["code"]
+
+    status, stand, _ = ruf("POST", f"/v2/sitzung/{code}/beitreten", {
+        "teilnehmer": beat,
+        "einschraenkungen": {"ernaehrung": [], "unvertraeglich": ["NUESSE"], "ohne": ["PILZE"], "eigene": ["Rosinen"]},
+    })
+    pruefe(status == 200, f"beigetreten (HTTP {status})")
+    pruefe("PILZE" in stand.get("einschraenkungen", {}).get("ohne", []), "wer beitritt, sieht die eigene Abneigung")
+
+    status, stand, _ = ruf("GET", f"/v2/sitzung/{code}?teilnehmer={anna}")
+    angaben = stand.get("einschraenkungen", {})
+    pruefe(
+        "PILZE" in angaben.get("ohne", []) and "NUESSE" in angaben.get("unvertraeglich", [])
+        and "Rosinen" in angaben.get("eigene", []),
+        f"wer eroeffnet hat, bekommt die Abneigungen der anderen Person: {angaben}",
+    )
+
+    ruf("POST", f"/v2/sitzung/{code}/einstellungen", {"teilnehmer": anna, "ziel": 3, "art": "essen", "quelle": "gespeichert"})
+    status, stand, _ = ruf("POST", f"/v2/sitzung/{code}/start", {"teilnehmer": anna})
+    pruefe(stand.get("zustand") == "sammeln", f"gestartet: {stand.get('zustand')} (HTTP {status})")
+    pruefe(
+        "PILZE" in stand.get("einschraenkungen", {}).get("ohne", []),
+        "auch beim Sammeln gelten die Angaben beider",
+    )
+
+    status, stand, dauer = ruf("POST", f"/v2/sitzung/{code}/beitrag", {
+        "teilnehmer": anna, "runde": 0, "rezepte": karten("a", gastgeber_karten),
+    })
+    pruefe(status == 200, f"Beitrag 1 mit {gastgeber_karten} Karten angenommen (HTTP {status}, {dauer} ms)")
+    if status != 200:
+        print(f"    {stand}")
+
+    status, stand, dauer = ruf("POST", f"/v2/sitzung/{code}/beitrag", {
+        "teilnehmer": beat, "runde": 0, "rezepte": karten("b", gast_karten),
+    })
+    pruefe(status == 200, f"Beitrag 2 mit {gast_karten} Karten angenommen (HTTP {status}, {dauer} ms)")
+    if status != 200:
+        print(f"    {stand}")
+
+    status, stand, dauer = ruf("GET", f"/v2/sitzung/{code}?teilnehmer={anna}&runde=-1")
+    stapel = stand.get("stapel") or []
+    eigene = sum(1 for karte in stapel if karte.get("vonMir"))
+    print(f"  Stapel: {len(stapel)} Karten ({eigene} von A, {len(stapel) - eigene} von B), "
+          f"Zustand {stand.get('zustand')}, {dauer} ms")
+
+    ruf("POST", f"/v2/sitzung/{code}/beenden", {"teilnehmer": anna})
+    status, _, _ = ruf("POST", f"/v2/sitzung/{code}/schliessen", {"teilnehmer": anna})
+    pruefe(status == 200, "Runde wieder geloescht")
+    return len(stapel)
 
 
 def main():
-    pruefe_bild(
-        "kochrezepte.at",
-        "https://www.kochrezepte.at/sitemap.xml",
-        r"kochrezepte\.at/[^/]+-rezept-\d+",
-    )
-    pruefe_bild(
-        "gutekueche.ch",
-        "https://www.gutekueche.ch/sitemap.xml.gz",
-        r"gutekueche\.ch/[^/]+-rezept-\d+",
-    )
-    pruefe_pairing()
+    print(f"{'=' * 62}\nPairing-Dienst: {PAIRING}\n{'=' * 62}")
+    status, inhalt, dauer = ruf("GET", "/gesundheit", timeout=20)
+    print(f"  /gesundheit: HTTP {status} {inhalt} ({dauer} ms)")
+    if status != 200:
+        print("  Der Dienst ist nicht erreichbar - mehr laesst sich nicht pruefen.")
+        return 0
+
+    for gastgeber, gast in ((12, 12), (45, 30), (80, 80), (300, 250)):
+        anzahl = runde(gastgeber, gast)
+        if anzahl is not None:
+            print(f"  => im Stapel: {anzahl} von {gastgeber + gast} beigesteuerten Karten")
+
+    print(f"\n{len(abweichungen)} Abweichung(en)")
+    for text in abweichungen:
+        print(f"  - {text}")
     return 0
 
 

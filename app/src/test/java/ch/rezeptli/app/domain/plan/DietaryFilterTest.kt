@@ -112,6 +112,67 @@ class DietaryFilterTest {
     }
 
     @Test
+    fun `Einzahl und Mehrzahl sind beim Stichwort dasselbe`() {
+        val rosinen = DietaryFilter(customDislikes = listOf("Rosinen"))
+        val nuesse = DietaryFilter(customDislikes = listOf("Nüsse"))
+        val aepfel = DietaryFilter(customDislikes = listOf("Äpfel"))
+
+        assertFalse(rosinen.allows(traits(DietClass.VEGAN, words = setOf("rosine", "hafer"))))
+        assertFalse(nuesse.allows(traits(DietClass.VEGAN, words = setOf("haselnuss"))))
+        assertFalse(nuesse.allows(traits(DietClass.VEGAN, words = setOf("baumnuesse"))))
+        assertFalse(aepfel.allows(traits(DietClass.VEGAN, words = setOf("apfelmus"))))
+        // Ein kurzes Wort bleibt, wie es ist - "Reis" soll nicht jedes "Rei..." treffen.
+        assertTrue(
+            DietaryFilter(customDislikes = listOf("Reis")).allows(traits(DietClass.VEGAN, words = setOf("reibkaese"))),
+        )
+    }
+
+    @Test
+    fun `Schweizer und hochdeutscher Name meinen dasselbe`() {
+        val rueebli = DietaryFilter(customDislikes = listOf("Rüebli"))
+        val karotten = DietaryFilter(customDislikes = listOf("Karotten"))
+        val classifier = RecipeClassifier()
+
+        fun rezept(zutat: String) = classifier.classify(
+            ch.rezeptli.app.domain.model.Recipe(
+                title = "Suppe",
+                ingredients = listOf(
+                    ch.rezeptli.app.domain.parser
+                        .IngredientTextParser()
+                        .parseLine(zutat)!!
+                        .toIngredient(),
+                ),
+            ),
+        )
+
+        assertFalse(rueebli.allows(rezept("300 g Karotten")))
+        assertFalse(rueebli.allows(rezept("300 g Rüebli")))
+        assertFalse(karotten.allows(rezept("300 g Rüebli")))
+        assertTrue(karotten.allows(rezept("300 g Lauch")))
+    }
+
+    @Test
+    fun `wer eine ganze Gruppe eintippt, meint die Gruppe`() {
+        val pilze = DietaryFilter(customDislikes = listOf("Pilze"))
+        val fisch = DietaryFilter(customDislikes = listOf("fisch"))
+
+        // "Champignons" enthaelt das Wort "Pilze" nicht - gemeint sind sie trotzdem.
+        assertFalse(
+            pilze.allows(traits(DietClass.VEGAN, dislikes = setOf(Dislike.PILZE), words = setOf("champignons"))),
+        )
+        assertFalse(fisch.allows(traits(DietClass.FISCH, dislikes = setOf(Dislike.FISCH), words = setOf("thon"))))
+        assertTrue(pilze.allows(traits(DietClass.VEGAN, words = setOf("zucchetti"))))
+        // Ein einzelner Pilz ist keine Gruppe: Wer "Champignons" schreibt, meint Champignons.
+        val champignons = DietaryFilter(customDislikes = listOf("Champignons"))
+        assertTrue(
+            champignons.allows(traits(DietClass.VEGAN, dislikes = setOf(Dislike.PILZE), words = setOf("steinpilze"))),
+        )
+        assertFalse(
+            champignons.allows(traits(DietClass.VEGAN, dislikes = setOf(Dislike.PILZE), words = setOf("champignon"))),
+        )
+    }
+
+    @Test
     fun `Umlaute und Grossschreibung spielen beim Stichwort keine Rolle`() {
         val filter = DietaryFilter(customDislikes = listOf("KÜRBIS"))
 

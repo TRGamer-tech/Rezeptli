@@ -9,12 +9,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
@@ -25,6 +22,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ch.rezeptli.app.presentation.common.components.KeyboardAwareScaffold
 import ch.rezeptli.app.presentation.common.theme.RezeptliTheme
 import ch.rezeptli.app.presentation.cooking.CookingRoute
 import ch.rezeptli.app.presentation.deck.DeckRoute
@@ -62,13 +60,14 @@ fun RezeptliNavHost(
     val openShoppingItems by shell.openShoppingItems.collectAsStateWithLifecycle()
     val motion = RezeptliTheme.motion
 
-    Scaffold(
-        bottomBar = {
+    KeyboardAwareScaffold(
+        bottomBar = { tastaturOffen ->
             // Die Leiste steht nur auf den Hauptbildschirmen. Beim Wischen einer
             // gemeinsamen Runde oder im Kochmodus waere sie ein Ausrutscher zu viel.
             // Sie gleitet hinaus und wieder herein, statt einfach zu verschwinden.
+            // Solange getippt wird, macht sie der Tastatur Platz.
             AnimatedVisibility(
-                visible = zeigtLeiste(backStackEntry?.destination?.route),
+                visible = zeigtLeiste(backStackEntry?.destination?.route) && !tastaturOffen,
                 enter = if (motion.reduced) {
                     fadeIn(motion.fade())
                 } else {
@@ -83,11 +82,12 @@ fun RezeptliNavHost(
                 RezeptliBottomBar(navController = navController, openShoppingItems = openShoppingItems)
             }
         },
-    ) { leistenAbstand ->
+    ) { platz ->
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.padding(leistenAbstand),
+            // Ueber der Leiste - und ueber der Tastatur, damit sie kein Eingabefeld verdeckt.
+            modifier = platz,
             // Vorwaerts schiebt sich der neue Bildschirm von der Seite herein, zurueck
             // gleitet er wieder hinaus. Zwischen Tabs gibt es keine Richtung - dort
             // blendet der Inhalt nur weich ueber.

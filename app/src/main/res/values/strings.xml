@@ -333,4 +333,12 @@
     <string name="timer_kanal_laeuft_beschreibung">Zeigt die Restzeit, solange ein Timer aus dem Kochmodus läuft.</string>
     <string name="timer_kanal_um">Kochtimer abgelaufen</string>
     <string name="timer_kanal_um_beschreibung">Meldet sich, wenn die Zeit um ist. Geklingelt wird mit dem Weckton deines Telefons.</string>
+
+    <!-- Schlagworte im Filter -->
+    <string name="tags_alle_anzeigen">Alle %1$d anzeigen</string>
+    <string name="tags_weniger_anzeigen">Weniger anzeigen</string>
+    <plurals name="swipe_setup_versteckt">
+        <item quantity="one">%d Rezept passt nicht zu deinen Vorlieben und bleibt draussen.</item>
+        <item quantity="other">%d Rezepte passen nicht zu deinen Vorlieben und bleiben draussen.</item>
+    </plurals>
 </resources>

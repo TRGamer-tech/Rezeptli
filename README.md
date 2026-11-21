@@ -29,7 +29,8 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
   nicht vorgeschlagen wurde. Was der Plan holt, landet nicht ungefragt in der Sammlung.
   Abwechslung ist eingebaut: Was in den letzten zwei Wochen gekocht wurde, kommt erst
   wieder, wenn sonst nichts passt, und ein neu gebauter Plan bringt andere Gerichte als
-  der alte.
+  der alte. Ändern sich die Vorlieben, bleibt die Woche stehen; eine Mahlzeit, die nicht
+  mehr passt, ist markiert und lässt sich mit einem Tipp tauschen.
 - **Einkaufsliste mit Packungen** – ein eigener Tab. Bedarf in der Menge des Rezepts,
   darunter die Packung, die man kauft, und der geschätzte Preis. Abgehaktes sinkt ans Ende
   der Gruppe; die Liste lässt sich kopieren und teilen und um eigene Posten ergänzen. Auf
@@ -37,16 +38,21 @@ gemeinsam mit jemandem entscheiden. Beides ist freiwillig, beides steht unten un
   und dann fragt die App, für wie viele Personen, und rechnet die Mengen um.
 - **Zu zweit wischen** – eine Person eröffnet und bekommt sofort den Code; sie legt fest,
   wie viele Gerichte gesucht werden und ob Essen, Getränke oder beides. Beide wischen
-  denselben Stapel – zuerst die gespeicherten Rezepte beider, auf Wunsch danach neue. Was
-  eine Person nicht isst, gilt für beide. Sobald genug gemeinsame Treffer da sind, ist
+  denselben Stapel – zuerst alle gespeicherten Rezepte beider, die für beide passen, auf
+  Wunsch danach neue in kleinen Stapeln. Was eine Person nicht isst, gilt für beide. Sobald genug gemeinsame Treffer da sind, ist
   Schluss; sie lassen sich in die eigene Sammlung, in den Wochenplan und auf die
   Einkaufsliste übernehmen – auch ein Rezept, das die andere Person selbst erfasst hat.
   Doppelt angelegt wird dabei nichts. Mit *Woche überschreiben* ersetzen die Treffer den
   bisherigen Plan; für jedes Gericht wählt man den Tag. Schickt ein Telefon seine Karten
-  nicht, geht es nach einer Minute ohne es weiter.
+  nicht, geht es nach einer Minute ohne es weiter. *Fertig* beendet die Runde; nachgefragt
+  wird nur, wenn mit den Treffern noch nichts geschehen ist – dann wären sie verloren.
 - **Wischen allein** – Kartenstapel aus dem Rezeptverzeichnis: nur Neues (nichts, was
   schon gespeichert ist), wahlweise Essen, Getränke oder beides. Ein Tipp auf die Karte
-  zeigt Quelle und Zutaten, die letzte Entscheidung lässt sich zurücknehmen.
+  zeigt Quelle und Zutaten, die letzte Entscheidung lässt sich zurücknehmen. Die
+  Vorlieben gelten sofort – auch für eine Runde, die schon läuft – und ebenso beim
+  Wischen durch die eigene Sammlung. Geprüft wird an Titel und Zutaten; Fleisch, Fisch und
+  was du nicht magst, auch an der Zubereitung, falls die Zutatenliste einer Seite lückenhaft
+  ist.
 - **Kalorien und Eiweiss** – unter jeder Zutatenliste, im Rezept wie beim Antippen einer
   Wischkarte: pro Portion in kcal und Gramm. Nennt die Rezeptseite die Werte, gelten ihre;
   sonst schätzt die App aus den Zutaten und schreibt „ca.“ und „geschätzt“ dazu.
@@ -127,7 +133,7 @@ enthält Rezepttitel und Adressen der unterstützten Quellen und ist für alle d
 daraus lässt sich nicht ablesen, wonach du suchst.
 
 **Wenn du zu zweit entscheidest**, gehen an unseren Pairing-Dienst: die Titel der Rezepte
-der Runde (zuerst die eurer gespeicherten Rezepte, die für beide passen), eure
+der Runde (zuerst die aller eurer gespeicherten Rezepte, die für beide passen), eure
 Entscheidungen dazu, und was ihr für die Runde ausschliesst – Ernährungsform,
 Unverträglichkeiten, Abneigungen. Das zweite Telefon muss davon erfahren, damit "kein
 Fisch" der einen Person auch für die andere gilt; gespeichert wird es für beide

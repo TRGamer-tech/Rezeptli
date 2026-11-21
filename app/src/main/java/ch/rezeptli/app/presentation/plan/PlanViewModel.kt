@@ -2,6 +2,7 @@ package ch.rezeptli.app.presentation.plan
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ch.rezeptli.app.domain.plan.FindUnfittingMealsUseCase
 import ch.rezeptli.app.domain.plan.ObservePlanUseCase
 import ch.rezeptli.app.domain.plan.PlanEntry
 import ch.rezeptli.app.domain.plan.PlanPlace
@@ -50,6 +51,8 @@ data class PlanUiState(
     val comparisons: List<StoreEstimate> = emptyList(),
     val replacing: PlanPlace? = null,
     val showRebuildDialog: Boolean = false,
+    /** Mahlzeiten, die nicht (mehr) zu den Vorlieben passen - etwa nach einer neuen Abneigung. */
+    val unfitting: Set<PlanPlace> = emptySet(),
 ) {
     val hasPlan: Boolean get() = meals.isNotEmpty()
 
@@ -82,15 +85,22 @@ class PlanViewModel @Inject constructor(
     observePlan: ObservePlanUseCase,
     observeShoppingList: ObserveShoppingListUseCase,
     private val replaceMeal: ReplaceMealUseCase,
+    findUnfittingMeals: FindUnfittingMealsUseCase,
 ) : ViewModel() {
     private val local = MutableStateFlow(LocalState())
+
+    /** Neu bestimmt, sobald sich der Plan oder die Vorlieben aendern. */
+    private val unfitting = combine(profileRepository.profile, observePlan()) { profile, meals ->
+        findUnfittingMeals(meals, profile)
+    }
 
     val uiState: StateFlow<PlanUiState> = combine(
         profileRepository.profile,
         observePlan(),
         observeShoppingList(),
         local,
-    ) { profile, meals, items, state ->
+        unfitting,
+    ) { profile, meals, items, state, unpassend ->
         val planItems = items.filter { it.fromPlan }
         val cost = planItems.sumOf { it.price ?: 0.0 }
         PlanUiState(
@@ -107,6 +117,7 @@ class PlanViewModel @Inject constructor(
             comparisons = StoreComparison.of(profile, cost),
             replacing = state.replacing,
             showRebuildDialog = state.showRebuildDialog,
+            unfitting = unpassend,
         )
     }.stateIn(
         scope = viewModelScope,

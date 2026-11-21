@@ -6,13 +6,16 @@ import ch.rezeptli.app.domain.model.IngredientUnit
 import ch.rezeptli.app.domain.model.Recipe
 import ch.rezeptli.app.domain.nutrition.NutritionBasis
 import ch.rezeptli.app.domain.nutrition.NutritionValue
+import ch.rezeptli.app.domain.plan.RecipeClassifier
 import ch.rezeptli.app.domain.swipe.SwipeMatcher
 import ch.rezeptli.app.domain.usecase.FinishSwipeSessionUseCase
 import ch.rezeptli.app.domain.usecase.RecordSwipeUseCase
+import ch.rezeptli.app.domain.usecase.SelectSwipeRecipesUseCase
 import ch.rezeptli.app.domain.usecase.StartSwipeSessionUseCase
 import ch.rezeptli.app.domain.usecase.UndoLastSwipeUseCase
 import ch.rezeptli.app.fake.FakeRecipeRepository
 import ch.rezeptli.app.fake.FakeSwipeSessionRepository
+import ch.rezeptli.app.fake.FakeUserProfileRepository
 import ch.rezeptli.app.util.MainDispatcherExtension
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -55,11 +58,15 @@ class SwipeViewModelTest {
         ),
     )
     private val sessionRepository = FakeSwipeSessionRepository()
+    private val profileRepository = FakeUserProfileRepository()
     private val matcher = SwipeMatcher()
 
     private fun createViewModel(savedStateHandle: SavedStateHandle = SavedStateHandle()) = SwipeViewModel(
         savedStateHandle = savedStateHandle,
-        startSwipeSession = StartSwipeSessionUseCase(recipeRepository, sessionRepository),
+        startSwipeSession = StartSwipeSessionUseCase(
+            SelectSwipeRecipesUseCase(recipeRepository, profileRepository, RecipeClassifier()),
+            sessionRepository,
+        ),
         recordSwipe = RecordSwipeUseCase(sessionRepository),
         undoLastSwipe = UndoLastSwipeUseCase(sessionRepository),
         finishSwipeSession = FinishSwipeSessionUseCase(sessionRepository),

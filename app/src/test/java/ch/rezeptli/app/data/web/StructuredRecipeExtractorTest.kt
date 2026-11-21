@@ -273,6 +273,30 @@ class StructuredRecipeExtractorTest {
         assertEquals("Faschiertes anbraten.", recipe?.instructionSteps?.first())
     }
 
+    @Test
+    fun `liest Microdata auch aus meta-Elementen und bei mehreren Namen im itemprop`() {
+        // Zwei Schreibweisen, an denen ein Vergleich auf Gleichheit und auf sichtbaren Text
+        // scheitert: der Wert im content eines unsichtbaren meta-Elements, und ein itemprop,
+        // das zwei Namen traegt.
+        val seite = page(
+            body = """
+            <div itemscope itemtype="https://schema.org/Recipe">
+              <meta itemprop="name" content="Schwammerlgulasch">
+              <meta itemprop="recipeIngredient" content="500 g Eierschwammerl">
+              <li itemprop="ingredients recipeIngredient">1 Zwiebel</li>
+              <meta itemprop="recipeInstructions" content="Schwammerl putzen und mit der Zwiebel anbraten.">
+            </div>
+            """.trimIndent(),
+        )
+
+        val recipe = extractor.extract(seite, "https://www.ichkoche.at/x-rezept-2", "ichkoche.at")
+
+        assertNotNull(recipe)
+        assertEquals("Schwammerlgulasch", recipe?.title)
+        assertEquals(listOf("500 g Eierschwammerl", "1 Zwiebel"), recipe?.ingredientLines)
+        assertEquals(listOf("Schwammerl putzen und mit der Zwiebel anbraten."), recipe?.instructionSteps)
+    }
+
     @Nested
     @DisplayName("Bildadressen")
     inner class Bildadressen {

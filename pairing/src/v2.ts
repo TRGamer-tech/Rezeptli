@@ -58,8 +58,16 @@ import {
 const FASSUNG = 2;
 const TEILNEHMER = 2;
 
-/** So viele Karten darf eine Person je Runde beisteuern. */
-const MAX_BEITRAG = 80;
+/**
+ * So viele Karten darf eine Person je Runde beisteuern.
+ *
+ * Wer mit den gespeicherten Rezepten beginnt, bringt die ganze Sammlung mit - das waren
+ * frueher hoechstens achtzig Karten, und was darueber lag, fiel still weg.
+ */
+const MAX_BEITRAG = 500;
+
+/** So viele Karten gehen in einem Zug in die Datenbank - groessere Beitraege in mehreren. */
+const KARTEN_JE_ZUG = 80;
 const MAX_ZIEL = 20;
 const MAX_STIMMEN_JE_ANFRAGE = 200;
 
@@ -541,20 +549,30 @@ async function beitragen(sitzung: Sitzung, kennung: string, rumpf: Record<string
         const versatz = sitzung.gastgeber === kennung ? 0 : 1;
         const code = sitzung.code;
 
-        await env.DB.batch([
-            ...karten.map((karte, index) =>
-                env.DB.prepare(KARTE_EINFUEGEN).bind(
-                    code,
-                    index * 2 + versatz,
-                    karte.titel,
-                    karte.quelleUrl,
-                    karte.bildUrl,
-                    karte.zubereitungszeit,
-                    runde,
-                    kennung,
-                    karte.schluessel,
-                ),
+        const einfuegen = karten.map((karte, index) =>
+            env.DB.prepare(KARTE_EINFUEGEN).bind(
+                code,
+                index * 2 + versatz,
+                karte.titel,
+                karte.quelleUrl,
+                karte.bildUrl,
+                karte.zubereitungszeit,
+                runde,
+                kennung,
+                karte.schluessel,
             ),
+        );
+
+        // Eine grosse Sammlung geht in mehreren Zuegen hinein. Erst der letzte vermerkt den
+        // Beitrag und laesst die Runde beginnen - bricht es vorher ab, schickt das Telefon
+        // alles noch einmal, und was schon liegt, kommt kein zweites Mal hinein.
+        const letzterZug = einfuegen.splice(Math.max(0, einfuegen.length - KARTEN_JE_ZUG));
+        for (let anfang = 0; anfang < einfuegen.length; anfang += KARTEN_JE_ZUG) {
+            await env.DB.batch(einfuegen.slice(anfang, anfang + KARTEN_JE_ZUG));
+        }
+
+        await env.DB.batch([
+            ...letzterZug,
             env.DB.prepare(BEITRAG_VERMERKEN).bind(code, kennung, runde),
             env.DB.prepare(FRIST_STARTEN).bind(code, jetzt()),
             env.DB.prepare(STAPEL_STEHT).bind(code),

@@ -233,6 +233,35 @@ class GeneratePlanUseCase @Inject constructor(
 }
 
 /**
+ * Findet die Mahlzeiten des Plans, die nicht (mehr) zu den Vorlieben passen.
+ *
+ * Der Plan bleibt stehen, wenn sich die Vorlieben aendern - das Antippen einer Abneigung soll
+ * einem nicht die Woche unter den Fuessen wegziehen. Nur: Wer "keine Pilze" waehlt und am
+ * Mittwoch weiter das Pilzrisotto stehen hat, haelt den Filter fuer kaputt. Darum sagt die
+ * Plan-Seite bei solchen Mahlzeiten, dass sie nicht mehr passen; tauschen kann man sie dort
+ * mit einem Tipp.
+ *
+ * Was schon gekocht ist, wird nicht mehr beanstandet. Dasselbe gilt fuer Mahlzeiten, die man
+ * selbst eingeplant hat, nicht: Der Hinweis stimmt auch dann, und er aendert nichts.
+ */
+class FindUnfittingMealsUseCase @Inject constructor(
+    private val recipeRepository: RecipeRepository,
+    private val classifier: RecipeClassifier,
+) {
+    suspend operator fun invoke(meals: List<PlanEntry>, profile: UserProfile): Set<PlanPlace> {
+        val rules = CardRules.of(profile)
+        if (!rules.filter.isActive && rules.kitchen.isEmpty()) return emptySet()
+
+        return meals
+            .filterNot { it.isCooked }
+            .mapNotNull { meal ->
+                val recipe = recipeRepository.getRecipe(meal.recipeId) ?: return@mapNotNull null
+                meal.place.takeUnless { rules.allows(classifier.classify(recipe)) }
+            }.toSet()
+    }
+}
+
+/**
  * Tauscht eine Mahlzeit gegen ein anderes passendes Rezept.
  *
  * Das verworfene Rezept merkt sich der Plan: Es kommt in dieser Woche nicht wieder. Geht

@@ -87,7 +87,8 @@ class RecipeListViewModelTest {
         // Anzahl noch bei den Tags.
         assertEquals(2, state.totalRecipeCount)
         assertTrue(state.hasAnyRecipes)
-        assertEquals(listOf("schnell", "vegetarisch"), state.availableTags)
+        // Die meistbenutzten zuerst: "vegetarisch" tragen beide Rezepte, "schnell" nur eines.
+        assertEquals(listOf("vegetarisch", "schnell"), state.availableTags)
     }
 
     @Test

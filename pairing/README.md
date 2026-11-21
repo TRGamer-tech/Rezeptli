@@ -117,6 +117,22 @@ weicht ab); hat sich seit `stand` nichts getan, kommt nur `unveraendert`.
 Trifft eine App auf eine Runde der anderen Fassung, antwortet der Dienst mit
 `426` - "bitte aktualisieren" statt einer Runde, die nur halb funktioniert.
 
+## Wie viele Karten eine Person mitbringt
+
+Beginnt die Runde mit den gespeicherten Rezepten, bringt jedes Telefon seine **ganze
+Sammlung** mit - soweit sie zu den Angaben beider passt. Frueher waren es hoechstens
+60 je Telefon, und der Dienst schnitt bei 80 still ab: Wer mehr gespeichert hatte, sah
+nur einen Ausschnitt und wurde danach schon nach neuen Rezepten gefragt.
+
+Jetzt nimmt der Dienst bis zu 500 Karten je Person und Runde an (`MAX_BEITRAG`). Eine
+grosse Sammlung geht in mehreren Zuegen in die Datenbank (`KARTEN_JE_ZUG`); erst der
+letzte vermerkt den Beitrag und laesst die Runde beginnen. Bricht es vorher ab, schickt
+das Telefon alles noch einmal - was schon liegt, kommt kein zweites Mal hinein.
+
+Neue Rezepte kommen weiter in kleinen Stapeln (in der App: zwoelf Karten je Telefon,
+bei hohen Zielen mehr). Stimmen liest der Dienst hoechstens 200 je Anfrage; die App
+schickt sie nach einem Funkloch deshalb in Portionen.
+
 ## Warum eine Runde nicht ewig auf Karten wartet
 
 Schickte ein Telefon seine Karten nie - Funkloch, App geschlossen, Akku leer -,

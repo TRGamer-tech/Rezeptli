@@ -10,6 +10,7 @@ import ch.rezeptli.app.domain.multiplayer.SharedSelectionHolder
 import ch.rezeptli.app.domain.plan.CardRules
 import ch.rezeptli.app.domain.plan.CheckRecipeCardUseCase
 import ch.rezeptli.app.domain.plan.CourseChoice
+import ch.rezeptli.app.domain.plan.DietaryFilter
 import ch.rezeptli.app.domain.plan.ReadRecipeCardUseCase
 import ch.rezeptli.app.domain.profile.LanguageRegion
 import ch.rezeptli.app.domain.repository.RecipeRepository
@@ -24,7 +25,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -519,6 +522,47 @@ class DeckViewModel @Inject constructor(
                     beendenWennNichtsMehrKommt()
                 }
             }
+        }
+    }
+
+    /**
+     * Zieht den Stapel neu, wenn sich die Vorlieben geaendert haben, waehrend eine Runde laeuft.
+     *
+     * Gemeldet war: Pilzgerichte trotz "keine Pilze". Die Regeln einer Runde wurden nur beim
+     * Start gelesen - und dieser Stapel bleibt liegen, wenn man zum Tab "Vorlieben" wechselt.
+     * Wer mitten in der Runde etwas ausschloss, sah es danach weiter.
+     *
+     * Was schon gefallen hat, bleibt. Die offenen Karten gehen zurueck in den Vorrat und werden
+     * nach den neuen Regeln neu gezogen und geprueft: Eine Karte, die unter den alten Regeln
+     * bestanden hat, gilt damit nicht als bestanden.
+     */
+    private suspend fun vorliebenUebernehmen() {
+        val state = _uiState.value
+        if (state.step != DeckStep.WISCHEN && state.step != DeckStep.LADEN) return
+        val rules = CardRules.of(profileRepository.profile.first(), state.course)
+        if (rules == state.rules) return
+
+        if (state.step == DeckStep.LADEN) {
+            // Der Stapel wird gerade erst gezogen - dann gleich mit den neuen Angaben.
+            onStart()
+            return
+        }
+
+        neueRunde()
+        gesehen -= state.cards.map { it.url }.toSet()
+        pruefungVersucht.clear()
+        region = if (rules.needsPage) LanguageRegion.DEUTSCH else null
+        _uiState.update { it.copy(rules = rules, approved = emptySet(), cards = emptyList(), canUndo = false) }
+        refillWennNoetig()
+    }
+
+    // Steht am Ende der Klasse, damit beim ersten Wert alle Felder oben schon bereit sind.
+    init {
+        viewModelScope.launch {
+            profileRepository.profile
+                .map { DietaryFilter.of(it) to it.appliances }
+                .distinctUntilChanged()
+                .collect { vorliebenUebernehmen() }
         }
     }
 
